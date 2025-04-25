@@ -10,6 +10,9 @@ const userController = require('../controllers/userController');
 // Import utilities
 const dataMigration = require('../utils/data-migration');
 
+// Import middleware
+const { auth, optionalAuth } = require('../middleware/auth');
+
 // Test route
 router.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });
@@ -66,23 +69,25 @@ router.post('/openai/images', async (req, res) => {
 });
 
 // Workflow routes
-router.get('/workflows', workflowController.getAllWorkflows);
-router.get('/workflows/:id', workflowController.getWorkflowById);
-router.post('/workflows', workflowController.createWorkflow);
-router.put('/workflows/:id', workflowController.updateWorkflow);
-router.delete('/workflows/:id', workflowController.deleteWorkflow);
+router.get('/workflows', optionalAuth, workflowController.getAllWorkflows);
+router.get('/workflows/:id', optionalAuth, workflowController.getWorkflowById);
+router.post('/workflows', auth, workflowController.createWorkflow);
+router.put('/workflows/:id', auth, workflowController.updateWorkflow);
+router.delete('/workflows/:id', auth, workflowController.deleteWorkflow);
 
 // Node routes
-router.get('/nodes', nodeController.getAllNodes);
-router.get('/nodes/:id', nodeController.getNodeById);
-router.post('/nodes', nodeController.createNode);
-router.put('/nodes/:id', nodeController.updateNode);
-router.delete('/nodes/:id', nodeController.deleteNode);
+router.get('/nodes', optionalAuth, nodeController.getAllNodes);
+router.get('/nodes/:id', optionalAuth, nodeController.getNodeById);
+router.post('/nodes', auth, nodeController.createNode);
+router.put('/nodes/:id', auth, nodeController.updateNode);
+router.delete('/nodes/:id', auth, nodeController.deleteNode);
 
 // User routes
 router.post('/users/register', userController.register);
 router.post('/users/login', userController.login);
-router.get('/users/profile', userController.getProfile);
-router.put('/users/profile', userController.updateProfile);
+router.get('/users/profile', auth, userController.getProfile);
+router.put('/users/profile', auth, userController.updateProfile);
+router.post('/users/logout', auth, userController.logout);
+router.post('/users/logoutAll', auth, userController.logoutAll);
 
 module.exports = router;

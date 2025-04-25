@@ -101,12 +101,12 @@ async function handleLogin() {
   }
 
   try {
-    // Check credentials with the server
-    const isValid = await checkCredentials(username, password);
+    // Try to login with the API
+    const userData = await checkCredentials(username, password);
 
-    if (isValid) {
+    if (userData) {
       // Save login state
-      setLoggedIn(true, username, rememberMe);
+      setLoggedIn(userData, rememberMe);
 
       // Redirect to the main app
       redirectToApp();
@@ -143,15 +143,14 @@ async function checkCredentials(username, password) {
   try {
     // Try to call the login API
     try {
+      // Call the login API
       const userData = await ApiService.users.login({
         username,
         password
       });
 
-      // Store user data in localStorage
-      localStorage.setItem('user_profile', JSON.stringify(userData));
-
-      return true;
+      // Return the user data and token
+      return userData;
     } catch (apiError) {
       console.warn('API login failed, falling back to local validation:', apiError);
 
@@ -168,23 +167,27 @@ async function checkCredentials(username, password) {
       );
 
       if (isValid) {
-        // Create mock user data
-        const mockUserData = {
+        // Create mock user data and token
+        const mockToken = `local-token-${Date.now()}`;
+        const mockUser = {
           id: `local-${Date.now()}`,
           username,
           email: `${username}@example.com`,
           createdAt: new Date()
         };
 
-        // Store mock user data
-        localStorage.setItem('user_profile', JSON.stringify(mockUserData));
+        // Return mock user data and token
+        return {
+          user: mockUser,
+          token: mockToken
+        };
       }
 
-      return isValid;
+      return null;
     }
   } catch (error) {
     console.error('Login error:', error);
-    return false;
+    return null;
   }
 }
 
@@ -198,15 +201,23 @@ function showError(message) {
 }
 
 // Set the logged in state
-function setLoggedIn(isLoggedIn, username, rememberMe) {
-  // Generate a dummy token (in a real app, this would come from the server)
-  const token = `dummy-token-${Date.now()}`;
+function setLoggedIn(userData, rememberMe) {
+  // Get the token from the response
+  const { user, token } = userData;
+
+  if (!token) {
+    console.error('No token provided');
+    return;
+  }
+
+  // Store user data
+  localStorage.setItem('user_profile', JSON.stringify(user));
 
   if (rememberMe) {
     // Store in localStorage (persists between sessions)
     localStorage.setItem('auth_token', token);
     localStorage.setItem('rememberMe', 'true');
-    localStorage.setItem('savedUsername', username);
+    localStorage.setItem('savedUsername', user.username);
   } else {
     // Store in sessionStorage (cleared when browser is closed)
     sessionStorage.setItem('auth_token', token);

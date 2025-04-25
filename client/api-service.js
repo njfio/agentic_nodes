@@ -13,43 +13,43 @@ const ApiService = {
    */
   async request(endpoint, method = 'GET', data = null) {
     const url = `${Config.apiBaseUrl}${endpoint}`;
-    
+
     const options = {
       method,
       headers: {
         'Content-Type': 'application/json'
       }
     };
-    
+
     // Add auth token if available
     const token = localStorage.getItem(Config.storageKeys.authToken);
     if (token) {
       options.headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     // Add request body for non-GET requests
     if (method !== 'GET' && data) {
       options.body = JSON.stringify(data);
     }
-    
+
     try {
       const response = await fetch(url, options);
-      
+
       // Handle non-JSON responses
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const responseData = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(responseData.message || 'API request failed');
         }
-        
+
         return responseData;
       } else {
         if (!response.ok) {
           throw new Error('API request failed');
         }
-        
+
         return await response.text();
       }
     } catch (error) {
@@ -57,7 +57,7 @@ const ApiService = {
       throw error;
     }
   },
-  
+
   // OpenAI API calls
   openai: {
     /**
@@ -68,7 +68,7 @@ const ApiService = {
     async chat(data) {
       return ApiService.request('/openai/chat', 'POST', data);
     },
-    
+
     /**
      * Call the OpenAI Image Generation API
      * @param {object} data - Request data
@@ -78,7 +78,7 @@ const ApiService = {
       return ApiService.request('/openai/images', 'POST', data);
     }
   },
-  
+
   // Workflow API calls
   workflows: {
     /**
@@ -88,7 +88,7 @@ const ApiService = {
     async getAll() {
       return ApiService.request('/workflows');
     },
-    
+
     /**
      * Get a workflow by ID
      * @param {string} id - Workflow ID
@@ -97,7 +97,7 @@ const ApiService = {
     async getById(id) {
       return ApiService.request(`/workflows/${id}`);
     },
-    
+
     /**
      * Create a new workflow
      * @param {object} workflow - Workflow data
@@ -106,7 +106,7 @@ const ApiService = {
     async create(workflow) {
       return ApiService.request('/workflows', 'POST', workflow);
     },
-    
+
     /**
      * Update a workflow
      * @param {string} id - Workflow ID
@@ -116,7 +116,7 @@ const ApiService = {
     async update(id, workflow) {
       return ApiService.request(`/workflows/${id}`, 'PUT', workflow);
     },
-    
+
     /**
      * Delete a workflow
      * @param {string} id - Workflow ID
@@ -126,7 +126,7 @@ const ApiService = {
       return ApiService.request(`/workflows/${id}`, 'DELETE');
     }
   },
-  
+
   // Node API calls
   nodes: {
     /**
@@ -136,7 +136,7 @@ const ApiService = {
     async getAll() {
       return ApiService.request('/nodes');
     },
-    
+
     /**
      * Get a node by ID
      * @param {string} id - Node ID
@@ -145,7 +145,7 @@ const ApiService = {
     async getById(id) {
       return ApiService.request(`/nodes/${id}`);
     },
-    
+
     /**
      * Create a new node
      * @param {object} node - Node data
@@ -154,7 +154,7 @@ const ApiService = {
     async create(node) {
       return ApiService.request('/nodes', 'POST', node);
     },
-    
+
     /**
      * Update a node
      * @param {string} id - Node ID
@@ -164,7 +164,7 @@ const ApiService = {
     async update(id, node) {
       return ApiService.request(`/nodes/${id}`, 'PUT', node);
     },
-    
+
     /**
      * Delete a node
      * @param {string} id - Node ID
@@ -174,7 +174,7 @@ const ApiService = {
       return ApiService.request(`/nodes/${id}`, 'DELETE');
     }
   },
-  
+
   // User API calls
   users: {
     /**
@@ -185,7 +185,7 @@ const ApiService = {
     async register(userData) {
       return ApiService.request('/users/register', 'POST', userData);
     },
-    
+
     /**
      * Login a user
      * @param {object} credentials - User login credentials
@@ -194,7 +194,7 @@ const ApiService = {
     async login(credentials) {
       return ApiService.request('/users/login', 'POST', credentials);
     },
-    
+
     /**
      * Get user profile
      * @returns {Promise} - Promise with user profile data
@@ -202,7 +202,7 @@ const ApiService = {
     async getProfile() {
       return ApiService.request('/users/profile');
     },
-    
+
     /**
      * Update user profile
      * @param {object} profileData - Updated profile data
@@ -210,6 +210,22 @@ const ApiService = {
      */
     async updateProfile(profileData) {
       return ApiService.request('/users/profile', 'PUT', profileData);
+    },
+
+    /**
+     * Logout user
+     * @returns {Promise} - Promise with logout confirmation
+     */
+    async logout() {
+      return ApiService.request('/users/logout', 'POST');
+    },
+
+    /**
+     * Logout from all devices
+     * @returns {Promise} - Promise with logout confirmation
+     */
+    async logoutAll() {
+      return ApiService.request('/users/logoutAll', 'POST');
     }
   }
 };

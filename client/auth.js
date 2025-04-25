@@ -69,14 +69,23 @@ const Auth = {
   },
 
   // Log out the user
-  logout() {
-    // Clear the auth data
-    localStorage.removeItem('auth_token');
-    sessionStorage.removeItem('auth_token');
-    localStorage.removeItem('user_profile');
+  async logout() {
+    try {
+      // Call the logout API if available
+      if (typeof ApiService !== 'undefined') {
+        await ApiService.users.logout();
+      }
+    } catch (error) {
+      console.error('Error logging out:', error);
+    } finally {
+      // Clear the auth data
+      localStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_token');
+      localStorage.removeItem('user_profile');
 
-    // Redirect to the login page
-    this.redirectToLogin();
+      // Redirect to the login page
+      this.redirectToLogin();
+    }
   },
 
   // Add the user info and logout button to the toolbar
