@@ -556,6 +556,58 @@ kbd {
   100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0); }
 }
 
+/* Mini-map styles */
+.mini-map {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  width: 200px;
+  height: 150px;
+  background-color: rgba(46, 46, 46, 0.9);
+  border: 1px solid #444;
+  border-radius: 8px;
+  z-index: 90;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+}
+
+.mini-map.collapsed {
+  height: 30px;
+}
+
+.mini-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background-color: #333;
+  border-bottom: 1px solid #444;
+  cursor: move;
+}
+
+.mini-map-toggle {
+  background: none;
+  border: none;
+  color: #eee;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 5px;
+}
+
+#miniMapCanvas {
+  width: 100%;
+  height: calc(100% - 30px);
+  background-color: #1e1e1e;
+}
+
+.mini-map-viewport {
+  position: absolute;
+  border: 2px solid #4a90e2;
+  background-color: rgba(74, 144, 226, 0.1);
+  pointer-events: none;
+}
+
 /* Status indicators */
 .api-status {
   position: fixed;

@@ -11,9 +11,12 @@
 <body>
   <div id="toolbar">
     <button id="addNodeBtn" type="button">Add Node</button>
+    <button id="testWorkflowBtn" type="button">Test Workflow</button>
     <button id="configBtn" type="button">OpenAI Config</button>
     <button id="saveBtn" type="button">Save Canvas</button>
     <button id="loadBtn" type="button">Load Canvas</button>
+    <button id="exportBtn" type="button">Export</button>
+    <button id="importBtn" type="button">Import</button>
     <button id="helpBtn" type="button" title="Show Help">?</button>
   </div>
 
@@ -283,6 +286,16 @@
 
   <div id="canvasContainer">
     <canvas id="canvas"></canvas>
+
+    <!-- Mini-map for navigation -->
+    <div id="miniMap" class="mini-map">
+      <div class="mini-map-header">
+        <span>Mini-map</span>
+        <button id="toggleMiniMap" class="mini-map-toggle" type="button">-</button>
+      </div>
+      <canvas id="miniMapCanvas"></canvas>
+      <div class="mini-map-viewport"></div>
+    </div>
   </div>
 
   <!-- Debug Panel -->
@@ -312,5 +325,7 @@
 
   <script src="app.js"></script>
   <script src="modal-edit.js"></script>
+  <script src="mini-map.js"></script>
+  <script src="workflow-test.js"></script>
 </body>
 </html>
