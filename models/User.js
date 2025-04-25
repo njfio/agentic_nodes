@@ -22,9 +22,44 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  firstName: {
+    type: String,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    trim: true
+  },
+  bio: {
+    type: String,
+    trim: true,
+    maxlength: 500
+  },
+  avatar: {
+    type: String,
+    default: ''
+  },
   color: {
     type: String,
     default: '#3498db'
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin', 'editor'],
+    default: 'user'
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationToken: {
+    type: String
+  },
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
   },
   tokens: [{
     token: {
@@ -32,6 +67,20 @@ const userSchema = new mongoose.Schema({
       required: true
     }
   }],
+  lastLogin: {
+    type: Date
+  },
+  settings: {
+    theme: {
+      type: String,
+      enum: ['light', 'dark', 'system'],
+      default: 'system'
+    },
+    notifications: {
+      type: Boolean,
+      default: true
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -106,6 +155,69 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
+// Generate verification token
+userSchema.methods.generateVerificationToken = async function() {
+  const user = this;
+  const verificationToken = jwt.sign(
+    { id: user._id.toString() },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
+
+  user.verificationToken = verificationToken;
+  await user.save();
+
+  return verificationToken;
+};
+
+// Generate password reset token
+userSchema.methods.generatePasswordResetToken = async function() {
+  const user = this;
+  const resetToken = jwt.sign(
+    { id: user._id.toString() },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  user.resetPasswordToken = resetToken;
+  user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+  await user.save();
+
+  return resetToken;
+};
+
+// Verify user's email
+userSchema.methods.verifyEmail = async function() {
+  const user = this;
+  user.isVerified = true;
+  user.verificationToken = undefined;
+  await user.save();
+  return user;
+};
+
+// Get full name
+userSchema.methods.getFullName = function() {
+  const user = this;
+  if (user.firstName && user.lastName) {
+    return `${user.firstName} ${user.lastName}`;
+  } else if (user.firstName) {
+    return user.firstName;
+  } else if (user.lastName) {
+    return user.lastName;
+  }
+  return user.username;
+};
+
+// Check if user has a specific role
+userSchema.methods.hasRole = function(role) {
+  return this.role === role;
+};
+
+// Check if user is an admin
+userSchema.methods.isAdmin = function() {
+  return this.role === 'admin';
+};
+
 // Remove sensitive data when converting to JSON
 userSchema.methods.toJSON = function() {
   const user = this;
@@ -114,6 +226,9 @@ userSchema.methods.toJSON = function() {
   // Remove sensitive data
   delete userObject.password;
   delete userObject.tokens;
+  delete userObject.verificationToken;
+  delete userObject.resetPasswordToken;
+  delete userObject.resetPasswordExpires;
 
   return userObject;
 };

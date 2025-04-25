@@ -226,6 +226,34 @@ const ApiService = {
      */
     async logoutAll() {
       return ApiService.request('/users/logoutAll', 'POST');
+    },
+
+    /**
+     * Verify email
+     * @param {string} token - Verification token
+     * @returns {Promise} - Promise with verification result
+     */
+    async verifyEmail(token) {
+      return ApiService.request(`/users/verify-email?token=${token}`, 'GET');
+    },
+
+    /**
+     * Request password reset
+     * @param {string} email - User email
+     * @returns {Promise} - Promise with request result
+     */
+    async requestPasswordReset(email) {
+      return ApiService.request('/users/request-password-reset', 'POST', { email });
+    },
+
+    /**
+     * Reset password
+     * @param {string} token - Reset token
+     * @param {string} password - New password
+     * @returns {Promise} - Promise with reset result
+     */
+    async resetPassword(token, password) {
+      return ApiService.request('/users/reset-password', 'POST', { token, password });
     }
   }
 };

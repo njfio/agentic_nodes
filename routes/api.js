@@ -90,4 +90,9 @@ router.put('/users/profile', auth, userController.updateProfile);
 router.post('/users/logout', auth, userController.logout);
 router.post('/users/logoutAll', auth, userController.logoutAll);
 
+// Email verification and password reset
+router.get('/users/verify-email', userController.verifyEmail);
+router.post('/users/request-password-reset', userController.requestPasswordReset);
+router.post('/users/reset-password', userController.resetPassword);
+
 module.exports = router;
