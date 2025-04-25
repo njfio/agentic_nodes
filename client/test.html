@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modal Editor Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #1e1e1e;
+      color: #eee;
+    }
+    
+    h1 {
+      color: #4CAF50;
+    }
+    
+    .test-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background-color: #2e2e2e;
+      border-radius: 8px;
+    }
+    
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    
+    button:hover {
+      background-color: #45a049;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 100;
+    }
+    
+    .modal-content {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #2e2e2e;
+      padding: 20px;
+      border-radius: 8px;
+      min-width: 400px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #eee;
+    }
+    
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      background-color: #1e1e1e;
+      color: #eee;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    
+    .primary-btn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .secondary-btn {
+      background-color: #555;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Modal Editor Test</h1>
+  
+  <div class="test-section">
+    <h2>Test Modals</h2>
+    <p>Click the buttons below to test the modal editing functionality:</p>
+    
+    <button id="openModal1">Open Test Modal 1</button>
+    <button id="openModal2">Open Test Modal 2</button>
+    <button id="testWorkflow">Test Workflow</button>
+  </div>
+  
+  <!-- Test Modal 1 -->
+  <div id="testModal1" class="modal">
+    <div class="modal-content">
+      <h2>Test Modal 1</h2>
+      <div class="form-group">
+        <label for="testInput1">Test Input:</label>
+        <input type="text" id="testInput1" value="Default value">
+      </div>
+      <div class="form-group">
+        <label for="testTextarea1">Test Textarea:</label>
+        <textarea id="testTextarea1" rows="4">Default text area content</textarea>
+      </div>
+      <div class="form-group">
+        <label for="testSelect1">Test Select:</label>
+        <select id="testSelect1">
+          <option value="option1">Option 1</option>
+          <option value="option2">Option 2</option>
+          <option value="option3">Option 3</option>
+        </select>
+      </div>
+      <div class="button-group">
+        <button id="saveModal1" class="primary-btn">Save</button>
+        <button id="closeModal1" class="secondary-btn">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Test Modal 2 -->
+  <div id="testModal2" class="modal">
+    <div class="modal-content">
+      <h2>Test Modal 2</h2>
+      <div class="form-group">
+        <label for="testInput2">Another Test Input:</label>
+        <input type="text" id="testInput2" value="Another default value">
+      </div>
+      <div class="form-group">
+        <label for="testTextarea2">Another Test Textarea:</label>
+        <textarea id="testTextarea2" rows="4">Another default text area content</textarea>
+      </div>
+      <div class="button-group">
+        <button id="saveModal2" class="primary-btn">Save</button>
+        <button id="closeModal2" class="secondary-btn">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Simple Modal Manager
+    const ModalManager = {
+      openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.style.display = 'block';
+        }
+      },
+      
+      closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.style.display = 'none';
+        }
+      }
+    };
+    
+    // Modal Editor
+    const ModalEditor = {
+      init() {
+        // Make modals editable
+        this.makeModalsEditable();
+        
+        // Add test buttons
+        this.addTestButtons();
+        
+        console.log('Modal Editor initialized');
+      },
+      
+      makeModalsEditable() {
+        // Get all modals
+        const modals = document.querySelectorAll('.modal');
+        
+        // Make each modal editable
+        modals.forEach(modal => {
+          // Find all input elements
+          const inputs = modal.querySelectorAll('input, textarea, select');
+          
+          // Make sure they're editable
+          inputs.forEach(input => {
+            input.removeAttribute('readonly');
+            input.removeAttribute('disabled');
+          });
+          
+          // Add a class to indicate it's editable
+          modal.classList.add('editable-modal');
+        });
+      },
+      
+      addTestButtons() {
+        // Get all modals
+        const modals = document.querySelectorAll('.modal');
+        
+        // Add test button to each modal
+        modals.forEach(modal => {
+          // Get the modal ID
+          const modalId = modal.id;
+          
+          // Create a test button
+          const testButton = document.createElement('button');
+          testButton.textContent = 'Test This Modal';
+          testButton.className = 'modal-test-button primary-btn';
+          testButton.style.marginTop = '10px';
+          
+          // Add click event
+          testButton.addEventListener('click', () => {
+            this.testModal(modalId);
+          });
+          
+          // Find the button group
+          const buttonGroup = modal.querySelector('.button-group');
+          if (buttonGroup) {
+            buttonGroup.appendChild(testButton);
+          }
+        });
+      },
+      
+      testModal(modalId) {
+        console.log(`Testing modal: ${modalId}`);
+        alert(`Testing modal: ${modalId}`);
+      },
+      
+      testWorkflow() {
+        console.log('Testing workflow');
+        alert('Testing workflow - check console for details');
+        
+        // Define workflow steps
+        const steps = [
+          { action: 'openModal', modalId: 'testModal1', description: 'Opening Test Modal 1' },
+          { action: 'wait', time: 2000, description: 'Waiting for modal to open' },
+          { action: 'fillInput', inputId: 'testInput1', value: 'New test value', description: 'Filling input' },
+          { action: 'wait', time: 1000, description: 'Waiting after filling input' },
+          { action: 'clickButton', buttonId: 'closeModal1', description: 'Closing modal' },
+          { action: 'wait', time: 1000, description: 'Waiting after closing modal' },
+          { action: 'openModal', modalId: 'testModal2', description: 'Opening Test Modal 2' },
+          { action: 'wait', time: 2000, description: 'Waiting for modal to open' },
+          { action: 'fillInput', inputId: 'testInput2', value: 'Another new value', description: 'Filling input' },
+          { action: 'wait', time: 1000, description: 'Waiting after filling input' },
+          { action: 'clickButton', buttonId: 'closeModal2', description: 'Closing modal' },
+          { action: 'complete', description: 'Workflow completed' }
+        ];
+        
+        // Execute workflow
+        this.executeWorkflow(steps);
+      },
+      
+      executeWorkflow(steps, index = 0) {
+        if (index >= steps.length) {
+          console.log('Workflow completed successfully');
+          alert('Workflow completed successfully');
+          return;
+        }
+        
+        const step = steps[index];
+        console.log(`Executing step ${index + 1}/${steps.length}: ${step.description}`);
+        
+        // Execute the step
+        switch (step.action) {
+          case 'openModal':
+            ModalManager.openModal(step.modalId);
+            break;
+            
+          case 'wait':
+            // Do nothing, just wait
+            break;
+            
+          case 'fillInput':
+            const input = document.getElementById(step.inputId);
+            if (input) {
+              input.value = step.value;
+              
+              // Trigger change event for select elements
+              if (input.tagName === 'SELECT') {
+                const event = new Event('change', { bubbles: true });
+                input.dispatchEvent(event);
+              }
+            } else {
+              console.error(`Input not found: ${step.inputId}`);
+            }
+            break;
+            
+          case 'clickButton':
+            const button = document.getElementById(step.buttonId);
+            if (button) {
+              button.click();
+            } else {
+              console.error(`Button not found: ${step.buttonId}`);
+            }
+            break;
+            
+          case 'complete':
+            // Final step
+            break;
+            
+          default:
+            console.error(`Unknown action: ${step.action}`);
+        }
+        
+        // Move to the next step after a delay
+        setTimeout(() => {
+          this.executeWorkflow(steps, index + 1);
+        }, step.time || 500);
+      }
+    };
+    
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      // Add event listeners for buttons
+      document.getElementById('openModal1').addEventListener('click', () => {
+        ModalManager.openModal('testModal1');
+      });
+      
+      document.getElementById('openModal2').addEventListener('click', () => {
+        ModalManager.openModal('testModal2');
+      });
+      
+      document.getElementById('testWorkflow').addEventListener('click', () => {
+        ModalEditor.testWorkflow();
+      });
+      
+      document.getElementById('closeModal1').addEventListener('click', () => {
+        ModalManager.closeModal('testModal1');
+      });
+      
+      document.getElementById('closeModal2').addEventListener('click', () => {
+        ModalManager.closeModal('testModal2');
+      });
+      
+      // Initialize the modal editor
+      ModalEditor.init();
+    });
+  </script>
+</body>
+</html>

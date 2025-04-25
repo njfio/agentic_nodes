@@ -1,0 +1,94 @@
+/* Document View Styles */
+
+.document-view-modal {
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+}
+
+.document-view-toolbar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #2a2a2a;
+  border-radius: 8px;
+}
+
+.document-view-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.document-view-options {
+  display: flex;
+  gap: 15px;
+}
+
+.document-view-container {
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.document-content {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #eee;
+}
+
+.document-section {
+  margin-bottom: 30px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 20px;
+}
+
+.document-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.document-section-header {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #4a90e2;
+  padding: 5px 0;
+  border-bottom: 1px solid #333;
+}
+
+.document-section-content {
+  white-space: pre-wrap;
+  font-family: 'Courier New', monospace;
+  background-color: #2a2a2a;
+  padding: 15px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.document-image {
+  max-width: 100%;
+  height: auto;
+  margin: 10px 0;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.no-content-message {
+  color: #888;
+  text-align: center;
+  padding: 30px;
+  font-style: italic;
+}
+
+/* Document view button */
+#documentViewBtn {
+  background-color: #27ae60;
+}
+
+#documentViewBtn:hover {
+  background-color: #219653;
+}
