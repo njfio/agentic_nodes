@@ -2957,9 +2957,11 @@ const App = {
   },
 
   // Handle save button click
-  handleSave() {
+  async handleSave() {
     // Create a JSON representation of the current state
     const state = {
+      name: 'Workflow ' + new Date().toLocaleString(),
+      description: 'Workflow created on ' + new Date().toLocaleString(),
       nodes: this.nodes.map(node => ({
         id: node.id,
         x: node.x,
@@ -2986,8 +2988,26 @@ const App = {
       }))
     };
 
-    // Save to localStorage
+    // Save to localStorage for backward compatibility
     localStorage.setItem('canvas_state', JSON.stringify(state));
+
+    // Try to save to the server
+    try {
+      // Show saving indicator
+      DebugManager.addLog('Saving workflow to server...', 'info');
+
+      // Save to server
+      const response = await ApiService.workflows.create(state);
+
+      // Store the workflow ID for future reference
+      if (response && response._id) {
+        localStorage.setItem('current_workflow_id', response._id);
+        DebugManager.addLog(`Workflow saved to server with ID: ${response._id}`, 'success');
+      }
+    } catch (error) {
+      console.error('Error saving to server:', error);
+      DebugManager.addLog(`Failed to save to server: ${error.message}. Using local storage only.`, 'warning');
+    }
 
     // Force all nodes to preload content after saving
     this.nodes.forEach(node => {
@@ -3001,108 +3021,136 @@ const App = {
   },
 
   // Handle load button click
-  handleLoad() {
-    // Get the saved state
-    const savedState = localStorage.getItem('canvas_state');
-    if (!savedState) {
-      DebugManager.addLog('No saved state found', 'error');
-      return;
-    }
-
+  async handleLoad() {
     try {
+      // First try to load from server
+      const workflowId = localStorage.getItem('current_workflow_id');
+
+      if (workflowId) {
+        try {
+          DebugManager.addLog(`Loading workflow ${workflowId} from server...`, 'info');
+
+          // Load from server
+          const workflow = await ApiService.workflows.getById(workflowId);
+
+          if (workflow) {
+            // Load the workflow
+            this.loadWorkflowState(workflow);
+            DebugManager.addLog('Workflow loaded from server', 'success');
+            return;
+          }
+        } catch (error) {
+          console.error('Error loading from server:', error);
+          DebugManager.addLog(`Failed to load from server: ${error.message}. Trying local storage.`, 'warning');
+        }
+      }
+
+      // If server load failed or no workflow ID, try localStorage
+      const savedState = localStorage.getItem('canvas_state');
+      if (!savedState) {
+        DebugManager.addLog('No saved state found', 'error');
+        return;
+      }
+
       // Parse the saved state
       const state = JSON.parse(savedState);
 
-      // Clear the current state
-      this.nodes = [];
-      this.connections = [];
-
-      // Recreate the nodes
-      state.nodes.forEach(nodeData => {
-        const node = new Node(nodeData.x, nodeData.y, nodeData.id);
-
-        // Restore basic properties
-        node.title = nodeData.title;
-        node.content = nodeData.content;
-        node.inputContent = nodeData.inputContent || '';
-        node.contentType = nodeData.contentType;
-        node.systemPrompt = nodeData.systemPrompt || '';
-        node.aiProcessor = nodeData.aiProcessor;
-        node.inputType = nodeData.inputType || 'text';
-        node.outputType = nodeData.outputType || 'text';
-
-        // Restore state properties
-        node.hasBeenProcessed = nodeData.hasBeenProcessed || false;
-        node.error = nodeData.error || null;
-        node.selected = nodeData.selected || false;
-        node.expanded = nodeData.expanded || false;
-        node.autoSize = nodeData.autoSize !== undefined ? nodeData.autoSize : true;
-
-        // Restore dimensions if saved
-        if (nodeData.width && nodeData.height) {
-          node.width = nodeData.width;
-          node.height = nodeData.height;
-        } else if (node.autoSize) {
-          // If dimensions weren't saved but autoSize is enabled, calculate optimal size
-          node.calculateOptimalSize();
-        }
-
-        // Special handling for image nodes
-        if (node.contentType === 'image' || node.aiProcessor === 'text-to-image') {
-          // Force content type to image for text-to-image nodes
-          if (node.aiProcessor === 'text-to-image') {
-            node.contentType = 'image';
-          }
-
-          // Preload the image content
-          if (node.content) {
-            // Force recreate the image object to ensure it loads properly
-            node.contentImage = new Image();
-            node.contentImage.src = node.content;
-
-            // Add load event listener to redraw when image loads
-            node.contentImage.onload = () => {
-              // When image loads, update node size if auto-sizing is enabled
-              if (node.autoSize) {
-                node.calculateOptimalSize();
-              }
-              // Force a redraw to show the image
-              this.draw();
-            };
-
-            // Log success for debugging
-            DebugManager.addLog(`Image content loaded for node ${node.id}`, 'info');
-          }
-        }
-
-        this.nodes.push(node);
-      });
-
-      // Recreate the connections
-      state.connections.forEach(connData => {
-        const fromNode = this.nodes.find(node => node.id === connData.fromNodeId);
-        const toNode = this.nodes.find(node => node.id === connData.toNodeId);
-
-        if (fromNode && toNode) {
-          this.connections.push(new Connection(fromNode, toNode));
-        }
-      });
-
-      // Redraw the canvas
-      this.draw();
-
-      // Force another redraw after a short delay to ensure images are properly loaded
-      setTimeout(() => {
-        // Preload content for all nodes again
-        this.nodes.forEach(node => node.preloadContent());
-        this.draw();
-      }, 500);
-
-      DebugManager.addLog('Canvas state loaded', 'success');
-      DebugManager.updateCanvasStats();
+      // Load the state
+      this.loadWorkflowState(state);
+      DebugManager.addLog('Canvas state loaded from local storage', 'success');
     } catch (err) {
       DebugManager.addLog(`Failed to load state: ${err.message}`, 'error');
     }
+  },
+
+  // Load workflow state
+  loadWorkflowState(state) {
+    // Clear the current state
+    this.nodes = [];
+    this.connections = [];
+
+    // Recreate the nodes
+    state.nodes.forEach(nodeData => {
+      const node = new Node(nodeData.x, nodeData.y, nodeData.id);
+
+      // Restore basic properties
+      node.title = nodeData.title;
+      node.content = nodeData.content;
+      node.inputContent = nodeData.inputContent || '';
+      node.contentType = nodeData.contentType;
+      node.systemPrompt = nodeData.systemPrompt || '';
+      node.aiProcessor = nodeData.aiProcessor;
+      node.inputType = nodeData.inputType || 'text';
+      node.outputType = nodeData.outputType || 'text';
+
+      // Restore state properties
+      node.hasBeenProcessed = nodeData.hasBeenProcessed || false;
+      node.error = nodeData.error || null;
+      node.selected = nodeData.selected || false;
+      node.expanded = nodeData.expanded || false;
+      node.autoSize = nodeData.autoSize !== undefined ? nodeData.autoSize : true;
+
+      // Restore dimensions if saved
+      if (nodeData.width && nodeData.height) {
+        node.width = nodeData.width;
+        node.height = nodeData.height;
+      } else if (node.autoSize) {
+        // If dimensions weren't saved but autoSize is enabled, calculate optimal size
+        node.calculateOptimalSize();
+      }
+
+      // Special handling for image nodes
+      if (node.contentType === 'image' || node.aiProcessor === 'text-to-image') {
+        // Force content type to image for text-to-image nodes
+        if (node.aiProcessor === 'text-to-image') {
+          node.contentType = 'image';
+        }
+
+        // Preload the image content
+        if (node.content) {
+          // Force recreate the image object to ensure it loads properly
+          node.contentImage = new Image();
+          node.contentImage.src = node.content;
+
+          // Add load event listener to redraw when image loads
+          node.contentImage.onload = () => {
+            // When image loads, update node size if auto-sizing is enabled
+            if (node.autoSize) {
+              node.calculateOptimalSize();
+            }
+            // Force a redraw to show the image
+            this.draw();
+          };
+
+          // Log success for debugging
+          DebugManager.addLog(`Image content loaded for node ${node.id}`, 'info');
+        }
+      }
+
+      this.nodes.push(node);
+    });
+
+    // Recreate the connections
+    state.connections.forEach(connData => {
+      const fromNode = this.nodes.find(node => node.id === connData.fromNodeId);
+      const toNode = this.nodes.find(node => node.id === connData.toNodeId);
+
+      if (fromNode && toNode) {
+        this.connections.push(new Connection(fromNode, toNode));
+      }
+    });
+
+    // Redraw the canvas
+    this.draw();
+
+    // Force another redraw after a short delay to ensure images are properly loaded
+    setTimeout(() => {
+      // Preload content for all nodes again
+      this.nodes.forEach(node => node.preloadContent());
+      this.draw();
+    }, 500);
+
+    DebugManager.updateCanvasStats();
   },
 
   // Add a node to the canvas

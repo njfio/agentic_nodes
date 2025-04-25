@@ -7,9 +7,23 @@ const workflowController = require('../controllers/workflowController');
 const nodeController = require('../controllers/nodeController');
 const userController = require('../controllers/userController');
 
+// Import utilities
+const dataMigration = require('../utils/data-migration');
+
 // Test route
 router.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });
+});
+
+// Data migration route
+router.post('/migrate', async (req, res) => {
+  try {
+    const result = await dataMigration.migrateData(req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // OpenAI API proxy routes

@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="collaboration.css" />
   <link rel="stylesheet" href="document-view.css" />
   <link rel="stylesheet" href="workflow-io.css" />
+  <link rel="stylesheet" href="workflow-list.css" />
   <link rel="stylesheet" href="auth.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
@@ -18,6 +19,23 @@
     <button id="addNodeBtn" type="button">Add Node</button>
     <button id="testWorkflowBtn" type="button">Test Workflow</button>
     <button id="configBtn" type="button">OpenAI Config</button>
+
+    <div class="toolbar-dropdown">
+      <button id="workflowsBtn" type="button">Workflows ▾</button>
+      <div id="workflowsDropdown" class="dropdown-content">
+        <div class="dropdown-header">
+          <input type="text" id="workflowSearch" placeholder="Search workflows...">
+        </div>
+        <div id="workflowsList" class="dropdown-list">
+          <!-- Workflows will be loaded here -->
+          <div class="dropdown-item loading">Loading workflows...</div>
+        </div>
+        <div class="dropdown-footer">
+          <button id="newWorkflowBtn" class="dropdown-btn" type="button">New Workflow</button>
+        </div>
+      </div>
+    </div>
+
     <button id="saveBtn" type="button">Save Canvas</button>
     <button id="loadBtn" type="button">Load Canvas</button>
     <button id="exportBtn" type="button">Export</button>
@@ -331,6 +349,7 @@
   <!-- Core Configuration and Services -->
   <script src="config.js"></script>
   <script src="api-service.js"></script>
+  <script src="data-migration.js"></script>
 
   <!-- Application Scripts -->
   <script src="auth.js"></script>
@@ -345,5 +364,6 @@
   <script src="collaboration.js"></script>
   <script src="document-view.js"></script>
   <script src="workflow-io.js"></script>
+  <script src="workflow-list.js"></script>
 </body>
 </html>
