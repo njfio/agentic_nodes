@@ -31,11 +31,22 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
 
-// Connect to MongoDB
-if (process.env.NODE_ENV !== 'test') {
+// Connect to MongoDB with retry logic
+const connectWithRetry = () => {
+  console.log('Attempting to connect to MongoDB...');
   mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .then(() => {
+      console.log('Connected to MongoDB successfully');
+    })
+    .catch(err => {
+      console.error('MongoDB connection error:', err);
+      console.log('Retrying connection in 5 seconds...');
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  connectWithRetry();
 }
 
 // Start the server

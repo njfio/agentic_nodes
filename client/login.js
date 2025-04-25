@@ -1,18 +1,35 @@
 /**
  * Login System
  * Provides authentication for the application
+ * Now integrated with the server API
  */
 
+// Load configuration
 document.addEventListener('DOMContentLoaded', () => {
+  // Create a script element for config.js
+  const configScript = document.createElement('script');
+  configScript.src = 'config.js';
+  configScript.onload = () => {
+    // After config is loaded, load the API service
+    const apiScript = document.createElement('script');
+    apiScript.src = 'api-service.js';
+    apiScript.onload = initLogin;
+    document.head.appendChild(apiScript);
+  };
+  document.head.appendChild(configScript);
+});
+
+// Initialize login functionality
+function initLogin() {
   // Check if the user is already logged in
   if (isLoggedIn()) {
     redirectToApp();
     return;
   }
-  
+
   // Set up event listeners
   setupEventListeners();
-});
+}
 
 // Set up event listeners
 function setupEventListeners() {
@@ -21,7 +38,7 @@ function setupEventListeners() {
   if (loginBtn) {
     loginBtn.addEventListener('click', handleLogin);
   }
-  
+
   // Enter key press in password field
   const passwordInput = document.getElementById('password');
   if (passwordInput) {
@@ -31,14 +48,14 @@ function setupEventListeners() {
       }
     });
   }
-  
+
   // Remember me checkbox
   const rememberMeCheckbox = document.getElementById('rememberMe');
   if (rememberMeCheckbox) {
     // Check if there's a saved preference
     const rememberMe = localStorage.getItem('rememberMe') === 'true';
     rememberMeCheckbox.checked = rememberMe;
-    
+
     // If remember me was checked, fill in the username
     if (rememberMe) {
       const savedUsername = localStorage.getItem('savedUsername');
@@ -53,63 +70,86 @@ function setupEventListeners() {
 }
 
 // Handle login attempt
-function handleLogin() {
+async function handleLogin() {
   const usernameInput = document.getElementById('username');
   const passwordInput = document.getElementById('password');
   const rememberMeCheckbox = document.getElementById('rememberMe');
   const loginError = document.getElementById('loginError');
-  
+  const loginBtn = document.getElementById('loginBtn');
+
   if (!usernameInput || !passwordInput || !loginError) return;
-  
+
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
   const rememberMe = rememberMeCheckbox ? rememberMeCheckbox.checked : false;
-  
+
   // Validate inputs
   if (!username || !password) {
     showError('Please enter both username and password');
     return;
   }
-  
-  // Check credentials (in a real app, this would be a server request)
-  if (checkCredentials(username, password)) {
-    // Save login state
-    setLoggedIn(true, username, rememberMe);
-    
-    // Redirect to the main app
-    redirectToApp();
-  } else {
-    // Show error
-    showError('Invalid username or password');
-    
-    // Shake the form
-    const loginForm = document.querySelector('.login-form');
-    if (loginForm) {
-      loginForm.classList.add('shake');
-      setTimeout(() => {
-        loginForm.classList.remove('shake');
-      }, 600);
+
+  // Disable login button and show loading state
+  if (loginBtn) {
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logging in...';
+  }
+
+  try {
+    // Check credentials with the server
+    const isValid = await checkCredentials(username, password);
+
+    if (isValid) {
+      // Save login state
+      setLoggedIn(true, username, rememberMe);
+
+      // Redirect to the main app
+      redirectToApp();
+    } else {
+      // Show error
+      showError('Invalid username or password');
+
+      // Shake the form
+      const loginForm = document.querySelector('.login-form');
+      if (loginForm) {
+        loginForm.classList.add('shake');
+        setTimeout(() => {
+          loginForm.classList.remove('shake');
+        }, 600);
+      }
+
+      // Clear the password field
+      passwordInput.value = '';
+      passwordInput.focus();
     }
-    
-    // Clear the password field
-    passwordInput.value = '';
-    passwordInput.focus();
+  } catch (error) {
+    showError(error.message || 'Login failed. Please try again.');
+  } finally {
+    // Re-enable login button
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Log In';
+    }
   }
 }
 
 // Check if the credentials are valid
-function checkCredentials(username, password) {
-  // In a real app, this would be a server request
-  // For demo purposes, we'll accept a few hardcoded credentials
-  const validCredentials = [
-    { username: 'admin', password: 'password' },
-    { username: 'user', password: 'user123' },
-    { username: 'demo', password: 'demo' }
-  ];
-  
-  return validCredentials.some(cred => 
-    cred.username === username && cred.password === password
-  );
+async function checkCredentials(username, password) {
+  try {
+    // Call the login API
+    const userData = await ApiService.users.login({
+      username,
+      password
+    });
+
+    // Store user data in localStorage
+    localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(userData));
+
+    return true;
+  } catch (error) {
+    console.error('Login error:', error);
+    return false;
+  }
 }
 
 // Show an error message
@@ -123,22 +163,27 @@ function showError(message) {
 
 // Set the logged in state
 function setLoggedIn(isLoggedIn, username, rememberMe) {
-  // Store the login state in sessionStorage (cleared when browser is closed)
-  sessionStorage.setItem('isLoggedIn', isLoggedIn);
-  sessionStorage.setItem('username', username);
-  
-  // If remember me is checked, store in localStorage (persists)
-  localStorage.setItem('rememberMe', rememberMe);
+  // Generate a dummy token (in a real app, this would come from the server)
+  const token = 'dummy-token-' + Date.now();
+
   if (rememberMe) {
+    // Store in localStorage (persists between sessions)
+    localStorage.setItem(Config.storageKeys.authToken, token);
+    localStorage.setItem('rememberMe', 'true');
     localStorage.setItem('savedUsername', username);
   } else {
+    // Store in sessionStorage (cleared when browser is closed)
+    sessionStorage.setItem(Config.storageKeys.authToken, token);
+    localStorage.setItem('rememberMe', 'false');
     localStorage.removeItem('savedUsername');
   }
 }
 
 // Check if the user is logged in
 function isLoggedIn() {
-  return sessionStorage.getItem('isLoggedIn') === 'true';
+  // Check both localStorage and sessionStorage for the auth token
+  return localStorage.getItem(Config.storageKeys.authToken) !== null ||
+         sessionStorage.getItem(Config.storageKeys.authToken) !== null;
 }
 
 // Redirect to the main application
