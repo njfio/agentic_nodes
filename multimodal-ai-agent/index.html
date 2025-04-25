@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multimodal AI Agent - Endless Canvas</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="modal-edit.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+  <div id="toolbar">
+    <button id="addNodeBtn" type="button">Add Node</button>
+    <button id="configBtn" type="button">OpenAI Config</button>
+    <button id="saveBtn" type="button">Save Canvas</button>
+    <button id="loadBtn" type="button">Load Canvas</button>
+    <button id="helpBtn" type="button" title="Show Help">?</button>
+  </div>
+
+  <!-- Node Editor Modal -->
+  <div id="nodeEditor" class="modal">
+    <div class="modal-content">
+      <h2>Node Editor</h2>
+      <form id="nodeEditorForm" onsubmit="event.preventDefault(); return false;" action="javascript:void(0);">
+      <div class="form-group">
+        <label for="nodeTitle">Title:</label>
+        <input type="text" id="nodeTitle">
+      </div>
+      <div class="form-group">
+        <label for="nodeModality">Modality:</label>
+        <select id="nodeModality">
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+          <option value="audio">Audio</option>
+          <option value="video">Video</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="systemPrompt">System Prompt:</label>
+        <textarea id="systemPrompt" placeholder="Enter instructions for how the AI should process this node's content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+      </div>
+
+      <!-- Content Type Specific Sections -->
+      <div id="textContentSection" class="content-section">
+        <div class="form-group">
+          <label for="nodeContent">Text Content:</label>
+          <textarea id="nodeContent" placeholder="Enter text content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+        </div>
+        <div class="debug-info">
+          <div class="token-counter">
+            <span>Input Tokens: <span id="inputTokenCount">0</span></span>
+            <span>Output Tokens: <span id="outputTokenCount">0</span></span>
+          </div>
+          <div class="processing-time">
+            Processing Time: <span id="processingTime">0ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="imageContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Image Content:</label>
+          <div class="image-upload-area">
+            <input type="file" id="imageFile" accept="image/*">
+            <div class="image-preview">
+              <img id="imagePreview" src="" alt="Preview" style="display: none;">
+            </div>
+            <div class="image-controls">
+              <button id="uploadImageBtn" class="secondary-btn" type="button">Upload Image</button>
+              <button id="generateImageBtn" class="secondary-btn" type="button">Generate Image</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="imagePrompt">Image Generation Prompt:</label>
+          <textarea id="imagePrompt" placeholder="Describe the image you want to generate..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+        </div>
+        <div class="debug-info">
+          <div class="image-info">
+            <span>Size: <span id="imageSize">0x0</span></span>
+            <span>Format: <span id="imageFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="audioContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Audio Content:</label>
+          <div class="audio-upload-area">
+            <input type="file" id="audioFile" accept="audio/*">
+            <div class="audio-preview">
+              <audio id="audioPreview" controls style="display: none;"></audio>
+            </div>
+            <div class="audio-controls">
+              <button id="recordAudioBtn" class="secondary-btn" type="button">Record Audio</button>
+              <button id="uploadAudioBtn" class="secondary-btn" type="button">Upload Audio</button>
+            </div>
+          </div>
+        </div>
+        <div class="debug-info">
+          <div class="audio-info">
+            <span>Duration: <span id="audioDuration">0s</span></span>
+            <span>Format: <span id="audioFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="videoContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Video Content:</label>
+          <div class="video-upload-area">
+            <input type="file" id="videoFile" accept="video/*">
+            <div class="video-preview">
+              <video id="videoPreview" controls style="display: none;"></video>
+            </div>
+            <div class="video-controls">
+              <button id="uploadVideoBtn" class="secondary-btn" type="button">Upload Video</button>
+            </div>
+          </div>
+        </div>
+        <div class="debug-info">
+          <div class="video-info">
+            <span>Duration: <span id="videoDuration">0s</span></span>
+            <span>Format: <span id="videoFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="aiProcessor">AI Processor:</label>
+        <select id="aiProcessor">
+          <option value="text-to-text">Text to Text</option>
+          <option value="text-to-image">Text to Image</option>
+          <option value="image-to-text">Image to Text</option>
+          <option value="audio-to-text">Audio to Text</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="autoSizeNode" checked>
+          <label for="autoSizeNode">Auto-size node to fit content</label>
+        </div>
+      </div>
+
+      <!-- Processing Log Section -->
+      <div class="log-section">
+        <h3>Processing Log</h3>
+        <div id="processingLog" class="log-content"></div>
+      </div>
+
+      <div class="button-group">
+        <button id="executeNode" class="primary-btn" type="button">Execute</button>
+        <button id="saveNode" class="primary-btn" type="button">Save</button>
+        <button id="cancelNode" class="secondary-btn" type="button">Cancel</button>
+      </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- OpenAI Configuration Modal -->
+  <div id="configModal" class="modal">
+    <div class="modal-content">
+      <h2>OpenAI Configuration</h2>
+      <div class="form-group">
+        <label for="apiKey">API Key:</label>
+        <input type="password" id="apiKey" placeholder="sk-...">
+      </div>
+      <div class="form-group">
+        <label for="model">Model:</label>
+        <select id="model">
+          <option value="gpt-4o">GPT-4o</option>
+          <option value="gpt-4.1">GPT-4.1</option>
+          <option value="o4-mini-high">o4-mini-high</option>
+          <option value="gpt-4">GPT-4</option>
+          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          <!-- GPT-4o is now used for both text and vision tasks -->
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="temperature">Temperature:</label>
+        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+        <span id="temperatureValue">0.7</span>
+      </div>
+      <div class="form-group">
+        <label for="maxTokens">Max Tokens:</label>
+        <input type="number" id="maxTokens" value="2000" min="1" max="8192">
+      </div>
+
+      <!-- API Test Section -->
+      <div class="test-section">
+        <h3>API Test</h3>
+        <div class="form-group">
+          <textarea id="testPrompt" placeholder="Enter a test prompt..."></textarea>
+        </div>
+        <button id="testAPI" class="secondary-btn" type="button">Test API</button>
+        <div id="testResult" class="test-result"></div>
+      </div>
+
+      <!-- Usage Statistics -->
+      <div class="usage-stats">
+        <h3>Usage Statistics</h3>
+        <div class="stats-grid">
+          <div>Total Requests: <span id="totalRequests">0</span></div>
+          <div>Total Tokens: <span id="totalTokens">0</span></div>
+          <div>Average Response Time: <span id="avgResponseTime">0ms</span></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="saveConfig" class="primary-btn" type="button">Save Configuration</button>
+        <button id="cancelConfig" class="secondary-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save/Load Modal -->
+  <div id="saveLoadModal" class="modal">
+    <div class="modal-content">
+      <h2>Save/Load Canvas</h2>
+      <div class="form-group">
+        <label for="canvasData">Canvas Data:</label>
+        <textarea id="canvasData" placeholder="Paste saved canvas data here to load..."></textarea>
+      </div>
+
+      <!-- Canvas Statistics -->
+      <div class="canvas-stats">
+        <h3>Canvas Statistics</h3>
+        <div class="stats-grid">
+          <div>Nodes: <span id="nodeCount">0</span></div>
+          <div>Connections: <span id="connectionCount">0</span></div>
+          <div>Processing Chains: <span id="chainCount">0</span></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="copyCanvas" class="primary-btn" type="button">Copy to Clipboard</button>
+        <button id="loadCanvas" class="primary-btn" type="button">Load Data</button>
+        <button id="exportJSON" class="secondary-btn" type="button">Export JSON</button>
+        <button id="cancelSaveLoad" class="secondary-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <h2>Help & Shortcuts</h2>
+      <div class="help-section">
+        <h3>Keyboard Shortcuts</h3>
+        <ul>
+          <li><kbd>N</kbd> - Add new node</li>
+          <li><kbd>Delete</kbd> - Delete selected node</li>
+          <li><kbd>Esc</kbd> - Cancel connection/Close modal</li>
+          <li><kbd>Ctrl/Cmd + S</kbd> - Save canvas</li>
+          <li><kbd>Ctrl/Cmd + O</kbd> - Load canvas</li>
+          <li><kbd>H</kbd> - Show/hide this help</li>
+        </ul>
+      </div>
+      <div class="help-section">
+        <h3>Node Operations</h3>
+        <ul>
+          <li>Double-click a node to edit its properties</li>
+          <li>Drag from right circle to left circle to connect nodes</li>
+          <li>Click and drag empty space to pan the canvas</li>
+          <li>Click and drag a node to move it</li>
+        </ul>
+      </div>
+      <div class="help-section">
+        <h3>Debug Information</h3>
+        <ul>
+          <li>Processing logs available in node editor</li>
+          <li>Token usage tracked in OpenAI config</li>
+          <li>Canvas statistics in Save/Load dialog</li>
+          <li>API test functionality in config</li>
+        </ul>
+      </div>
+      <div class="button-group">
+        <button id="closeHelp" class="secondary-btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- Debug Panel -->
+  <div id="debugPanel" class="debug-panel">
+    <div class="debug-header">
+      <h3>Debug Panel</h3>
+      <button id="toggleDebug" class="secondary-btn" type="button">Toggle</button>
+    </div>
+    <div class="debug-content">
+      <div class="debug-section">
+        <h4>Performance</h4>
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Active Nodes: <span id="activeNodes">0</span></div>
+        <div>Processing: <span id="processingNodes">0</span></div>
+      </div>
+      <div class="debug-section">
+        <h4>API Status</h4>
+        <div>Last Request: <span id="lastRequestTime">-</span></div>
+        <div>Queue Size: <span id="requestQueue">0</span></div>
+      </div>
+      <div class="debug-section">
+        <h4>Recent Logs</h4>
+        <div id="recentLogs" class="recent-logs"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="modal-edit.js"></script>
+</body>
+</html>
