@@ -21,11 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize login functionality
 function initLogin() {
+  console.log('Login init called');
+
   // Check if the user is already logged in
   if (isLoggedIn()) {
+    console.log('User already logged in, redirecting to app');
     redirectToApp();
     return;
   }
+
+  console.log('User not logged in, setting up login form');
 
   // Set up event listeners
   setupEventListeners();
@@ -144,7 +149,7 @@ async function checkCredentials(username, password) {
       });
 
       // Store user data in localStorage
-      localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(userData));
+      localStorage.setItem('user_profile', JSON.stringify(userData));
 
       return true;
     } catch (apiError) {
@@ -165,14 +170,14 @@ async function checkCredentials(username, password) {
       if (isValid) {
         // Create mock user data
         const mockUserData = {
-          id: 'local-' + Date.now(),
-          username: username,
+          id: `local-${Date.now()}`,
+          username,
           email: `${username}@example.com`,
           createdAt: new Date()
         };
 
         // Store mock user data
-        localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(mockUserData));
+        localStorage.setItem('user_profile', JSON.stringify(mockUserData));
       }
 
       return isValid;
@@ -195,16 +200,16 @@ function showError(message) {
 // Set the logged in state
 function setLoggedIn(isLoggedIn, username, rememberMe) {
   // Generate a dummy token (in a real app, this would come from the server)
-  const token = 'dummy-token-' + Date.now();
+  const token = `dummy-token-${Date.now()}`;
 
   if (rememberMe) {
     // Store in localStorage (persists between sessions)
-    localStorage.setItem(Config.storageKeys.authToken, token);
+    localStorage.setItem('auth_token', token);
     localStorage.setItem('rememberMe', 'true');
     localStorage.setItem('savedUsername', username);
   } else {
     // Store in sessionStorage (cleared when browser is closed)
-    sessionStorage.setItem(Config.storageKeys.authToken, token);
+    sessionStorage.setItem('auth_token', token);
     localStorage.setItem('rememberMe', 'false');
     localStorage.removeItem('savedUsername');
   }
@@ -213,8 +218,10 @@ function setLoggedIn(isLoggedIn, username, rememberMe) {
 // Check if the user is logged in
 function isLoggedIn() {
   // Check both localStorage and sessionStorage for the auth token
-  return localStorage.getItem(Config.storageKeys.authToken) !== null ||
-         sessionStorage.getItem(Config.storageKeys.authToken) !== null;
+  const localToken = localStorage.getItem('auth_token');
+  const sessionToken = sessionStorage.getItem('auth_token');
+
+  return localToken !== null || sessionToken !== null;
 }
 
 // Redirect to the main application

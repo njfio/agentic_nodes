@@ -4,59 +4,63 @@
  * Now integrated with the server API
  */
 
+// Make sure we have a Config object
+if (typeof Config === 'undefined') {
+  // Define a temporary Config object if it doesn't exist yet
+  window.Config = {
+    storageKeys: {
+      authToken: 'auth_token',
+      userProfile: 'user_profile'
+    }
+  };
+
+  console.warn('Config object not loaded yet, using default values');
+}
+
 const Auth = {
   // Initialize the authentication system
   init() {
+    console.log('Auth init called');
+
+    // Check if we're on the login page
+    if (window.location.pathname.includes('login.html')) {
+      console.log('On login page, skipping auth check');
+      return;
+    }
+
     // Check if the user is logged in
     if (!this.isLoggedIn()) {
+      console.log('User not logged in, redirecting to login');
       this.redirectToLogin();
       return;
     }
 
-    // Verify token with the server
-    this.verifyToken()
-      .then(valid => {
-        if (valid) {
-          // Add the user info and logout button to the toolbar
-          this.addUserInfoToToolbar();
-        } else {
-          // Token is invalid, log out
-          this.logout();
-        }
-      })
-      .catch(error => {
-        console.error('Error verifying token:', error);
-        // If there's an error, we'll still show the UI but log the error
-        this.addUserInfoToToolbar();
-      });
+    console.log('User is logged in, adding user info to toolbar');
+
+    // Add the user info and logout button to the toolbar
+    this.addUserInfoToToolbar();
   },
 
   // Check if the user is logged in
   isLoggedIn() {
-    return localStorage.getItem(Config.storageKeys.authToken) !== null;
+    // Check both localStorage and sessionStorage
+    const localToken = localStorage.getItem('auth_token');
+    const sessionToken = sessionStorage.getItem('auth_token');
+
+    console.log('Checking login status:', { localToken, sessionToken });
+
+    return localToken !== null || sessionToken !== null;
   },
 
   // Get the current user data
   getUserData() {
-    const userData = localStorage.getItem(Config.storageKeys.userProfile);
+    const userData = localStorage.getItem('user_profile');
     return userData ? JSON.parse(userData) : { username: 'User' };
   },
 
   // Get the current username
   getUsername() {
     return this.getUserData().username || 'User';
-  },
-
-  // Verify the token with the server
-  async verifyToken() {
-    try {
-      // In a real implementation, this would call an API endpoint to verify the token
-      // For now, we'll just check if the token exists
-      return this.isLoggedIn();
-    } catch (error) {
-      console.error('Error verifying token:', error);
-      return false;
-    }
   },
 
   // Redirect to the login page
@@ -67,8 +71,9 @@ const Auth = {
   // Log out the user
   logout() {
     // Clear the auth data
-    localStorage.removeItem(Config.storageKeys.authToken);
-    localStorage.removeItem(Config.storageKeys.userProfile);
+    localStorage.removeItem('auth_token');
+    sessionStorage.removeItem('auth_token');
+    localStorage.removeItem('user_profile');
 
     // Redirect to the login page
     this.redirectToLogin();
