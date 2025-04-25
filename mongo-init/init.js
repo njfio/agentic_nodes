@@ -10,11 +10,31 @@ db.createCollection('nodes');
 db.users.insertOne({
   username: 'admin',
   email: 'admin@example.com',
-  password: 'admin123', // In a real app, this would be hashed
+  password: 'password', // In a real app, this would be hashed
   color: '#3498db',
   createdAt: new Date(),
   updatedAt: new Date()
 });
+
+// Create additional test users
+db.users.insertMany([
+  {
+    username: 'user',
+    email: 'user@example.com',
+    password: 'user123',
+    color: '#2ecc71',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    username: 'demo',
+    email: 'demo@example.com',
+    password: 'demo',
+    color: '#e74c3c',
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+]);
 
 // Create a sample workflow
 const workflowId = ObjectId();
