@@ -8,22 +8,22 @@ const WorkflowIO = {
   inputNode: null,
   outputNode: null,
   isProcessing: false,
-  
+
   // Initialize the workflow I/O interface
   init() {
     // Create the workflow I/O modal
     this.createWorkflowIOModal();
-    
+
     // Set up event listeners
     this.setupEventListeners();
-    
+
     // Add the workflow I/O button to the toolbar
     this.addWorkflowIOButton();
-    
+
     // Add the node role options to the node editor
     this.addNodeRoleOptions();
   },
-  
+
   // Create the workflow I/O modal
   createWorkflowIOModal() {
     // Create the modal HTML
@@ -41,7 +41,7 @@ const WorkflowIO = {
               <span id="outputNodeStatus" class="status-value not-set">Not Set</span>
             </div>
           </div>
-          
+
           <div class="workflow-io-container">
             <div class="workflow-input">
               <h3>Input</h3>
@@ -54,7 +54,7 @@ const WorkflowIO = {
               </div>
               <button id="runWorkflowBtn" class="primary-btn" type="button">Run Workflow</button>
             </div>
-            
+
             <div class="workflow-output">
               <h3>Output</h3>
               <div id="workflowOutput" class="output-container">
@@ -66,7 +66,7 @@ const WorkflowIO = {
               </div>
             </div>
           </div>
-          
+
           <div class="workflow-io-help">
             <h3>How to Use</h3>
             <ol>
@@ -76,40 +76,40 @@ const WorkflowIO = {
               <li>View the result in the output area</li>
             </ol>
           </div>
-          
+
           <div class="button-group">
             <button id="closeWorkflowIO" class="secondary-btn" type="button">Close</button>
           </div>
         </div>
       </div>
     `;
-    
+
     // Add the modal to the document
     document.body.insertAdjacentHTML('beforeend', modalHTML);
   },
-  
+
   // Set up event listeners
   setupEventListeners() {
     // Close button
     document.getElementById('closeWorkflowIO').addEventListener('click', () => {
       this.closeWorkflowIO();
     });
-    
+
     // Run workflow button
     document.getElementById('runWorkflowBtn').addEventListener('click', () => {
       this.runWorkflow();
     });
-    
+
     // Copy output button
     document.getElementById('copyOutputBtn').addEventListener('click', () => {
       this.copyOutput();
     });
-    
+
     // Clear output button
     document.getElementById('clearOutputBtn').addEventListener('click', () => {
       this.clearOutput();
     });
-    
+
     // Input field enter key
     document.getElementById('workflowInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.ctrlKey) {
@@ -117,7 +117,7 @@ const WorkflowIO = {
       }
     });
   },
-  
+
   // Add the workflow I/O button to the toolbar
   addWorkflowIOButton() {
     // Create the button
@@ -125,12 +125,12 @@ const WorkflowIO = {
     workflowIOBtn.id = 'workflowIOBtn';
     workflowIOBtn.type = 'button';
     workflowIOBtn.textContent = 'Workflow Interface';
-    
+
     // Add click event listener
     workflowIOBtn.addEventListener('click', () => {
       this.openWorkflowIO();
     });
-    
+
     // Add the button to the toolbar
     const toolbar = document.getElementById('toolbar');
     if (toolbar) {
@@ -143,12 +143,12 @@ const WorkflowIO = {
       }
     }
   },
-  
+
   // Add the node role options to the node editor
   addNodeRoleOptions() {
     // Find the form group in the node editor
     const formGroups = document.querySelectorAll('#nodeEditorForm .form-group');
-    
+
     if (formGroups.length > 0) {
       // Create a new form group for node roles
       const nodeRoleGroup = document.createElement('div');
@@ -170,28 +170,28 @@ const WorkflowIO = {
           </div>
         </div>
       `;
-      
+
       // Insert after the AI processor form group
-      const aiProcessorGroup = Array.from(formGroups).find(group => 
+      const aiProcessorGroup = Array.from(formGroups).find(group =>
         group.querySelector('label[for="aiProcessor"]')
       );
-      
+
       if (aiProcessorGroup) {
         aiProcessorGroup.parentNode.insertBefore(nodeRoleGroup, aiProcessorGroup.nextSibling);
-        
+
         // Add event listeners to the radio buttons
         document.getElementById('nodeRoleNone').addEventListener('change', (e) => {
           if (e.target.checked && App.editingNode) {
             this.setNodeRole(App.editingNode, 'none');
           }
         });
-        
+
         document.getElementById('nodeRoleInput').addEventListener('change', (e) => {
           if (e.target.checked && App.editingNode) {
             this.setNodeRole(App.editingNode, 'input');
           }
         });
-        
+
         document.getElementById('nodeRoleOutput').addEventListener('change', (e) => {
           if (e.target.checked && App.editingNode) {
             this.setNodeRole(App.editingNode, 'output');
@@ -200,7 +200,7 @@ const WorkflowIO = {
       }
     }
   },
-  
+
   // Set the role of a node
   setNodeRole(node, role) {
     // If this node was previously an input or output node, remove that role
@@ -209,10 +209,10 @@ const WorkflowIO = {
     } else if (node.workflowRole === 'output' && this.outputNode === node) {
       this.outputNode = null;
     }
-    
+
     // Set the new role
     node.workflowRole = role;
-    
+
     // If the new role is input or output, update the corresponding property
     if (role === 'input') {
       // If there was a previous input node, remove its role
@@ -220,7 +220,7 @@ const WorkflowIO = {
         this.inputNode.workflowRole = 'none';
         DebugManager.addLog(`Node ${this.inputNode.id} is no longer the input node`, 'info');
       }
-      
+
       this.inputNode = node;
       DebugManager.addLog(`Node ${node.id} set as input node`, 'success');
     } else if (role === 'output') {
@@ -229,37 +229,37 @@ const WorkflowIO = {
         this.outputNode.workflowRole = 'none';
         DebugManager.addLog(`Node ${this.outputNode.id} is no longer the output node`, 'info');
       }
-      
+
       this.outputNode = node;
       DebugManager.addLog(`Node ${node.id} set as output node`, 'success');
     }
-    
+
     // Update the status in the modal if it's open
     this.updateStatus();
   },
-  
+
   // Open the workflow I/O modal
   openWorkflowIO() {
     // Update the status
     this.updateStatus();
-    
+
     // Show the modal
     ModalManager.openModal('workflowIOModal');
   },
-  
+
   // Close the workflow I/O modal
   closeWorkflowIO() {
     // Hide the modal
     ModalManager.closeModal('workflowIOModal');
   },
-  
+
   // Update the input and output node status
   updateStatus() {
     const inputNodeStatus = document.getElementById('inputNodeStatus');
     const outputNodeStatus = document.getElementById('outputNodeStatus');
-    
+
     if (!inputNodeStatus || !outputNodeStatus) return;
-    
+
     // Update input node status
     if (this.inputNode) {
       inputNodeStatus.textContent = `Node ${this.inputNode.id}: ${this.inputNode.title || 'Untitled'}`;
@@ -268,7 +268,7 @@ const WorkflowIO = {
       inputNodeStatus.textContent = 'Not Set';
       inputNodeStatus.className = 'status-value not-set';
     }
-    
+
     // Update output node status
     if (this.outputNode) {
       outputNodeStatus.textContent = `Node ${this.outputNode.id}: ${this.outputNode.title || 'Untitled'}`;
@@ -277,14 +277,14 @@ const WorkflowIO = {
       outputNodeStatus.textContent = 'Not Set';
       outputNodeStatus.className = 'status-value not-set';
     }
-    
+
     // Update the run button state
     const runWorkflowBtn = document.getElementById('runWorkflowBtn');
     if (runWorkflowBtn) {
       runWorkflowBtn.disabled = !this.inputNode || !this.outputNode || this.isProcessing;
     }
   },
-  
+
   // Run the workflow
   async runWorkflow() {
     // Check if input and output nodes are set
@@ -292,48 +292,53 @@ const WorkflowIO = {
       DebugManager.addLog('Input and output nodes must be set to run the workflow', 'error');
       return;
     }
-    
+
     // Get the input text
     const workflowInput = document.getElementById('workflowInput');
     const inputText = workflowInput.value.trim();
-    
+
     if (!inputText) {
       DebugManager.addLog('Please enter input text', 'error');
       return;
     }
-    
+
     // Check if we should clear the output
     const clearOutputOnRun = document.getElementById('clearOutputOnRun').checked;
     if (clearOutputOnRun) {
       this.clearOutput();
     }
-    
+
     // Set processing state
     this.isProcessing = true;
     this.updateStatus();
-    
+
     // Update the output to show processing
     const workflowOutput = document.getElementById('workflowOutput');
     workflowOutput.innerHTML = '<div class="processing-message">Processing your request...</div>';
-    
+
     try {
       // Set the input node's content
       this.inputNode.content = inputText;
       this.inputNode.hasBeenProcessed = false;
-      
+
       // Clear the output node's content
       this.outputNode.content = '';
       this.outputNode.hasBeenProcessed = false;
-      
+
       // Process the input node
       DebugManager.addLog(`Running workflow with input: ${inputText.substring(0, 50)}${inputText.length > 50 ? '...' : ''}`, 'info');
-      
+
       // Process the node chain starting from the input node
       await App.processNodeChain(this.inputNode);
-      
-      // Get the output from the output node
+
+      // Add a small delay to ensure all processing is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Get the output from the output node - make sure we're getting the latest content
       const output = this.outputNode.content;
-      
+
+      DebugManager.addLog(`Output node content: ${output ? (output.length > 50 ? output.substring(0, 50) + '...' : output) : 'empty'}`, 'info');
+
       // Update the output display
       if (output) {
         if (this.outputNode.contentType === 'image') {
@@ -349,11 +354,24 @@ const WorkflowIO = {
             </div>
           `;
         }
-        
+
         DebugManager.addLog('Workflow completed successfully', 'success');
       } else {
-        workflowOutput.innerHTML = '<div class="no-output-message">No output was generated</div>';
-        DebugManager.addLog('Workflow completed but no output was generated', 'warning');
+        // If the output node has been processed but has no content, check if it has inputContent
+        if (this.outputNode.hasBeenProcessed && this.outputNode.inputContent) {
+          const fallbackOutput = this.outputNode.inputContent;
+
+          workflowOutput.innerHTML = `
+            <div class="output-content">
+              <pre>${fallbackOutput}</pre>
+            </div>
+          `;
+
+          DebugManager.addLog('Workflow completed. Using input content as output.', 'warning');
+        } else {
+          workflowOutput.innerHTML = '<div class="no-output-message">No output was generated</div>';
+          DebugManager.addLog('Workflow completed but no output was generated', 'warning');
+        }
       }
     } catch (error) {
       // Show the error in the output
@@ -363,7 +381,7 @@ const WorkflowIO = {
           <pre>${error.message}</pre>
         </div>
       `;
-      
+
       DebugManager.addLog(`Workflow execution failed: ${error.message}`, 'error');
     } finally {
       // Reset processing state
@@ -371,15 +389,15 @@ const WorkflowIO = {
       this.updateStatus();
     }
   },
-  
+
   // Copy the output to clipboard
   copyOutput() {
     const workflowOutput = document.getElementById('workflowOutput');
     if (!workflowOutput) return;
-    
+
     // Get the output content
     let outputText = '';
-    
+
     // Check if there's an image
     const outputImage = workflowOutput.querySelector('.output-image');
     if (outputImage) {
@@ -391,12 +409,12 @@ const WorkflowIO = {
         outputText = outputContent.textContent;
       }
     }
-    
+
     if (!outputText) {
       DebugManager.addLog('No output to copy', 'error');
       return;
     }
-    
+
     // Copy to clipboard
     navigator.clipboard.writeText(outputText)
       .then(() => {
@@ -406,7 +424,7 @@ const WorkflowIO = {
         DebugManager.addLog(`Failed to copy output: ${err.message}`, 'error');
       });
   },
-  
+
   // Clear the output
   clearOutput() {
     const workflowOutput = document.getElementById('workflowOutput');
@@ -431,7 +449,7 @@ const originalOpenNodeEditorForWorkflowIO = App.openNodeEditor;
 App.openNodeEditor = function(node) {
   // Call the original openNodeEditor method
   originalOpenNodeEditorForWorkflowIO.call(this, node);
-  
+
   // Update the node role radio buttons
   if (this.editingNode) {
     const role = this.editingNode.workflowRole || 'none';
@@ -447,30 +465,30 @@ const originalDrawForWorkflowIO = App.draw;
 App.draw = function() {
   // Call the original draw method
   originalDrawForWorkflowIO.call(this);
-  
+
   // Draw indicators for input and output nodes
   this.nodes.forEach(node => {
     if (node.workflowRole === 'input' || node.workflowRole === 'output') {
       this.ctx.save();
-      
+
       // Draw a badge in the top-right corner
       const badgeX = node.x + node.width - 10;
       const badgeY = node.y + 10;
       const badgeRadius = 10;
-      
+
       // Draw the badge circle
       this.ctx.fillStyle = node.workflowRole === 'input' ? '#27ae60' : '#e74c3c';
       this.ctx.beginPath();
       this.ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
       this.ctx.fill();
-      
+
       // Draw the badge text
       this.ctx.fillStyle = '#fff';
       this.ctx.font = 'bold 12px Arial';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
       this.ctx.fillText(node.workflowRole === 'input' ? 'I' : 'O', badgeX, badgeY);
-      
+
       this.ctx.restore();
     }
   });

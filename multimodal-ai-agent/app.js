@@ -2915,6 +2915,15 @@ const App = {
     // Process the current node
     const output = await node.process(input);
 
+    // Store the output in the node's content
+    if (output && node.content !== output) {
+      node.content = output;
+      node.hasBeenProcessed = true;
+
+      // Log for debugging
+      DebugManager.addLog(`Node ${node.id} processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
+    }
+
     // Special handling for text-to-image nodes
     if (node.aiProcessor === 'text-to-image') {
       // Set content type to image for text-to-image nodes
@@ -2964,6 +2973,18 @@ const App = {
 
       // Process the connected node with the output from the current node
       await this.processNodeAndConnections(toNode, output);
+    }
+
+    // Special handling for workflow output nodes
+    if (node.workflowRole === 'output') {
+      // Ensure the content is set
+      if (output && node.content !== output) {
+        node.content = output;
+        node.hasBeenProcessed = true;
+      }
+
+      // Log for debugging
+      DebugManager.addLog(`Output node ${node.id} final content: ${node.content ? (node.content.substring ? node.content.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
     }
 
     return output;
