@@ -118,7 +118,9 @@ const connectWithRetry = async () => {
     });
     console.log('Connected to in-memory MongoDB successfully');
 
-    // Default user is already created in the in-memory server
+    // Create default test user
+    await createDefaultUser();
+
     return;
   } catch (err) {
     console.error('Failed to connect to MongoDB:', err);
