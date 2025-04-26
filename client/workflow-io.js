@@ -444,60 +444,124 @@ Object.defineProperty(Node.prototype, 'workflowRole', {
   }
 });
 
-// Modify the openNodeEditor method to update the node role radio buttons
-const originalOpenNodeEditorForWorkflowIO = App.openNodeEditor;
-App.openNodeEditor = function(node) {
-  // Call the original openNodeEditor method
-  originalOpenNodeEditorForWorkflowIO.call(this, node);
-
-  // Update the node role radio buttons
-  if (this.editingNode) {
-    const role = this.editingNode.workflowRole || 'none';
-    const radioButton = document.getElementById(`nodeRole${role.charAt(0).toUpperCase() + role.slice(1)}`);
-    if (radioButton) {
-      radioButton.checked = true;
-    }
-  }
-};
-
-// Modify the draw method to indicate input and output nodes
-const originalDrawForWorkflowIO = App.draw;
-App.draw = function() {
-  // Call the original draw method
-  originalDrawForWorkflowIO.call(this);
-
-  // Draw indicators for input and output nodes
-  this.nodes.forEach(node => {
-    if (node.workflowRole === 'input' || node.workflowRole === 'output') {
-      this.ctx.save();
-
-      // Draw a badge in the top-right corner
-      const badgeX = node.x + node.width - 10;
-      const badgeY = node.y + 10;
-      const badgeRadius = 10;
-
-      // Draw the badge circle
-      this.ctx.fillStyle = node.workflowRole === 'input' ? '#27ae60' : '#e74c3c';
-      this.ctx.beginPath();
-      this.ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // Draw the badge text
-      this.ctx.fillStyle = '#fff';
-      this.ctx.font = 'bold 12px Arial';
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.fillText(node.workflowRole === 'input' ? 'I' : 'O', badgeX, badgeY);
-
-      this.ctx.restore();
-    }
-  });
-};
-
 // Initialize the workflow I/O interface when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize after the App is initialized
   setTimeout(() => {
-    WorkflowIO.init();
+    // Make sure App is defined before using it
+    if (typeof App !== 'undefined') {
+      // Modify the openNodeEditor method to update the node role radio buttons
+      const originalOpenNodeEditorForWorkflowIO = App.openNodeEditor;
+      App.openNodeEditor = function(node) {
+        // Call the original openNodeEditor method
+        originalOpenNodeEditorForWorkflowIO.call(this, node);
+
+        // Update the node role radio buttons
+        if (this.editingNode) {
+          const role = this.editingNode.workflowRole || 'none';
+          const radioButton = document.getElementById(`nodeRole${role.charAt(0).toUpperCase() + role.slice(1)}`);
+          if (radioButton) {
+            radioButton.checked = true;
+          }
+        }
+      };
+
+      // Modify the draw method to indicate input and output nodes
+      const originalDrawForWorkflowIO = App.draw;
+      App.draw = function() {
+        // Call the original draw method
+        originalDrawForWorkflowIO.call(this);
+
+        // Draw indicators for input and output nodes
+        this.nodes.forEach(node => {
+          if (node.workflowRole === 'input' || node.workflowRole === 'output') {
+            this.ctx.save();
+
+            // Draw a badge in the top-right corner
+            const badgeX = node.x + node.width - 10;
+            const badgeY = node.y + 10;
+            const badgeRadius = 10;
+
+            // Draw the badge circle
+            this.ctx.fillStyle = node.workflowRole === 'input' ? '#27ae60' : '#e74c3c';
+            this.ctx.beginPath();
+            this.ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // Draw the badge text
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(node.workflowRole === 'input' ? 'I' : 'O', badgeX, badgeY);
+
+            this.ctx.restore();
+          }
+        });
+      };
+
+      // Initialize workflow I/O
+      WorkflowIO.init();
+    } else {
+      console.warn('App not defined yet, workflow I/O initialization delayed');
+      // Try again after a longer delay
+      setTimeout(() => {
+        if (typeof App !== 'undefined') {
+          // Modify the openNodeEditor method to update the node role radio buttons
+          const originalOpenNodeEditorForWorkflowIO = App.openNodeEditor;
+          App.openNodeEditor = function(node) {
+            // Call the original openNodeEditor method
+            originalOpenNodeEditorForWorkflowIO.call(this, node);
+
+            // Update the node role radio buttons
+            if (this.editingNode) {
+              const role = this.editingNode.workflowRole || 'none';
+              const radioButton = document.getElementById(`nodeRole${role.charAt(0).toUpperCase() + role.slice(1)}`);
+              if (radioButton) {
+                radioButton.checked = true;
+              }
+            }
+          };
+
+          // Modify the draw method to indicate input and output nodes
+          const originalDrawForWorkflowIO = App.draw;
+          App.draw = function() {
+            // Call the original draw method
+            originalDrawForWorkflowIO.call(this);
+
+            // Draw indicators for input and output nodes
+            this.nodes.forEach(node => {
+              if (node.workflowRole === 'input' || node.workflowRole === 'output') {
+                this.ctx.save();
+
+                // Draw a badge in the top-right corner
+                const badgeX = node.x + node.width - 10;
+                const badgeY = node.y + 10;
+                const badgeRadius = 10;
+
+                // Draw the badge circle
+                this.ctx.fillStyle = node.workflowRole === 'input' ? '#27ae60' : '#e74c3c';
+                this.ctx.beginPath();
+                this.ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Draw the badge text
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = 'bold 12px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText(node.workflowRole === 'input' ? 'I' : 'O', badgeX, badgeY);
+
+                this.ctx.restore();
+              }
+            });
+          };
+
+          WorkflowIO.init();
+        } else {
+          console.error('App still not defined, workflow I/O initialization failed');
+        }
+      }, 500);
+    }
   }, 100);
 });

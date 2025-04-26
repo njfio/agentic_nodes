@@ -3340,11 +3340,9 @@ const App = {
     // Get input and output types if those fields exist
     const inputTypeField = document.getElementById('inputType');
     const outputTypeField = document.getElementById('outputType');
-    const autoSizeCheckbox = document.getElementById('autoSizeNode');
 
     if (inputTypeField) this.editingNode.inputType = inputTypeField.value;
     if (outputTypeField) this.editingNode.outputType = outputTypeField.value;
-    if (autoSizeCheckbox) this.editingNode.autoSize = autoSizeCheckbox.checked;
 
     // Reset cached content images when content type changes
     if (this.editingNode.contentType !== 'image') {

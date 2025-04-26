@@ -83,10 +83,10 @@ class NodeGroup {
         x: node.x,
         y: node.y
       }));
-      
+
       // Collapse the group
       this.collapsed = true;
-      
+
       // Hide the nodes
       this.nodes.forEach(node => {
         node.hidden = true;
@@ -94,11 +94,11 @@ class NodeGroup {
     } else {
       // Expand the group
       this.collapsed = false;
-      
+
       // Show the nodes and restore positions
       this.nodes.forEach(node => {
         node.hidden = false;
-        
+
         // Find the original position
         const originalPos = this.originalPositions.find(pos => pos.id === node.id);
         if (originalPos) {
@@ -106,10 +106,10 @@ class NodeGroup {
           node.y = originalPos.y;
         }
       });
-      
+
       // Clear the original positions
       this.originalPositions = [];
-      
+
       // Recalculate the group size
       this.recalculateSize();
     }
@@ -126,14 +126,14 @@ class NodeGroup {
 
     // Find the bounds of all nodes
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
+
     this.nodes.forEach(node => {
       minX = Math.min(minX, node.x);
       minY = Math.min(minY, node.y);
       maxX = Math.max(maxX, node.x + node.width);
       maxY = Math.max(maxY, node.y + node.height);
     });
-    
+
     // Set the group position and size with padding
     this.x = minX - this.padding;
     this.y = minY - this.padding - this.headerHeight;
@@ -145,7 +145,7 @@ class NodeGroup {
   move(dx, dy) {
     this.x += dx;
     this.y += dy;
-    
+
     // Move all nodes in the group
     this.nodes.forEach(node => {
       node.x += dx;
@@ -163,12 +163,12 @@ class NodeGroup {
   // Draw the group
   draw(ctx) {
     ctx.save();
-    
+
     // Draw the group background
-    ctx.fillStyle = this.selected ? 
+    ctx.fillStyle = this.selected ?
       `${this.color}80` : // 50% opacity when selected
       `${this.color}40`;  // 25% opacity when not selected
-    
+
     // Draw rounded rectangle
     const radius = 8;
     ctx.beginPath();
@@ -183,12 +183,12 @@ class NodeGroup {
     ctx.quadraticCurveTo(this.x, this.y, this.x + radius, this.y);
     ctx.closePath();
     ctx.fill();
-    
+
     // Draw the group border
     ctx.strokeStyle = this.selected ? this.color : `${this.color}80`;
     ctx.lineWidth = this.selected ? 2 : 1;
     ctx.stroke();
-    
+
     // Draw the header background
     ctx.fillStyle = this.color;
     ctx.beginPath();
@@ -201,20 +201,20 @@ class NodeGroup {
     ctx.quadraticCurveTo(this.x, this.y, this.x + radius, this.y);
     ctx.closePath();
     ctx.fill();
-    
+
     // Draw the title
     ctx.fillStyle = "#fff";
     ctx.font = "bold 14px Arial";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(this.title, this.x + 10, this.y + this.headerHeight / 2);
-    
+
     // Draw node count
     const nodeCountText = `${this.nodes.length} node${this.nodes.length !== 1 ? 's' : ''}`;
     ctx.font = "12px Arial";
     ctx.textAlign = "right";
     ctx.fillText(nodeCountText, this.x + this.width - 30, this.y + this.headerHeight / 2);
-    
+
     // Draw collapse/expand button
     ctx.fillStyle = "#fff";
     ctx.beginPath();
@@ -231,7 +231,7 @@ class NodeGroup {
     }
     ctx.lineWidth = 2;
     ctx.stroke();
-    
+
     // Draw resize handle if not collapsed
     if (!this.collapsed) {
       ctx.fillStyle = this.color;
@@ -242,7 +242,7 @@ class NodeGroup {
       ctx.closePath();
       ctx.fill();
     }
-    
+
     // If collapsed, draw a preview of the nodes
     if (this.collapsed) {
       // Draw a grid of small squares representing nodes
@@ -253,17 +253,17 @@ class NodeGroup {
       const previewCols = 3;
       const startX = this.x + (this.width - (previewCols * previewSize + (previewCols - 1) * previewGap)) / 2;
       const startY = this.y + this.headerHeight + (this.height - this.headerHeight - (previewRows * previewSize + (previewRows - 1) * previewGap)) / 2;
-      
+
       for (let i = 0; i < Math.min(this.nodes.length, maxPreviewNodes); i++) {
         const row = Math.floor(i / previewCols);
         const col = i % previewCols;
         const x = startX + col * (previewSize + previewGap);
         const y = startY + row * (previewSize + previewGap);
-        
+
         ctx.fillStyle = "#fff";
         ctx.fillRect(x, y, previewSize, previewSize);
       }
-      
+
       // If there are more nodes than can be shown in the preview
       if (this.nodes.length > maxPreviewNodes) {
         ctx.fillStyle = "#fff";
@@ -273,7 +273,7 @@ class NodeGroup {
         ctx.fillText(`+${this.nodes.length - maxPreviewNodes} more`, this.x + this.width / 2, this.y + this.height - 15);
       }
     }
-    
+
     ctx.restore();
   }
 }
@@ -289,29 +289,29 @@ const NodeGroups = {
   selectedGroup: null,
   dragOffsetX: 0,
   dragOffsetY: 0,
-  
+
   // Initialize the node groups functionality
   init() {
     // Set up event listeners
     this.setupEventListeners();
-    
+
     // Add the create group button to the toolbar
     this.addCreateGroupButton();
   },
-  
+
   // Set up event listeners
   setupEventListeners() {
     // Add mouse event listeners to the canvas
     const canvas = document.getElementById('canvas');
-    
+
     // Mouse down event for selecting and dragging groups
     canvas.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Only handle left mouse button
-      
+
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) / App.zoom - App.offsetX;
       const y = (e.clientY - rect.top) / App.zoom - App.offsetY;
-      
+
       // Check if creating a new group
       if (this.creatingGroup) {
         this.startX = x;
@@ -320,14 +320,14 @@ const NodeGroups = {
         this.currentY = y;
         return;
       }
-      
+
       // Check if clicking on a group
       let clickedOnGroup = false;
-      
+
       // Check groups in reverse order (top to bottom in z-index)
       for (let i = this.groups.length - 1; i >= 0; i--) {
         const group = this.groups[i];
-        
+
         // Check if clicking on the resize handle
         if (!group.collapsed && group.resizeHandleContainsPoint(x, y)) {
           group.resizing = true;
@@ -335,7 +335,7 @@ const NodeGroups = {
           clickedOnGroup = true;
           break;
         }
-        
+
         // Check if clicking on the header (for dragging or collapsing)
         if (group.headerContainsPoint(x, y)) {
           // Check if clicking on the collapse/expand button
@@ -345,23 +345,23 @@ const NodeGroups = {
             clickedOnGroup = true;
             break;
           }
-          
+
           // Start dragging the group
           group.dragging = true;
           this.dragOffsetX = x - group.x;
           this.dragOffsetY = y - group.y;
-          
+
           // Select the group
           this.selectGroup(group);
           clickedOnGroup = true;
           break;
         }
-        
+
         // Check if clicking inside the group (for selection)
         if (group.containsPoint(x, y)) {
           // Don't select the group if clicking on a node inside it
           let clickedOnNode = false;
-          
+
           // Check if clicking on a node
           for (const node of App.nodes) {
             if (!node.hidden && node.containsPoint(x, y)) {
@@ -369,7 +369,7 @@ const NodeGroups = {
               break;
             }
           }
-          
+
           if (!clickedOnNode) {
             this.selectGroup(group);
             clickedOnGroup = true;
@@ -377,22 +377,22 @@ const NodeGroups = {
           }
         }
       }
-      
+
       // If not clicking on any group, deselect the current group
       if (!clickedOnGroup) {
         this.deselectAll();
       }
     });
-    
+
     // Mouse move event for dragging and resizing groups
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) / App.zoom - App.offsetX;
       const y = (e.clientY - rect.top) / App.zoom - App.offsetY;
-      
+
       // Update cursor based on hover state
       this.updateCursor(x, y);
-      
+
       // Handle creating a new group
       if (this.creatingGroup && e.buttons === 1) {
         this.currentX = x;
@@ -400,40 +400,40 @@ const NodeGroups = {
         App.draw();
         return;
       }
-      
+
       // Handle dragging a group
       if (this.selectedGroup && this.selectedGroup.dragging && e.buttons === 1) {
         const newX = x - this.dragOffsetX;
         const newY = y - this.dragOffsetY;
         const dx = newX - this.selectedGroup.x;
         const dy = newY - this.selectedGroup.y;
-        
+
         this.selectedGroup.move(dx, dy);
         App.draw();
         return;
       }
-      
+
       // Handle resizing a group
       if (this.selectedGroup && this.selectedGroup.resizing && e.buttons === 1) {
         const newWidth = x - this.selectedGroup.x;
         const newHeight = y - this.selectedGroup.y;
-        
+
         this.selectedGroup.resize(newWidth, newHeight);
         App.draw();
         return;
       }
     });
-    
+
     // Mouse up event for finishing drag, resize, or group creation
     canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return; // Only handle left mouse button
-      
+
       // Handle finishing group creation
       if (this.creatingGroup) {
         const rect = canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / App.zoom - App.offsetX;
         const y = (e.clientY - rect.top) / App.zoom - App.offsetY;
-        
+
         // Calculate the bounds of the selection rectangle
         const left = Math.min(this.startX, x);
         const top = Math.min(this.startY, y);
@@ -441,14 +441,14 @@ const NodeGroups = {
         const bottom = Math.max(this.startY, y);
         const width = right - left;
         const height = bottom - top;
-        
+
         // Only create a group if the selection has a minimum size
         if (width > 20 && height > 20) {
           // Create a new group
           const group = new NodeGroup(left, top);
           group.width = width;
           group.height = height;
-          
+
           // Add nodes that are inside the selection rectangle
           App.nodes.forEach(node => {
             if (
@@ -460,7 +460,7 @@ const NodeGroups = {
               group.addNode(node);
             }
           });
-          
+
           // Only add the group if it contains nodes
           if (group.nodes.length > 0) {
             this.groups.push(group);
@@ -470,47 +470,47 @@ const NodeGroups = {
             DebugManager.addLog('No nodes selected for grouping', 'error');
           }
         }
-        
+
         this.creatingGroup = false;
         App.draw();
         return;
       }
-      
+
       // Reset dragging and resizing flags
       if (this.selectedGroup) {
         this.selectedGroup.dragging = false;
         this.selectedGroup.resizing = false;
       }
     });
-    
+
     // Double click event for editing group title
     canvas.addEventListener('dblclick', (e) => {
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) / App.zoom - App.offsetX;
       const y = (e.clientY - rect.top) / App.zoom - App.offsetY;
-      
+
       // Check if double-clicking on a group header
       for (let i = this.groups.length - 1; i >= 0; i--) {
         const group = this.groups[i];
-        
+
         if (group.headerContainsPoint(x, y)) {
           // Don't edit if clicking on the collapse button
           if (x >= group.x + group.width - 20 && x <= group.x + group.width - 5) {
             return;
           }
-          
+
           // Prompt for a new title
           const newTitle = prompt('Enter a new title for the group:', group.title);
           if (newTitle !== null) {
             group.title = newTitle;
             App.draw();
           }
-          
+
           break;
         }
       }
     });
-    
+
     // Key event for deleting groups
     document.addEventListener('keydown', (e) => {
       // Delete key
@@ -519,7 +519,7 @@ const NodeGroups = {
       }
     });
   },
-  
+
   // Add the create group button to the toolbar
   addCreateGroupButton() {
     // Create the button
@@ -527,12 +527,12 @@ const NodeGroups = {
     createGroupBtn.id = 'createGroupBtn';
     createGroupBtn.type = 'button';
     createGroupBtn.textContent = 'Create Group';
-    
+
     // Add click event listener
     createGroupBtn.addEventListener('click', () => {
       this.startCreatingGroup();
     });
-    
+
     // Add the button to the toolbar
     const toolbar = document.getElementById('toolbar');
     if (toolbar) {
@@ -545,7 +545,7 @@ const NodeGroups = {
       }
     }
   },
-  
+
   // Start creating a new group
   startCreatingGroup() {
     this.creatingGroup = true;
@@ -553,62 +553,62 @@ const NodeGroups = {
     this.startY = 0;
     this.currentX = 0;
     this.currentY = 0;
-    
+
     // Change cursor to crosshair
     document.body.style.cursor = 'crosshair';
-    
+
     DebugManager.addLog('Drag to select nodes for grouping', 'info');
   },
-  
+
   // Select a group
   selectGroup(group) {
     // Deselect all groups
     this.deselectAll();
-    
+
     // Select the new group
     group.selected = true;
     this.selectedGroup = group;
-    
+
     App.draw();
   },
-  
+
   // Deselect all groups
   deselectAll() {
     this.groups.forEach(group => {
       group.selected = false;
     });
-    
+
     this.selectedGroup = null;
-    
+
     App.draw();
   },
-  
+
   // Delete the selected group
   deleteSelectedGroup() {
     if (!this.selectedGroup) return;
-    
+
     // Remove the group reference from all nodes
     this.selectedGroup.nodes.forEach(node => {
       node.group = null;
       node.hidden = false;
     });
-    
+
     // Remove the group from the list
     const index = this.groups.indexOf(this.selectedGroup);
     if (index !== -1) {
       this.groups.splice(index, 1);
     }
-    
+
     this.selectedGroup = null;
-    
+
     DebugManager.addLog('Group deleted', 'info');
     App.draw();
   },
-  
+
   // Update cursor based on hover state
   updateCursor(x, y) {
     let cursorSet = false;
-    
+
     // Check if creating a group
     if (this.creatingGroup) {
       document.body.style.cursor = 'crosshair';
@@ -617,14 +617,14 @@ const NodeGroups = {
       // Check if hovering over a group
       for (let i = this.groups.length - 1; i >= 0; i--) {
         const group = this.groups[i];
-        
+
         // Check if hovering over the resize handle
         if (!group.collapsed && group.resizeHandleContainsPoint(x, y)) {
           document.body.style.cursor = 'nwse-resize';
           cursorSet = true;
           break;
         }
-        
+
         // Check if hovering over the header
         if (group.headerContainsPoint(x, y)) {
           // Check if hovering over the collapse/expand button
@@ -638,38 +638,38 @@ const NodeGroups = {
         }
       }
     }
-    
+
     // Reset cursor if not hovering over anything special
     if (!cursorSet) {
       document.body.style.cursor = 'default';
     }
   },
-  
+
   // Draw all groups
   draw(ctx) {
     // Draw the selection rectangle when creating a group
     if (this.creatingGroup) {
       ctx.save();
-      
+
       // Calculate the bounds of the selection rectangle
       const left = Math.min(this.startX, this.currentX);
       const top = Math.min(this.startY, this.currentY);
       const width = Math.abs(this.currentX - this.startX);
       const height = Math.abs(this.currentY - this.startY);
-      
+
       // Draw the selection rectangle
       ctx.strokeStyle = '#3498db';
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 3]);
       ctx.strokeRect(left, top, width, height);
-      
+
       // Draw the fill with low opacity
       ctx.fillStyle = 'rgba(52, 152, 219, 0.1)';
       ctx.fillRect(left, top, width, height);
-      
+
       ctx.restore();
     }
-    
+
     // Draw all groups
     this.groups.forEach(group => {
       group.draw(ctx);
@@ -697,30 +697,64 @@ Object.defineProperty(Node.prototype, 'hidden', {
   }
 });
 
-// Modify the Node's draw method to respect the hidden property
-const originalNodeDrawForGroups = Node.prototype.draw;
-Node.prototype.draw = function(ctx) {
-  // Skip drawing if the node is hidden
-  if (this.hidden) return;
-  
-  // Call the original draw method
-  originalNodeDrawForGroups.call(this, ctx);
-};
-
-// Modify the App's draw method to draw groups
-const originalAppDrawForGroups = App.draw;
-App.draw = function() {
-  // Call the original draw method
-  originalAppDrawForGroups.call(this);
-  
-  // Draw the groups
-  NodeGroups.draw(this.ctx);
-};
-
 // Initialize the node groups functionality when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize after the App is initialized
   setTimeout(() => {
-    NodeGroups.init();
+    // Make sure App and Node are defined before using them
+    if (typeof App !== 'undefined' && typeof Node !== 'undefined') {
+      // Modify the Node's draw method to respect the hidden property
+      const originalNodeDrawForGroups = Node.prototype.draw;
+      Node.prototype.draw = function(ctx) {
+        // Skip drawing if the node is hidden
+        if (this.hidden) return;
+
+        // Call the original draw method
+        originalNodeDrawForGroups.call(this, ctx);
+      };
+
+      // Modify the App's draw method to draw groups
+      const originalAppDrawForGroups = App.draw;
+      App.draw = function() {
+        // Call the original draw method
+        originalAppDrawForGroups.call(this);
+
+        // Draw the groups
+        NodeGroups.draw(this.ctx);
+      };
+
+      // Initialize node groups
+      NodeGroups.init();
+    } else {
+      console.warn('App or Node not defined yet, node groups initialization delayed');
+      // Try again after a longer delay
+      setTimeout(() => {
+        if (typeof App !== 'undefined' && typeof Node !== 'undefined') {
+          // Modify the Node's draw method to respect the hidden property
+          const originalNodeDrawForGroups = Node.prototype.draw;
+          Node.prototype.draw = function(ctx) {
+            // Skip drawing if the node is hidden
+            if (this.hidden) return;
+
+            // Call the original draw method
+            originalNodeDrawForGroups.call(this, ctx);
+          };
+
+          // Modify the App's draw method to draw groups
+          const originalAppDrawForGroups = App.draw;
+          App.draw = function() {
+            // Call the original draw method
+            originalAppDrawForGroups.call(this);
+
+            // Draw the groups
+            NodeGroups.draw(this.ctx);
+          };
+
+          NodeGroups.init();
+        } else {
+          console.error('App or Node still not defined, node groups initialization failed');
+        }
+      }, 500);
+    }
   }, 100);
 });
