@@ -38,10 +38,11 @@ const ApiService = {
    * @param {number} maxRetries - Maximum number of retries (default: 3)
    * @param {number} retryDelay - Delay between retries in ms (default: 1000)
    * @param {number} retryCount - Current retry count (used internally)
+   * @param {number} timeout - Request timeout in ms (default: 30000)
    * @returns {Promise} - Promise with response data
    */
   async request(endpoint, method = 'GET', data = null, retry = true, customHeaders = {},
-                maxRetries = 3, retryDelay = 1000, retryCount = 0) {
+                maxRetries = 3, retryDelay = 1000, retryCount = 0, timeout = 30000) {
     const url = `${Config.apiBaseUrl}${endpoint}`;
 
     const options = {
@@ -78,7 +79,7 @@ const ApiService = {
     try {
       // Add timeout to fetch request
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), timeout); // Use the provided timeout value
       options.signal = controller.signal;
 
       const response = await fetch(url, options);
@@ -154,8 +155,14 @@ const ApiService = {
     } catch (error) {
       // Handle network errors, timeouts, and aborts
       if (error.name === 'AbortError') {
-        console.error(`API request to ${endpoint} timed out`);
-        throw new Error('API request timed out. Please try again.');
+        console.error(`API request to ${endpoint} timed out after ${timeout/1000} seconds`);
+
+        // Provide a more specific error message for image generation timeouts
+        if (endpoint === '/openai/images') {
+          throw new Error('Image generation timed out. This operation can take longer than expected. Please try again or consider using a simpler prompt.');
+        } else {
+          throw new Error('API request timed out. Please try again.');
+        }
       }
 
       if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
@@ -163,18 +170,27 @@ const ApiService = {
         throw new Error('Network error. Please check your internet connection and try again.');
       }
 
-      // For network errors, retry if we haven't exceeded max retries
-      if ((error.name === 'TypeError' || error.name === 'NetworkError') && retryCount < maxRetries) {
-        console.warn(`Network error for API request to ${endpoint}. Retrying (${retryCount + 1}/${maxRetries})...`);
+      // For network errors or timeouts, retry if we haven't exceeded max retries
+      const retryableErrors = ['TypeError', 'NetworkError', 'AbortError'];
+      if (retryableErrors.includes(error.name) && retryCount < maxRetries) {
+        console.warn(`${error.name} for API request to ${endpoint}. Retrying (${retryCount + 1}/${maxRetries})...`);
 
         // Calculate exponential backoff delay
-        const backoffDelay = retryDelay * Math.pow(2, retryCount);
+        const backoffDelay = retryDelay * (2 ** retryCount);
 
         // Wait before retrying
         await new Promise(resolve => setTimeout(resolve, backoffDelay));
 
+        // For image generation, increase timeout on each retry
+        let nextTimeout = timeout;
+        if (endpoint === '/openai/images' && error.name === 'AbortError') {
+          // Increase timeout by 30 seconds on each retry
+          nextTimeout = timeout + 30_000 * (retryCount + 1);
+          console.warn(`Increasing timeout for image generation to ${nextTimeout/1000} seconds`);
+        }
+
         // Retry the request with incremented retry count
-        return this.request(endpoint, method, data, retry, customHeaders, maxRetries, retryDelay, retryCount + 1);
+        return this.request(endpoint, method, data, retry, customHeaders, maxRetries, retryDelay, retryCount + 1, nextTimeout);
       }
 
       console.error(`API Error (${endpoint}):`, error);
@@ -193,8 +209,8 @@ const ApiService = {
         // Try to get the API key from the correct storage key
         const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
 
-        // Log the config for debugging
-        console.log('OpenAI config from storage:', config);
+        // Debug logging can be enabled here if needed
+        // console.log('OpenAI config from storage:', config);
 
         return config.apiKey || null;
       } catch (error) {
@@ -222,7 +238,22 @@ const ApiService = {
     async generateImage(data) {
       const apiKey = this.getApiKey();
       const headers = apiKey ? { 'x-openai-api-key': apiKey } : {};
-      return ApiService.request('/openai/images', 'POST', data, true, headers);
+
+      // Use a longer timeout (120 seconds) for image generation
+      // Image generation can take significantly longer than text generation
+      const IMAGE_GENERATION_TIMEOUT = 120_000; // 120 seconds
+
+      return ApiService.request(
+        '/openai/images',
+        'POST',
+        data,
+        true,
+        headers,
+        3,    // maxRetries
+        1000, // retryDelay
+        0,    // retryCount
+        IMAGE_GENERATION_TIMEOUT
+      );
     }
   },
 
