@@ -39,7 +39,11 @@ const Auth = {
     const localToken = localStorage.getItem(Config.storageKeys.authToken);
     const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
 
-    return localToken !== null || sessionToken !== null;
+    // Also check for user profile data
+    const userProfile = localStorage.getItem(Config.storageKeys.userProfile);
+
+    // Return true if we have both a token and user profile data
+    return (localToken !== null || sessionToken !== null) && userProfile !== null;
   },
 
   // Get the current user data
