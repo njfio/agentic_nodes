@@ -2,6 +2,17 @@
 
 A node-based workflow editor for creating AI-powered workflows with multimodal capabilities.
 
+## Version Status
+
+### Current Version: v1.0.0-stable
+
+This is a known good commit with:
+
+- Working MongoDB integration (Docker, local, and in-memory fallback)
+- Fully functional canvas with panning and zooming
+- Working authentication system
+- All multimodal features operational
+
 ## Features
 
 - Node-based canvas interface for creating AI workflows
