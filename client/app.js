@@ -254,6 +254,12 @@ class Node {
     this.autoSize = true;     // Whether to automatically resize based on content
     this.inputCollapsed = false;  // Whether the input section is collapsed
     this.outputCollapsed = false; // Whether the output section is collapsed
+
+    // Input tracking for multiple inputs
+    this.inputSources = new Map(); // Map of source node IDs to their inputs
+    this.waitForAllInputs = true;  // Whether to wait for all inputs before processing
+    this.waitingForInputs = false; // Whether the node is waiting for inputs
+
     this.stats = {
       inputTokens: 0,
       outputTokens: 0,
@@ -650,6 +656,83 @@ class Node {
     }
 
     return false;
+  }
+
+  // Check if all inputs are ready for processing
+  areAllInputsReady() {
+    // If there are no input sources, the node is ready
+    if (this.inputSources.size === 0) {
+      return true;
+    }
+
+    // If we're not waiting for all inputs, any input is enough
+    if (!this.waitForAllInputs) {
+      return this.inputSources.size > 0;
+    }
+
+    // Check if all input sources have provided input
+    const incomingConnections = App.connections.filter(conn => conn.toNode === this);
+
+    // If there are no incoming connections, the node is ready
+    if (incomingConnections.length === 0) {
+      return true;
+    }
+
+    // Check if all connected nodes have been processed
+    for (const conn of incomingConnections) {
+      if (!conn.fromNode.hasBeenProcessed) {
+        return false;
+      }
+
+      // Check if this input source is in our map
+      if (!this.inputSources.has(conn.fromNode.id)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Add an input from a source node
+  addInput(sourceNode, input) {
+    // Store the input in the map
+    this.inputSources.set(sourceNode.id, input);
+
+    // If we're waiting for all inputs, check if we're ready
+    if (this.waitForAllInputs) {
+      const incomingConnections = App.connections.filter(conn => conn.toNode === this);
+      this.waitingForInputs = incomingConnections.length > this.inputSources.size;
+    } else {
+      // If we're not waiting for all inputs, we're ready as soon as we have one
+      this.waitingForInputs = false;
+    }
+
+    return this.areAllInputsReady();
+  }
+
+  // Combine all inputs into a single input
+  combineInputs() {
+    // If there's only one input, return it directly
+    if (this.inputSources.size === 1) {
+      return Array.from(this.inputSources.values())[0];
+    }
+
+    // Combine text inputs with newlines
+    const inputs = Array.from(this.inputSources.values());
+
+    // Check if any inputs are images
+    const hasImageInputs = inputs.some(input => Utils.isImageData(input));
+
+    if (hasImageInputs) {
+      // If there are image inputs, prioritize the first image input
+      const imageInput = inputs.find(input => Utils.isImageData(input));
+      if (imageInput) {
+        return imageInput;
+      }
+    }
+
+    // Otherwise, combine text inputs
+    return inputs.join('\n\n---\n\n');
   }
 
   // Preload content for rendering
@@ -1366,19 +1449,23 @@ class Node {
     // Node box with status-based colors
     const bgColor = this.selected ? '#4a90e2' :
                  this.processing ? '#d4af37' :
+                 this.waitingForInputs ? '#8e44ad' : // Purple for waiting
                  this.error ? '#e74c3c' :
                  App.hoveredNode === this ? '#404040' : '#333';
 
     ctx.fillStyle = bgColor;
     ctx.strokeStyle = this.error ? '#c0392b' :
+                     this.waitingForInputs ? '#9b59b6' : // Purple for waiting
                      App.hoveredNode === this ? '#aaa' : '#888';
     ctx.lineWidth = 2;
     ctx.fillRect(this.x, this.y, this.width, this.height);
     ctx.strokeRect(this.x, this.y, this.width, this.height);
 
-    if (this.selected || App.hoveredNode === this || this.processing) {
+    if (this.selected || App.hoveredNode === this || this.processing || this.waitingForInputs) {
       ctx.shadowColor = this.selected ? '#4a90e2' :
-                       this.processing ? '#d4af37' : '#666';
+                       this.processing ? '#d4af37' :
+                       this.waitingForInputs ? '#9b59b6' : // Purple for waiting
+                       '#666';
       ctx.shadowBlur = 10;
       ctx.strokeRect(this.x, this.y, this.width, this.height);
       ctx.shadowBlur = 0;
@@ -2384,10 +2471,20 @@ const App = {
             const connection = new Connection(this.connectingNode, node);
             this.connections.push(connection);
             DebugManager.addLog(`Connected node "${this.connectingNode.title}" (ID: ${this.connectingNode.id}) to node "${node.title}" (ID: ${node.id})`, 'success');
-            // Process the node chain with the new connection
-            this.processNodeAndConnections(this.connectingNode, this.connectingNode.content).catch(err => {
-              DebugManager.addLog(`Failed to process chain: ${err.message}`, 'error');
-            });
+
+            // Check if the connecting node has been processed
+            if (this.connectingNode.hasBeenProcessed) {
+              // Process the node with the new connection
+              // Pass the connecting node as the source node
+              this.processNodeAndConnections(node, this.connectingNode.content, this.connectingNode).catch(err => {
+                DebugManager.addLog(`Failed to process node: ${err.message}`, 'error');
+              });
+            } else {
+              // If the connecting node hasn't been processed yet, just mark the target node as waiting
+              node.waitingForInputs = true;
+              DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) is waiting for input from "${this.connectingNode.title}"`, 'info');
+              this.draw();
+            }
           } else {
             DebugManager.addLog(
               `Incompatible types: ${this.connectingNode.outputType} → ${node.inputType}`,
@@ -2619,10 +2716,12 @@ const App = {
     const inputTypeField = document.getElementById('inputType');
     const outputTypeField = document.getElementById('outputType');
     const autoSizeCheckbox = document.getElementById('autoSizeNode');
+    const waitForAllInputsCheckbox = document.getElementById('waitForAllInputs');
 
     if (inputTypeField) inputTypeField.value = node.inputType;
     if (outputTypeField) outputTypeField.value = node.outputType;
     if (autoSizeCheckbox) autoSizeCheckbox.checked = node.autoSize;
+    if (waitForAllInputsCheckbox) waitForAllInputsCheckbox.checked = node.waitForAllInputs;
 
     // Clear the processing log
     const processingLog = document.getElementById('processingLog');
@@ -2989,6 +3088,13 @@ const App = {
     this.editingNode.contentType = document.getElementById('nodeModality').value;
     this.editingNode.aiProcessor = document.getElementById('aiProcessor').value;
     this.editingNode.systemPrompt = document.getElementById('systemPrompt').value;
+
+    // Get checkbox values
+    const autoSizeCheckbox = document.getElementById('autoSizeNode');
+    const waitForAllInputsCheckbox = document.getElementById('waitForAllInputs');
+
+    if (autoSizeCheckbox) this.editingNode.autoSize = autoSizeCheckbox.checked;
+    if (waitForAllInputsCheckbox) this.editingNode.waitForAllInputs = waitForAllInputsCheckbox.checked;
 
     // Get content based on content type
     switch (this.editingNode.contentType) {
@@ -3404,16 +3510,34 @@ const App = {
   },
 
   // Process a node and all its connected nodes
-  async processNodeAndConnections(node, input) {
+  async processNodeAndConnections(node, input, sourceNode = null) {
     if (!node) return;
 
-    // Store the input content for the node
-    if (input) {
+    // If we have a source node, add this input to the node's input sources
+    if (sourceNode) {
+      // Add the input to the node's input sources
+      const isReady = node.addInput(sourceNode, input);
+
+      // If the node is not ready for processing, mark it as waiting and return
+      if (!isReady) {
+        node.waitingForInputs = true;
+        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) is waiting for more inputs`, 'info');
+        this.draw(); // Redraw to show waiting status
+        return;
+      }
+    } else if (input) {
+      // If we don't have a source node but have input, store it directly
       node.inputContent = input;
     }
 
+    // Reset waiting status
+    node.waitingForInputs = false;
+
+    // Get the combined input if we have multiple inputs
+    const processInput = node.inputSources.size > 0 ? node.combineInputs() : (input || node.inputContent);
+
     // Process the current node
-    const output = await node.process(input);
+    const output = await node.process(processInput);
 
     // Store the output in the node's content
     if (output && node.content !== output) {
@@ -3430,8 +3554,8 @@ const App = {
       node.contentType = 'image';
 
       // Store the input content for text-to-image nodes
-      if (!node.inputContent && input) {
-        node.inputContent = input;
+      if (!node.inputContent && processInput) {
+        node.inputContent = processInput;
       }
 
       if (node.hasBeenProcessed) {
@@ -3466,13 +3590,11 @@ const App = {
 
         // Clear any existing input image cache
         toNode.inputImage = null;
-
-        // For image-to-text nodes, store the image URL as input content
-        toNode.inputContent = output;
       }
 
       // Process the connected node with the output from the current node
-      await this.processNodeAndConnections(toNode, output);
+      // Pass the current node as the source node
+      await this.processNodeAndConnections(toNode, output, node);
     }
 
     // Special handling for workflow output nodes
