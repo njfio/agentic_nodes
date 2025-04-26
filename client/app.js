@@ -280,7 +280,9 @@ class Node {
     this.processing = true;
     this.error = null;
     DebugManager.state.processingNodes++;
-    DebugManager.addLog(`Processing node ${this.id}...`);
+
+    // Add more detailed logging
+    DebugManager.addLog(`Processing node "${this.title}" (ID: ${this.id}) with input: ${input ? (typeof input === 'string' ? input.substring(0, 30) + '...' : 'non-text content') : 'empty input'}`, 'info');
 
     // Store the input content
     this.inputContent = input;
@@ -385,17 +387,28 @@ class Node {
     // Find all connections from this node
     const connections = App.connections.filter(conn => conn.fromNode === this);
 
+    // Log for debugging
+    if (connections.length > 0) {
+      DebugManager.addLog(`Node ${this.id} updating ${connections.length} dependent node(s)`, 'info');
+    }
+
     // For each connected node, update its input sources
     for (const connection of connections) {
       const toNode = connection.toNode;
 
       // Add this node's output to the target node's input sources
-      toNode.addInput(this, this.content);
+      const isReady = toNode.addInput(this, this.content);
+
+      // Log the input being passed
+      DebugManager.addLog(`Passing output from node ${this.id} to node ${toNode.id}: ${this.content ? (typeof this.content === 'string' ? this.content.substring(0, 30) + '...' : 'non-text content') : 'empty content'}`, 'info');
 
       // If the node is ready to process, trigger processing
-      if (toNode.areAllInputsReady() && toNode.waitingForInputs) {
+      if (isReady) {
+        DebugManager.addLog(`Node ${toNode.id} is ready to process`, 'info');
         // Process the node asynchronously to allow parallel processing
         this.processNodeAsync(toNode);
+      } else {
+        DebugManager.addLog(`Node ${toNode.id} is waiting for more inputs before processing`, 'info');
       }
     }
   }
@@ -408,8 +421,14 @@ class Node {
       // Get the combined input
       const processInput = node.inputSources.size > 0 ? node.combineInputs() : node.inputContent;
 
-      // Process the node
-      App.processNodeAndConnections(node, processInput)
+      // Log the processing attempt
+      DebugManager.addLog(`Starting to process node "${node.title}" (ID: ${node.id}) with input: ${processInput ? (typeof processInput === 'string' ? processInput.substring(0, 30) + '...' : 'non-text content') : 'empty input'}`, 'info');
+
+      // Process the node with this node as the source
+      App.processNodeAndConnections(node, processInput, this)
+        .then(output => {
+          DebugManager.addLog(`Successfully processed node "${node.title}" (ID: ${node.id})`, 'success');
+        })
         .catch(err => {
           DebugManager.addLog(`Failed to process node "${node.title}" (ID: ${node.id}): ${err.message}`, 'error');
         });
@@ -3754,8 +3773,12 @@ const App = {
         DebugManager.addLog(`Output node "${node.title}" (ID: ${node.id}) final content: ${node.content ? (node.content.substring ? node.content.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
       }
 
-      // The node's updateDependentNodes method will handle processing connected nodes
-      // This allows for parallel processing of nodes that are ready
+      // Explicitly call updateDependentNodes to ensure connected nodes are processed
+      DebugManager.addLog(`Calling updateDependentNodes for node "${node.title}" (ID: ${node.id})`, 'info');
+      node.updateDependentNodes();
+
+      // Redraw to show updated state
+      this.draw();
 
       return output;
     } catch (error) {
