@@ -12,7 +12,11 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "docker:restart": "docker-compose restart",
-    "db:check": "node utils/db-check.js"
+    "db:check": "node utils/db-check.js",
+    "db:backup": "./scripts/mongodb-backup.sh",
+    "db:restore": "./scripts/mongodb-restore.sh",
+    "db:monitor": "./scripts/mongodb-monitor.sh",
+    "setup:dev": "./scripts/setup-dev-environment.sh"
   },
   "repository": {
     "type": "git",
