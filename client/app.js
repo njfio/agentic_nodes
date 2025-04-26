@@ -862,31 +862,17 @@ class Node {
     const inputAreaHeight = this.inputCollapsed ? 20 : (this.height / 2) - 50;
     const outputAreaHeight = this.outputCollapsed ? 20 : (this.height / 2) - 25;
 
+    // Draw node toolbar
+    this.drawNodeToolbar(ctx);
+
     // Draw input area
     ctx.fillStyle = '#1e1e1e';
     ctx.fillRect(contentAreaX, inputAreaY, contentAreaWidth, inputAreaHeight);
 
-    // Draw input label and collapse/expand button
+    // Draw input label
     ctx.fillStyle = '#888';
     ctx.font = '10px Arial';
     ctx.fillText('INPUT:', contentAreaX + 5, inputAreaY - 2);
-
-    // Draw input collapse/expand button
-    const inputCollapseButtonX = contentAreaX + contentAreaWidth - 20;
-    const inputCollapseButtonY = inputAreaY - 10;
-    ctx.fillStyle = '#555';
-    ctx.fillRect(inputCollapseButtonX, inputCollapseButtonY, 15, 15);
-    ctx.fillStyle = '#ccc';
-    ctx.font = '12px Arial';
-    ctx.fillText(this.inputCollapsed ? '+' : '-', inputCollapseButtonX + 4, inputCollapseButtonY + 12);
-
-    // Store button position for click detection
-    this.inputCollapseButton = {
-      x: inputCollapseButtonX,
-      y: inputCollapseButtonY,
-      width: 15,
-      height: 15
-    };
 
     // Draw input content if not collapsed
     if (!this.inputCollapsed) {
@@ -907,27 +893,10 @@ class Node {
     ctx.fillStyle = '#222';
     ctx.fillRect(contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
 
-    // Draw output label and collapse/expand button
+    // Draw output label
     ctx.fillStyle = this.hasBeenProcessed ? '#4a90e2' : '#888';
     ctx.font = '10px Arial';
     ctx.fillText('OUTPUT:', contentAreaX + 5, outputAreaY - 2);
-
-    // Draw output collapse/expand button
-    const outputCollapseButtonX = contentAreaX + contentAreaWidth - 20;
-    const outputCollapseButtonY = outputAreaY - 10;
-    ctx.fillStyle = '#555';
-    ctx.fillRect(outputCollapseButtonX, outputCollapseButtonY, 15, 15);
-    ctx.fillStyle = '#ccc';
-    ctx.font = '12px Arial';
-    ctx.fillText(this.outputCollapsed ? '+' : '-', outputCollapseButtonX + 4, outputCollapseButtonY + 12);
-
-    // Store button position for click detection
-    this.outputCollapseButton = {
-      x: outputCollapseButtonX,
-      y: outputCollapseButtonY,
-      width: 15,
-      height: 15
-    };
 
     // Make sure content is preloaded
     this.preloadContent();
@@ -959,6 +928,125 @@ class Node {
     ctx.strokeStyle = this.hasBeenProcessed ? '#4a90e2' : '#333';
     ctx.lineWidth = 1;
     ctx.strokeRect(contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
+  },
+
+  // Draw node toolbar
+  drawNodeToolbar(ctx) {
+    const toolbarX = this.x + 10;
+    const toolbarY = this.y + 22;
+    const toolbarWidth = this.width - 20;
+    const toolbarHeight = 16;
+    const buttonSize = 14;
+    const buttonSpacing = 4;
+
+    // Draw toolbar background
+    ctx.fillStyle = '#333';
+    ctx.fillRect(toolbarX, toolbarY, toolbarWidth, toolbarHeight);
+
+    // Draw toolbar buttons
+    let currentX = toolbarX + 4;
+
+    // Collapse/Expand Input button
+    this.inputCollapseButton = {
+      x: currentX,
+      y: toolbarY + 1,
+      width: buttonSize,
+      height: buttonSize,
+      icon: this.inputCollapsed ? '↓' : '↑',
+      tooltip: this.inputCollapsed ? 'Expand Input' : 'Collapse Input'
+    };
+
+    ctx.fillStyle = '#555';
+    ctx.fillRect(this.inputCollapseButton.x, this.inputCollapseButton.y, buttonSize, buttonSize);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.inputCollapseButton.icon,
+                 this.inputCollapseButton.x + buttonSize/2,
+                 this.inputCollapseButton.y + buttonSize/2 + 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    currentX += buttonSize + buttonSpacing;
+
+    // Collapse/Expand Output button
+    this.outputCollapseButton = {
+      x: currentX,
+      y: toolbarY + 1,
+      width: buttonSize,
+      height: buttonSize,
+      icon: this.outputCollapsed ? '↓' : '↑',
+      tooltip: this.outputCollapsed ? 'Expand Output' : 'Collapse Output'
+    };
+
+    ctx.fillStyle = '#555';
+    ctx.fillRect(this.outputCollapseButton.x, this.outputCollapseButton.y, buttonSize, buttonSize);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.outputCollapseButton.icon,
+                 this.outputCollapseButton.x + buttonSize/2,
+                 this.outputCollapseButton.y + buttonSize/2 + 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    currentX += buttonSize + buttonSpacing;
+
+    // Edit button
+    this.editButton = {
+      x: currentX,
+      y: toolbarY + 1,
+      width: buttonSize,
+      height: buttonSize,
+      icon: '✎',
+      tooltip: 'Edit Node'
+    };
+
+    ctx.fillStyle = '#555';
+    ctx.fillRect(this.editButton.x, this.editButton.y, buttonSize, buttonSize);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.editButton.icon,
+                 this.editButton.x + buttonSize/2,
+                 this.editButton.y + buttonSize/2 + 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    currentX += buttonSize + buttonSpacing;
+
+    // Delete button
+    this.deleteButton = {
+      x: currentX,
+      y: toolbarY + 1,
+      width: buttonSize,
+      height: buttonSize,
+      icon: '✕',
+      tooltip: 'Delete Node'
+    };
+
+    ctx.fillStyle = '#555';
+    ctx.fillRect(this.deleteButton.x, this.deleteButton.y, buttonSize, buttonSize);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.deleteButton.icon,
+                 this.deleteButton.x + buttonSize/2,
+                 this.deleteButton.y + buttonSize/2 + 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    // Draw tooltip for hovered button
+    if (App.hoveredButton) {
+      const tooltipX = App.hoveredButton.x + buttonSize/2;
+      const tooltipY = App.hoveredButton.y - 5;
+      Utils.drawTooltip(ctx, App.hoveredButton.tooltip, tooltipX, tooltipY);
+    }
+  }
   }
 
   // Draw input content (can be text or image)
@@ -1558,6 +1646,9 @@ const App = {
   MIN_SCALE: 0.1,
   MAX_SCALE: 3,
 
+  // UI state
+  hoveredButton: null,
+
   init() {
     this.canvas = document.getElementById('canvas');
     this.ctx = this.canvas.getContext('2d');
@@ -1992,14 +2083,18 @@ const App = {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Check if a collapse/expand button was clicked
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (x - this.offsetX) / this.scale;
+    const canvasY = (y - this.offsetY) / this.scale;
+
+    // Reset hovered button
+    this.hoveredButton = null;
+
+    // Check if a toolbar button was clicked
     for (const node of this.nodes) {
       // Check input collapse button
       if (node.inputCollapseButton &&
-          x >= node.inputCollapseButton.x &&
-          x <= node.inputCollapseButton.x + node.inputCollapseButton.width &&
-          y >= node.inputCollapseButton.y &&
-          y <= node.inputCollapseButton.y + node.inputCollapseButton.height) {
+          this.isPointInButton(canvasX, canvasY, node.inputCollapseButton)) {
 
         // Toggle input collapsed state
         node.inputCollapsed = !node.inputCollapsed;
@@ -2015,10 +2110,7 @@ const App = {
 
       // Check output collapse button
       if (node.outputCollapseButton &&
-          x >= node.outputCollapseButton.x &&
-          x <= node.outputCollapseButton.x + node.outputCollapseButton.width &&
-          y >= node.outputCollapseButton.y &&
-          y <= node.outputCollapseButton.y + node.outputCollapseButton.height) {
+          this.isPointInButton(canvasX, canvasY, node.outputCollapseButton)) {
 
         // Toggle output collapsed state
         node.outputCollapsed = !node.outputCollapsed;
@@ -2031,7 +2123,49 @@ const App = {
         this.draw();
         return;
       }
+
+      // Check edit button
+      if (node.editButton &&
+          this.isPointInButton(canvasX, canvasY, node.editButton)) {
+
+        // Open node editor
+        this.openNodeEditor(node);
+        return;
+      }
+
+      // Check delete button
+      if (node.deleteButton &&
+          this.isPointInButton(canvasX, canvasY, node.deleteButton)) {
+
+        // Delete the node
+        this.deleteNode(node);
+        return;
+      }
     }
+  },
+
+  // Helper method to check if a point is inside a button
+  isPointInButton(x, y, button) {
+    return button &&
+           x >= button.x &&
+           x <= button.x + button.width &&
+           y >= button.y &&
+           y <= button.y + button.height;
+  },
+
+  // Delete a node
+  deleteNode(node) {
+    // Remove connections to/from this node
+    this.connections = this.connections.filter(conn =>
+      conn.fromNode !== node && conn.toNode !== node
+    );
+
+    // Remove the node
+    this.nodes = this.nodes.filter(n => n !== node);
+
+    DebugManager.addLog(`Deleted node ${node.id}`, 'info');
+    DebugManager.updateCanvasStats();
+    this.draw();
   },
 
   handleMouseDown(e) {
@@ -2051,46 +2185,7 @@ const App = {
       return;
     }
 
-    // First check if a collapse/expand button was clicked
-    for (const node of this.nodes) {
-      // Check input collapse button
-      if (node.inputCollapseButton &&
-          canvasX >= node.inputCollapseButton.x &&
-          canvasX <= node.inputCollapseButton.x + node.inputCollapseButton.width &&
-          canvasY >= node.inputCollapseButton.y &&
-          canvasY <= node.inputCollapseButton.y + node.inputCollapseButton.height) {
-
-        // Toggle input collapsed state
-        node.inputCollapsed = !node.inputCollapsed;
-
-        // If auto-sizing is enabled, recalculate the node size
-        if (node.autoSize) {
-          node.calculateOptimalSize();
-        }
-
-        this.draw();
-        return;
-      }
-
-      // Check output collapse button
-      if (node.outputCollapseButton &&
-          canvasX >= node.outputCollapseButton.x &&
-          canvasX <= node.outputCollapseButton.x + node.outputCollapseButton.width &&
-          canvasY >= node.outputCollapseButton.y &&
-          canvasY <= node.outputCollapseButton.y + node.outputCollapseButton.height) {
-
-        // Toggle output collapsed state
-        node.outputCollapsed = !node.outputCollapsed;
-
-        // If auto-sizing is enabled, recalculate the node size
-        if (node.autoSize) {
-          node.calculateOptimalSize();
-        }
-
-        this.draw();
-        return;
-      }
-    }
+    // We don't need to check for toolbar buttons here since they're handled in handleClick
 
     for (const node of this.nodes) {
       if (node.outputConnectorContainsPoint(canvasX, canvasY)) {
@@ -2133,6 +2228,7 @@ const App = {
     this.hoveredNode = null;
     this.hoveredConnector = null;
     this.hoveredConnection = null;
+    this.hoveredButton = null;
     this.canvas.style.cursor = 'default';
 
     // Handle panning
@@ -2190,6 +2286,42 @@ const App = {
         }
       }
     } else {
+      // Check for hovering over toolbar buttons first
+      for (const node of this.nodes) {
+        // Check input collapse button
+        if (node.inputCollapseButton && this.isPointInButton(canvasX, canvasY, node.inputCollapseButton)) {
+          this.hoveredButton = node.inputCollapseButton;
+          this.canvas.style.cursor = 'pointer';
+          this.draw();
+          return;
+        }
+
+        // Check output collapse button
+        if (node.outputCollapseButton && this.isPointInButton(canvasX, canvasY, node.outputCollapseButton)) {
+          this.hoveredButton = node.outputCollapseButton;
+          this.canvas.style.cursor = 'pointer';
+          this.draw();
+          return;
+        }
+
+        // Check edit button
+        if (node.editButton && this.isPointInButton(canvasX, canvasY, node.editButton)) {
+          this.hoveredButton = node.editButton;
+          this.canvas.style.cursor = 'pointer';
+          this.draw();
+          return;
+        }
+
+        // Check delete button
+        if (node.deleteButton && this.isPointInButton(canvasX, canvasY, node.deleteButton)) {
+          this.hoveredButton = node.deleteButton;
+          this.canvas.style.cursor = 'pointer';
+          this.draw();
+          return;
+        }
+      }
+
+      // Then check connections
       for (const conn of this.connections) {
         if (conn.containsPoint(canvasX, canvasY)) {
           this.hoveredConnection = conn;
@@ -2199,6 +2331,7 @@ const App = {
         }
       }
 
+      // Then check node connectors and body
       for (const node of this.nodes) {
         if (node.outputConnectorContainsPoint(canvasX, canvasY)) {
           this.hoveredNode = node;
