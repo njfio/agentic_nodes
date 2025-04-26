@@ -47,8 +47,6 @@ const createDefaultUser = async () => {
     const existingUser = await User.findOne({ username: 'testuser' });
 
     if (!existingUser) {
-      console.log('Creating default test user...');
-
       // Hash the password manually
       const hashedPassword = await bcrypt.hash('password123', 10);
 
@@ -58,18 +56,22 @@ const createDefaultUser = async () => {
         password: hashedPassword,
         email: 'test@example.com',
         isVerified: true,
-        role: 'user'
+        role: 'user',
+        tokens: []
       });
 
       // Save the user (this will skip password hashing since it's already hashed)
       user.isNew = true; // Ensure it's treated as a new document
       await user.save();
       console.log('Default test user created successfully');
+      return user;
     } else {
       console.log('Default test user already exists');
+      return existingUser;
     }
   } catch (error) {
     console.error('Error creating default user:', error);
+    return null;
   }
 };
 

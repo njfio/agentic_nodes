@@ -5,6 +5,7 @@
 
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 let mongoServer;
 
@@ -16,7 +17,7 @@ async function startMemoryServer() {
   try {
     console.log('Starting in-memory MongoDB server...');
 
-    // Create a new MongoDB memory server without authentication first
+    // Create a new MongoDB memory server without authentication
     mongoServer = await MongoMemoryServer.create({
       instance: {
         dbName: 'multimodal-ai-agent'
@@ -48,21 +49,30 @@ async function startMemoryServer() {
 
     // Create a default user directly in the database
     try {
-      const bcrypt = require('bcryptjs');
+      // Hash the password manually
       const hashedPassword = await bcrypt.hash('password123', 10);
 
-      await db.collection('users').insertOne({
-        username: 'testuser',
-        password: hashedPassword,
-        email: 'test@example.com',
-        isVerified: true,
-        role: 'user',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      console.log('Created test user in memory MongoDB');
+      // Check if user already exists
+      const existingUser = await db.collection('users').findOne({ username: 'testuser' });
+
+      if (!existingUser) {
+        // Create the user
+        await db.collection('users').insertOne({
+          username: 'testuser',
+          password: hashedPassword,
+          email: 'test@example.com',
+          isVerified: true,
+          role: 'user',
+          tokens: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        console.log('Created test user in memory MongoDB');
+      } else {
+        console.log('Test user already exists in memory MongoDB');
+      }
     } catch (userError) {
-      console.log('User creation error (may already exist):', userError.message);
+      console.log('User creation error:', userError.message);
     }
 
     // Close the connection
