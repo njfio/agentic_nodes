@@ -1913,6 +1913,10 @@ const App = {
 
     // Load OpenAI config
     const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
+
+    // Log the config for debugging
+    console.log('Loading OpenAI config:', config, 'from key:', Config.storageKeys.openAIConfig);
+
     if (config) {
       document.getElementById('apiKey').value = config.apiKey || '';
       document.getElementById('model').value = config.model || Config.defaultOpenAIConfig.model;
@@ -2114,7 +2118,12 @@ const App = {
       maxTokens: parseInt(document.getElementById('maxTokens').value) || Config.defaultOpenAIConfig.maxTokens
     };
 
+    // Save to localStorage using the correct key
     localStorage.setItem(Config.storageKeys.openAIConfig, JSON.stringify(config));
+
+    // Log the saved config for debugging
+    console.log('Saved OpenAI config:', config, 'to key:', Config.storageKeys.openAIConfig);
+
     DebugManager.addLog('OpenAI configuration saved', 'success');
 
     // Show a confirmation message

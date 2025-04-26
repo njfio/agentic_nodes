@@ -190,7 +190,12 @@ const ApiService = {
      */
     getApiKey() {
       try {
+        // Try to get the API key from the correct storage key
         const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
+
+        // Log the config for debugging
+        console.log('OpenAI config from storage:', config);
+
         return config.apiKey || null;
       } catch (error) {
         console.error('Error getting OpenAI API key:', error);
