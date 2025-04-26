@@ -265,6 +265,12 @@ class Node {
       outputTokens: 0,
       lastProcessingTime: 0
     };
+
+    // For API payload tracking
+    this.lastRequestPayload = null; // Last API request payload
+    this.lastResponsePayload = null; // Last API response payload
+    this.lastRequestTime = null; // Timestamp of last request
+    this.lastResponseTime = null; // Timestamp of last response
   }
 
   getContentTypeIcon() {
@@ -558,6 +564,10 @@ class Node {
         max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
       };
 
+      // Store the request payload and timestamp
+      this.lastRequestPayload = JSON.parse(JSON.stringify(requestData));
+      this.lastRequestTime = new Date().toISOString();
+
       try {
         // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.chat(requestData);
@@ -566,6 +576,10 @@ class Node {
         if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
           throw new Error('Invalid response from OpenAI API. Please try again.');
         }
+
+        // Store the response payload and timestamp
+        this.lastResponsePayload = JSON.parse(JSON.stringify(data));
+        this.lastResponseTime = new Date().toISOString();
 
         DebugManager.state.totalRequests++;
         return data.choices[0].message.content;
@@ -633,6 +647,10 @@ class Node {
         size: "1024x1024",
         quality: "high"  // Valid values are 'low', 'medium', 'high', and 'auto'
       };
+
+      // Store the request payload and timestamp
+      this.lastRequestPayload = JSON.parse(JSON.stringify(requestData));
+      this.lastRequestTime = new Date().toISOString();
 
       try {
         // Call the API through our service with retry logic built into ApiService
@@ -897,9 +915,17 @@ class Node {
         max_tokens: Config.defaultOpenAIConfig.maxTokens
       };
 
+      // Store the request payload and timestamp
+      this.lastRequestPayload = JSON.parse(JSON.stringify(requestData));
+      this.lastRequestTime = new Date().toISOString();
+
       try {
         // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.chat(requestData);
+
+        // Store the response payload and timestamp
+        this.lastResponsePayload = JSON.parse(JSON.stringify(data));
+        this.lastResponseTime = new Date().toISOString();
 
         // Check if we have a valid response
         if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
@@ -1114,22 +1140,29 @@ class Node {
         // Step 1: Use GPT-4o to analyze the images and create a detailed description
         DebugManager.addLog(`Using GPT-4o to analyze ${imageDataArray.length} images`, 'info');
 
+        // Prepare the vision request data
+        const visionRequestData = {
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "user",
+              content
+            }
+          ],
+          max_tokens: 1000
+        };
+
+        // Store the vision request payload and timestamp
+        this.lastRequestPayload = JSON.parse(JSON.stringify(visionRequestData));
+        this.lastRequestTime = new Date().toISOString();
+
         const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "user",
-                content
-              }
-            ],
-            max_tokens: 1000
-          })
+          body: JSON.stringify(visionRequestData)
         });
 
         // Check if the vision request was successful
@@ -1148,6 +1181,10 @@ class Node {
 
         // Parse the vision response
         const visionData = await visionResponse.json();
+
+        // Store the vision response payload and timestamp
+        this.lastResponsePayload = JSON.parse(JSON.stringify(visionData));
+        this.lastResponseTime = new Date().toISOString();
 
         // Get the enhanced prompt from the Vision API
         const enhancedPrompt = visionData.choices[0].message.content;
@@ -3619,6 +3656,88 @@ const App = {
     }
   },
 
+  // Open the payload viewer modal
+  openPayloadViewer(node) {
+    if (!node) {
+      DebugManager.addLog('No node selected for payload viewing', 'error');
+      return;
+    }
+
+    // Check if we have payloads to display
+    if (!node.lastRequestPayload && !node.lastResponsePayload) {
+      DebugManager.addLog('No API payloads available for this node', 'info');
+      return;
+    }
+
+    // Format the request payload for display
+    const requestPayload = document.getElementById('requestPayload');
+    const requestTimestamp = document.getElementById('requestTimestamp');
+
+    if (node.lastRequestPayload) {
+      requestPayload.textContent = JSON.stringify(node.lastRequestPayload, null, 2);
+      requestTimestamp.textContent = node.lastRequestTime || '-';
+    } else {
+      requestPayload.textContent = 'No request payload available';
+      requestTimestamp.textContent = '-';
+    }
+
+    // Format the response payload for display
+    const responsePayload = document.getElementById('responsePayload');
+    const responseTimestamp = document.getElementById('responseTimestamp');
+
+    if (node.lastResponsePayload) {
+      responsePayload.textContent = JSON.stringify(node.lastResponsePayload, null, 2);
+      responseTimestamp.textContent = node.lastResponseTime || '-';
+    } else {
+      responsePayload.textContent = 'No response payload available';
+      responseTimestamp.textContent = '-';
+    }
+
+    // Set up tab switching
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        // Remove active class from all buttons and panes
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabPanes.forEach(pane => pane.classList.remove('active'));
+
+        // Add active class to clicked button and corresponding pane
+        button.classList.add('active');
+        const tabId = button.getAttribute('data-tab');
+        document.getElementById(tabId).classList.add('active');
+      });
+    });
+
+    // Set up copy button
+    const copyButton = document.getElementById('copyPayload');
+    copyButton.addEventListener('click', () => {
+      // Determine which tab is active
+      const activeTab = document.querySelector('.tab-pane.active');
+      const textToCopy = activeTab.querySelector('pre').textContent;
+
+      // Copy to clipboard
+      navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+          DebugManager.addLog('Payload copied to clipboard', 'success');
+        })
+        .catch(err => {
+          DebugManager.addLog(`Failed to copy: ${err}`, 'error');
+        });
+    });
+
+    // Set up close button
+    const closeButton = document.getElementById('closePayloadViewer');
+    closeButton.addEventListener('click', () => {
+      ModalManager.closeModal('payloadViewerModal');
+    });
+
+    // Open the modal
+    ModalManager.openModal('payloadViewerModal');
+    DebugManager.addLog(`Viewing API payloads for node ${node.id}`, 'info');
+  },
+
   // Open the node editor modal
   openNodeEditor(node) {
     // Set the editing node
@@ -3972,6 +4091,33 @@ const App = {
 
         // Call the execute method
         this.executeNode(e);
+
+        // Return false to prevent form submission
+        return false;
+      });
+    }
+
+    // Set up view payloads button handler
+    const viewPayloadsButton = document.getElementById('viewPayloads');
+    if (viewPayloadsButton) {
+      // Remove any existing event listeners
+      viewPayloadsButton.replaceWith(viewPayloadsButton.cloneNode(true));
+
+      // Get the fresh reference
+      const newViewPayloadsButton = document.getElementById('viewPayloads');
+
+      // Add the event listener
+      newViewPayloadsButton.addEventListener('click', (e) => {
+        // Prevent any default form submission
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Call the openPayloadViewer method with the current editing node
+        if (this.editingNode) {
+          this.openPayloadViewer(this.editingNode);
+        } else {
+          DebugManager.addLog('No node selected for payload viewing', 'error');
+        }
 
         // Return false to prevent form submission
         return false;

@@ -354,6 +354,54 @@ body, html {
   white-space: pre-wrap;
 }
 
+/* API Payload Viewer styles */
+.tabs {
+  display: flex;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #444;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  background-color: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn.active {
+  color: #4a90e2;
+  border-bottom: 2px solid #4a90e2;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+.payload-content {
+  background-color: #1e1e1e;
+  padding: 15px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.payload-info {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #aaa;
+}
+
 /* Upload area styles */
 .image-upload-area,
 .audio-upload-area,

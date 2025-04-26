@@ -187,6 +187,7 @@
 
       <div class="button-group">
         <button id="executeNode" class="primary-btn" type="button">Execute</button>
+        <button id="viewPayloads" class="secondary-btn" type="button">View API Payloads</button>
         <button id="saveNode" class="primary-btn" type="button">Save</button>
         <button id="cancelNode" class="secondary-btn" type="button">Cancel</button>
       </div>
@@ -347,6 +348,35 @@
       </div>
       <canvas id="miniMapCanvas"></canvas>
       <div class="mini-map-viewport"></div>
+    </div>
+  </div>
+
+  <!-- API Payload Viewer Modal -->
+  <div id="payloadViewerModal" class="modal">
+    <div class="modal-content">
+      <h2>API Payloads</h2>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="requestTab">Request</button>
+        <button class="tab-btn" data-tab="responseTab">Response</button>
+      </div>
+      <div class="tab-content">
+        <div id="requestTab" class="tab-pane active">
+          <div class="payload-info">
+            <div>Timestamp: <span id="requestTimestamp">-</span></div>
+          </div>
+          <pre id="requestPayload" class="payload-content">No request payload available</pre>
+        </div>
+        <div id="responseTab" class="tab-pane">
+          <div class="payload-info">
+            <div>Timestamp: <span id="responseTimestamp">-</span></div>
+          </div>
+          <pre id="responsePayload" class="payload-content">No response payload available</pre>
+        </div>
+      </div>
+      <div class="button-group">
+        <button id="copyPayload" class="secondary-btn" type="button">Copy to Clipboard</button>
+        <button id="closePayloadViewer" class="secondary-btn" type="button">Close</button>
+      </div>
     </div>
   </div>
 
