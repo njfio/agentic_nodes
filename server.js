@@ -78,89 +78,60 @@ const createDefaultUser = async () => {
 // Connect to MongoDB with retry logic
 const connectWithRetry = async () => {
   console.log('Attempting to connect to MongoDB...');
-  const maxRetries = 5;
-  let retries = 0;
-  let connected = false;
 
-  while (!connected && retries < maxRetries) {
+  try {
+    // First, try to connect to the in-memory MongoDB server
+    console.log('Starting in-memory MongoDB server...');
+    const mongoUri = await startMemoryServer();
+
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000
+    });
+
+    console.log('Connected to in-memory MongoDB successfully');
+
+    // Create default test user
+    await createDefaultUser();
+
+    return;
+  } catch (memoryErr) {
+    console.error('Failed to start in-memory MongoDB server:', memoryErr.message);
+    console.log('Falling back to local MongoDB...');
+
     try {
-      // First try to connect to the MongoDB Docker container
-      if (process.env.MONGODB_URI.includes('mongodb:')) {
-        try {
-          await mongoose.connect(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000, // 5 seconds timeout
-            connectTimeoutMS: 5000
-          });
-          console.log('Connected to MongoDB Docker container successfully');
-          connected = true;
-        } catch (dockerErr) {
-          console.error('MongoDB Docker connection error:', dockerErr.message);
+      // Try to connect to local MongoDB
+      await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000
+      });
 
-          // If Docker connection fails, try local MongoDB
-          try {
-            // Use the local MongoDB URI if available, otherwise replace the hostname in the Docker URI
-            const localMongoURI = process.env.MONGODB_LOCAL_URI || process.env.MONGODB_URI.replace('mongodb:', 'localhost');
-            console.log(`Trying local MongoDB at ${localMongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`);
+      console.log('Connected to local MongoDB successfully');
 
-            await mongoose.connect(localMongoURI, {
-              serverSelectionTimeoutMS: 5000,
-              connectTimeoutMS: 5000
-            });
-            console.log('Connected to local MongoDB successfully');
-            connected = true;
-          } catch (localErr) {
-            console.error('Local MongoDB connection error:', localErr.message);
-            throw new Error('Failed to connect to both Docker and local MongoDB');
-          }
-        }
-      } else {
-        // Direct connection to the specified URI
-        await mongoose.connect(process.env.MONGODB_URI, {
+      // Create default test user
+      await createDefaultUser();
+
+      return;
+    } catch (localErr) {
+      console.error('Local MongoDB connection error:', localErr.message);
+      console.log('Falling back to Docker MongoDB...');
+
+      try {
+        // Try to connect to Docker MongoDB
+        await mongoose.connect(process.env.MONGODB_DOCKER_URI, {
           serverSelectionTimeoutMS: 5000,
           connectTimeoutMS: 5000
         });
-        console.log('Connected to MongoDB successfully');
-        connected = true;
-      }
 
-      // If we reach here, we're connected
-      if (connected) {
+        console.log('Connected to Docker MongoDB successfully');
+
         // Create default test user
         await createDefaultUser();
+
         return;
-      }
-    } catch (err) {
-      retries++;
-      console.error(`MongoDB connection attempt ${retries}/${maxRetries} failed:`, err.message);
-
-      if (retries >= maxRetries) {
-        console.log('Maximum retries reached. Starting in-memory MongoDB server...');
-
-        try {
-          // Start in-memory MongoDB server as a last resort
-          const mongoUri = await startMemoryServer();
-
-          // Connect to in-memory MongoDB
-          await mongoose.connect(mongoUri, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 5000
-          });
-          console.log('Connected to in-memory MongoDB successfully');
-
-          // Create default test user
-          await createDefaultUser();
-
-          // Set connected flag to true
-          connected = true;
-          return;
-        } catch (memoryErr) {
-          console.error('Failed to start in-memory MongoDB server:', memoryErr.message);
-          throw new Error('All MongoDB connection methods failed');
-        }
-      } else {
-        // Wait before retrying
-        console.log(`Retrying connection in 3 seconds... (${retries}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+      } catch (dockerErr) {
+        console.error('Docker MongoDB connection error:', dockerErr.message);
+        throw new Error('All MongoDB connection methods failed');
       }
     }
   }
