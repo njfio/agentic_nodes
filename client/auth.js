@@ -35,15 +35,11 @@ const Auth = {
 
   // Check if the user is logged in
   isLoggedIn() {
-    // Check both localStorage and sessionStorage
-    const localToken = localStorage.getItem(Config.storageKeys.authToken);
-    const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
-
-    // Also check for user profile data
+    // For simplicity, just check if we have a user profile
     const userProfile = localStorage.getItem(Config.storageKeys.userProfile);
 
-    // Return true if we have both a token and user profile data
-    return (localToken !== null || sessionToken !== null) && userProfile !== null;
+    // Return true if we have user profile data
+    return userProfile !== null;
   },
 
   // Get the current user data
@@ -67,18 +63,27 @@ const Auth = {
     try {
       // Call the logout API if available
       if (typeof ApiService !== 'undefined') {
-        await ApiService.users.logout();
+        try {
+          await ApiService.users.logout();
+        } catch (apiError) {
+          console.log('API logout failed, continuing with local logout');
+        }
       }
     } catch (error) {
       console.error('Error logging out:', error);
     } finally {
-      // Clear the auth data
+      // Clear all auth data
       localStorage.removeItem(Config.storageKeys.authToken);
       sessionStorage.removeItem(Config.storageKeys.authToken);
       localStorage.removeItem(Config.storageKeys.userProfile);
+      localStorage.removeItem('rememberMe');
+      localStorage.removeItem('savedUsername');
+
+      // Clear any other potential auth-related data
+      sessionStorage.clear();
 
       // Redirect to the login page
-      this.redirectToLogin();
+      window.location.href = 'login.html';
     }
   },
 
