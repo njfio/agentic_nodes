@@ -239,9 +239,9 @@ const ApiService = {
       const apiKey = this.getApiKey();
       const headers = apiKey ? { 'x-openai-api-key': apiKey } : {};
 
-      // Use a longer timeout (120 seconds) for image generation
+      // Use a longer timeout (240 seconds) for image generation
       // Image generation can take significantly longer than text generation
-      const IMAGE_GENERATION_TIMEOUT = 120_000; // 120 seconds
+      const IMAGE_GENERATION_TIMEOUT = 240_000; // 240 seconds (4 minutes)
 
       return ApiService.request(
         '/openai/images',

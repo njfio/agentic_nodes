@@ -276,6 +276,27 @@ class Node {
     }
   }
 
+  // Reset the node's input state
+  reset() {
+    // Clear input sources
+    this.inputSources = new Map();
+
+    // Clear image inputs array
+    this.imageInputs = [];
+
+    // Clear additional images
+    this.additionalImages = [];
+
+    // Clear any cached image objects
+    this.inputImage = null;
+
+    // Reset waiting status
+    this.waitingForInputs = false;
+
+    // Log the reset
+    DebugManager.addLog(`Reset input state for node "${this.title}" (ID: ${this.id})`, 'info');
+  }
+
   async process(input) {
     this.processing = true;
     this.error = null;
@@ -308,11 +329,22 @@ class Node {
           break;
 
         case 'text-to-image':
-          output = await this.processTextToImage(input);
+          if (isImageInput) {
+            // If input is an image and this is a text-to-image node,
+            // use image-to-image processing instead
+            DebugManager.addLog(`Node ${this.id} received image input, using image-to-image processing`, 'info');
+            output = await this.processImageToImage(input);
+          } else {
+            output = await this.processTextToImage(input);
+          }
           break;
 
         case 'image-to-text':
           output = await this.processImageToText(input);
+          break;
+
+        case 'image-to-image':
+          output = await this.processImageToImage(input);
           break;
 
         case 'audio-to-text':
@@ -390,6 +422,7 @@ class Node {
     // Log for debugging
     if (connections.length > 0) {
       DebugManager.addLog(`Node ${this.id} updating ${connections.length} dependent node(s)`, 'info');
+      DebugManager.addLog(`Calling updateDependentNodes for node "${this.title}" (ID: ${this.id})`, 'info');
     }
 
     // For each connected node, update its input sources
@@ -402,11 +435,46 @@ class Node {
         continue;
       }
 
+      // Skip if the node has already been processed and we don't support retriggering yet
+      if (toNode.hasBeenProcessed) {
+        DebugManager.addLog(`Node ${toNode.id} has already been processed, skipping (retriggering not supported yet)`, 'info');
+        continue;
+      }
+
+      // Determine what to pass to the target node
+      let outputToPass;
+
+      // If this is an image node and we have an outputImageId, pass that
+      if (this.contentType === 'image' && this.outputImageId) {
+        outputToPass = this.outputImageId;
+        DebugManager.addLog(`Passing image ID ${this.outputImageId} from node ${this.id} to node ${toNode.id}`, 'info');
+      } else {
+        // Otherwise pass the content directly
+        outputToPass = this.content;
+      }
+
+      // Special handling for image data passing to image-capable nodes
+      if (this.contentType === 'image' &&
+          (toNode.aiProcessor === 'image-to-text' ||
+           toNode.aiProcessor === 'image-to-image' ||
+           (toNode.aiProcessor === 'text-to-text' &&
+            (toNode.systemPrompt.toLowerCase().includes('image') ||
+             toNode.systemPrompt.toLowerCase().includes('visual') ||
+             toNode.systemPrompt.toLowerCase().includes('picture'))))) {
+
+        // Clear any existing input image cache
+        toNode.inputImage = null;
+
+        // For image-capable nodes, we don't set inputContent directly anymore
+        // Instead, we'll let the addInput method handle it through the inputSources map
+        DebugManager.addLog(`Passing image data from node ${this.id} to node ${toNode.id}`, 'info');
+      }
+
       // Add this node's output to the target node's input sources
-      const isReady = toNode.addInput(this, this.content);
+      const isReady = toNode.addInput(this, outputToPass);
 
       // Log the input being passed
-      DebugManager.addLog(`Passing output from node ${this.id} to node ${toNode.id}: ${this.content ? (typeof this.content === 'string' ? this.content.substring(0, 30) + '...' : 'non-text content') : 'empty content'}`, 'info');
+      DebugManager.addLog(`Passing output from node ${this.id} to node ${toNode.id}: ${outputToPass ? (typeof outputToPass === 'string' && outputToPass.length > 30 ? outputToPass.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
 
       // If the node is ready to process (all required inputs available), trigger processing
       if (isReady) {
@@ -422,9 +490,39 @@ class Node {
 
   // Process a node asynchronously
   processNodeAsync(node) {
+    // Skip if the node is already processing
+    if (node.processing) {
+      DebugManager.addLog(`Node ${node.id} is already processing, skipping async processing`, 'info');
+      return;
+    }
+
+    // Skip if the node has already been processed and we don't support retriggering yet
+    if (node.hasBeenProcessed) {
+      DebugManager.addLog(`Node ${node.id} has already been processed, skipping async processing (retriggering not supported yet)`, 'info');
+      return;
+    }
+
     // Use setTimeout with 0 delay to process in the next event loop iteration
     // This allows multiple nodes to start processing in parallel
     setTimeout(() => {
+      // Skip if the node started processing in the meantime
+      if (node.processing) {
+        DebugManager.addLog(`Node ${node.id} started processing since scheduling, skipping async processing`, 'info');
+        return;
+      }
+
+      // Skip if the node has been processed in the meantime
+      if (node.hasBeenProcessed) {
+        DebugManager.addLog(`Node ${node.id} has been processed since scheduling, skipping async processing`, 'info');
+        return;
+      }
+
+      // Check if the node is ready to process
+      if (!node.isReadyToProcess()) {
+        DebugManager.addLog(`Node ${node.id} is not ready to process yet, waiting for more inputs`, 'info');
+        return;
+      }
+
       // Get the combined input
       const processInput = node.inputSources.size > 0 ? node.combineInputs() : node.inputContent;
 
@@ -521,12 +619,19 @@ class Node {
       // Store the input content
       this.inputContent = input;
 
-      // Prepare the request data
+      // Check if input is an image URL or data
+      if (Utils.isImageData(input)) {
+        DebugManager.addLog(`Node ${this.id} received image input for text-to-image node, redirecting to image-to-image processing`, 'info');
+        return this.processImageToImage(input);
+      }
+
+      // Prepare the request data for text-to-image
       const requestData = {
         model: Config.imageModel,
         prompt: input,
         n: 1,
-        size: "1024x1024"
+        size: "1024x1024",
+        quality: "high"  // Valid values are 'low', 'medium', 'high', and 'auto'
       };
 
       try {
@@ -819,6 +924,377 @@ class Node {
     }
   }
 
+  async processImageToImage(input) {
+    DebugManager.state.requestQueue++;
+    DebugManager.state.lastRequestTime = Date.now();
+
+    try {
+      // Check if input is an image ID from our storage
+      let inputImageId = null;
+      let inputImageData = null;
+
+      if (typeof input === 'string' && input.startsWith('img_')) {
+        // This is an image ID
+        inputImageId = input;
+        inputImageData = ImageStorage.getImage(inputImageId);
+
+        if (!inputImageData) {
+          throw new Error(`Image with ID ${inputImageId} not found in storage`);
+        }
+      } else if (Utils.isImageData(input)) {
+        // This is raw image data, store it and get an ID
+        inputImageId = ImageStorage.storeImage(input);
+        inputImageData = input;
+      } else {
+        throw new Error('Invalid image input for image-to-image processing');
+      }
+
+      // Store the input content
+      this.inputContent = inputImageData;
+      this.inputImageId = inputImageId;
+
+      // Initialize arrays if they don't exist
+      if (!this.imageInputIds) {
+        this.imageInputIds = [];
+      }
+
+      if (!this.additionalImageIds) {
+        this.additionalImageIds = [];
+      }
+
+      // If we have imageInputIds array, make sure the primary input is included
+      if (!this.imageInputIds.includes(inputImageId)) {
+        this.imageInputIds.unshift(inputImageId);
+        DebugManager.addLog(`Added primary input to imageInputIds array (total: ${this.imageInputIds.length})`, 'info');
+      }
+
+      // Log the image processing
+      DebugManager.addLog(`Processing image-to-image for node ${this.id}`, 'info');
+
+      // Get the OpenAI API key from the configuration
+      const apiKey = document.getElementById('apiKey').value;
+      if (!apiKey) {
+        throw new Error('OpenAI API key is required for image-to-image processing');
+      }
+
+      // Get the prompt from the node's system prompt or use a default
+      const prompt = this.systemPrompt || 'Enhance this image';
+
+      // Collect all image IDs for the request
+      let allImageIds = [];
+
+      // Add the primary image ID
+      allImageIds.push(inputImageId);
+
+      // Add additional image IDs from both arrays, ensuring no duplicates
+      const allAdditionalImageIds = new Set();
+
+      // Add from additionalImageIds array
+      if (Array.isArray(this.additionalImageIds)) {
+        for (const imgId of this.additionalImageIds) {
+          if (imgId && imgId !== inputImageId) {
+            allAdditionalImageIds.add(imgId);
+          }
+        }
+      }
+
+      // Add from imageInputIds array
+      if (Array.isArray(this.imageInputIds) && this.imageInputIds.length > 1) {
+        for (const imgId of this.imageInputIds.slice(1)) {
+          if (imgId && imgId !== inputImageId) {
+            allAdditionalImageIds.add(imgId);
+          }
+        }
+      }
+
+      // Add all additional image IDs to the allImageIds array
+      allImageIds = [...allImageIds, ...Array.from(allAdditionalImageIds)];
+
+      DebugManager.addLog(`Using ${allImageIds.length} total images for image-to-image processing`, 'info');
+
+      // Retrieve the actual image data from storage
+      const allImageData = [];
+      for (const imgId of allImageIds) {
+        const imgData = ImageStorage.getImage(imgId);
+        if (imgData) {
+          allImageData.push(imgData);
+        } else {
+          DebugManager.addLog(`Warning: Image with ID ${imgId} not found in storage`, 'warning');
+        }
+      }
+
+      if (allImageData.length === 0) {
+        throw new Error('No valid images available for processing');
+      }
+
+      // Following the OpenAI example, we'll use the images/generation endpoint with the image parameter
+      // that accepts an array of images
+
+      // Prepare the images for the OpenAI API
+      DebugManager.addLog(`Preparing ${allImageIds.length} images for OpenAI API`, 'info');
+
+      // Get the actual image data for each image ID
+      const imageDataArray = [];
+      for (const imageId of allImageIds) {
+        const imageData = ImageStorage.getImage(imageId);
+        if (imageData) {
+          imageDataArray.push(imageData);
+          DebugManager.addLog(`Retrieved image data for ID ${imageId}`, 'info');
+        } else {
+          DebugManager.addLog(`Warning: Could not find image data for ID ${imageId}`, 'warning');
+        }
+      }
+
+      if (imageDataArray.length === 0) {
+        throw new Error('No valid images available for processing');
+      }
+
+      // Prepare the request body for the image generation endpoint
+      // For multiple images, we'll use the Vision API to analyze them and then generate a new image
+      if (imageDataArray.length > 1) {
+        DebugManager.addLog(`Using Vision API to analyze ${imageDataArray.length} images before generation`, 'info');
+
+        // Prepare the content array for the Vision API
+        const content = [
+          {
+            type: "text",
+            text: `I need to create a new image based on the following reference images and prompt: "${prompt}".
+                   Please analyze these images and provide a detailed description that I can use with an image generation model.
+                   Focus on the key visual elements, style, composition, and how they relate to the prompt.
+                   Your description will be used directly as a prompt for image generation, so make it detailed and specific.`
+          }
+        ];
+
+        // Add all images to the content array
+        for (const imgData of imageDataArray) {
+          content.push({
+            type: "image_url",
+            image_url: {
+              url: imgData
+            }
+          });
+        }
+
+        // Step 1: Use GPT-4o to analyze the images and create a detailed description
+        DebugManager.addLog(`Using GPT-4o to analyze ${imageDataArray.length} images`, 'info');
+
+        const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              {
+                role: "user",
+                content
+              }
+            ],
+            max_tokens: 1000
+          })
+        });
+
+        // Check if the vision request was successful
+        if (!visionResponse.ok) {
+          const errorText = await visionResponse.text();
+          let errorMessage = `OpenAI Vision API error: ${errorText}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = `OpenAI Vision API error: ${errorData.error?.message || 'Unknown error'}`;
+            DebugManager.addLog(`Vision API Error Details: ${JSON.stringify(errorData)}`, 'error');
+          } catch (e) {
+            // If parsing fails, use the raw text
+          }
+          throw new Error(errorMessage);
+        }
+
+        // Parse the vision response
+        const visionData = await visionResponse.json();
+
+        // Get the enhanced prompt from the Vision API
+        const enhancedPrompt = visionData.choices[0].message.content;
+
+        DebugManager.addLog(`Enhanced prompt created from ${imageDataArray.length} images: ${enhancedPrompt.substring(0, 100)}...`, 'info');
+
+        // Step 2: Use the enhanced prompt to generate a new image
+        DebugManager.addLog(`Using image generation API with enhanced prompt`, 'info');
+
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',
+            prompt: enhancedPrompt,
+            n: 1,
+            size: '1024x1024',
+            quality: 'high'
+          })
+        });
+      }
+      // For a single image, use the variations endpoint
+      else {
+        DebugManager.addLog(`Using image variations endpoint for single image`, 'info');
+
+        // Extract base64 data from the image
+        let imageBase64;
+        if (imageDataArray[0].startsWith('data:')) {
+          imageBase64 = ImageStorage.extractBase64FromDataURL(imageDataArray[0]);
+        } else {
+          imageBase64 = imageDataArray[0];
+        }
+
+        // Create a FormData object for the variations API
+        const formData = new FormData();
+
+        // Convert base64 to blob
+        const blob = await ImageStorage.base64ToBlob(imageDataArray[0]);
+
+        // Add the image to the form data
+        formData.append('image', blob);
+        formData.append('model', 'gpt-image-1');
+        formData.append('prompt', prompt);
+        formData.append('n', '1');
+        formData.append('size', '1024x1024');
+        formData.append('quality', 'high');
+
+        // Make the API request to the variations endpoint
+        DebugManager.addLog(`Making API request to OpenAI images/variations endpoint`, 'info');
+
+        const response = await fetch('https://api.openai.com/v1/images/variations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: formData
+        });
+      }
+
+      // Define a function to handle the API response
+      const handleApiResponse = async (response) => {
+        // Check if the request was successful
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = `OpenAI API error: ${errorText}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = `OpenAI API error: ${errorData.error?.message || 'Unknown error'}`;
+            DebugManager.addLog(`API Error Details: ${JSON.stringify(errorData)}`, 'error');
+          } catch (e) {
+            // If parsing fails, use the raw text
+          }
+          throw new Error(errorMessage);
+        }
+
+        // Parse the response
+        const responseData = await response.json();
+
+        // Check if we have a valid response with image data
+        if (!responseData || !responseData.data || !responseData.data[0]) {
+          throw new Error(`Invalid response from OpenAI API: No image data returned`);
+        }
+
+        // Get the generated image URL or base64 data
+        let imageUrl;
+        if (responseData.data[0].url) {
+          imageUrl = responseData.data[0].url;
+          DebugManager.addLog(`Received image URL from API: ${imageUrl.substring(0, 50)}...`, 'info');
+        } else if (responseData.data[0].b64_json) {
+          // Convert base64 to data URL
+          imageUrl = `data:image/png;base64,${responseData.data[0].b64_json}`;
+          DebugManager.addLog(`Received base64 image data from API`, 'info');
+        } else {
+          throw new Error(`No image URL or base64 data in the response`);
+        }
+
+        return imageUrl;
+      };
+
+      // Process the response based on which API endpoint we used
+      let imageUrl;
+
+      if (imageDataArray.length > 1) {
+        // For multiple images, we used the generations endpoint
+        const generationResponse = await handleApiResponse(response);
+        imageUrl = generationResponse;
+      } else {
+        // For a single image, we used the variations endpoint
+        const variationResponse = await handleApiResponse(response);
+        imageUrl = variationResponse;
+      }
+
+      // Store the generated image in our storage
+      const outputImageId = ImageStorage.storeImage(imageUrl);
+
+      // Set the content to the image URL
+      this.content = imageUrl;
+      this.outputImageId = outputImageId;
+
+      // Set content type to image
+      this.contentType = 'image';
+
+      // Mark as processed
+      this.hasBeenProcessed = true;
+
+      // Create a new image object for preloading
+      const newImage = new Image();
+
+      // Set up a promise to wait for the image to load
+      const imageLoadPromise = new Promise((resolve, reject) => {
+        newImage.onload = () => resolve(newImage);
+        newImage.onerror = () => reject(new Error('Failed to load generated image'));
+
+        // Set the source to trigger loading
+        newImage.src = imageUrl;
+      });
+
+      try {
+        // Wait for the image to load
+        await imageLoadPromise;
+
+        // Now that we know the image loaded successfully, update the node's image
+        this.contentImage = newImage;
+
+        // Update node size if auto-sizing is enabled
+        if (this.autoSize) {
+          this.calculateOptimalSize();
+        }
+
+        // Force a redraw to show the image
+        App.draw();
+
+        DebugManager.addLog(`Image loaded successfully for node ${this.id}`, 'success');
+      } catch (loadError) {
+        DebugManager.addLog(`Error loading generated image: ${loadError.message}`, 'error');
+        // We'll still return the image ID even if preloading failed
+      }
+
+      DebugManager.addLog(`Image-to-image processing completed for node ${this.id}`, 'success');
+
+      // Return the image ID instead of the raw image data
+      return outputImageId;
+    } catch (error) {
+      // Log the error
+      DebugManager.addLog(`Error in image-to-image processing: ${error.message}`, 'error');
+
+      // Set the error on the node
+      this.error = error.message;
+
+      // If we have no content, add a warning
+      if (!this.content) {
+        DebugManager.addLog(`Warning: No image content for node ${this.id} after processing`, 'warning');
+      }
+
+      throw error;
+    } finally {
+      DebugManager.state.requestQueue--;
+    }
+  }
+
   async processAudioToText(input) {
     throw new Error('Audio to Text processing not implemented');
   }
@@ -831,6 +1307,16 @@ class Node {
 
     // Special case: Allow image inputs for image-to-text nodes
     if (this.aiProcessor === 'image-to-text' && fromNode.contentType === 'image') {
+      return true;
+    }
+
+    // Special case: Allow image inputs for text-to-image nodes (will be handled as image-to-image)
+    if (this.aiProcessor === 'text-to-image' && fromNode.contentType === 'image') {
+      return true;
+    }
+
+    // Special case: Allow image inputs for image-to-image nodes
+    if (this.aiProcessor === 'image-to-image' && fromNode.contentType === 'image') {
       return true;
     }
 
@@ -885,9 +1371,113 @@ class Node {
 
   // Add an input from a source node
   addInput(sourceNode, input) {
+    // Check if we already have input from this source node
+    if (this.inputSources.has(sourceNode.id)) {
+      DebugManager.addLog(`Node ${this.id} already has input from node ${sourceNode.id}, updating it`, 'info');
+    }
+
     // Store the input in the map
     this.inputSources.set(sourceNode.id, input);
 
+    // Special handling for image inputs
+    if (Utils.isImageData(input)) {
+      // Store the image in ImageStorage and get a reference ID
+      const imageId = ImageStorage.storeImage(input);
+
+      // Initialize the imageInputIds array if it doesn't exist
+      if (!this.imageInputIds) {
+        this.imageInputIds = [];
+      }
+
+      // Check if we already have this image ID
+      if (!this.imageInputIds.includes(imageId)) {
+        // Add the image ID to the array
+        this.imageInputIds.push(imageId);
+        DebugManager.addLog(`Added image input from node ${sourceNode.id} to node ${this.id}'s image inputs (total: ${this.imageInputIds.length})`, 'info');
+      }
+
+      // For image-to-image nodes, also store in additionalImageIds
+      if (this.aiProcessor === 'image-to-image') {
+        // Initialize additionalImageIds if it doesn't exist
+        if (!this.additionalImageIds) {
+          this.additionalImageIds = [];
+        }
+
+        // Check if we already have this image ID in additionalImageIds
+        if (!this.additionalImageIds.includes(imageId)) {
+          // Add to additionalImageIds
+          this.additionalImageIds.push(imageId);
+          DebugManager.addLog(`Added image to additionalImageIds for node ${this.id} (total: ${this.additionalImageIds.length})`, 'info');
+        }
+      }
+
+      // Store the mapping from source node to image ID
+      if (!this.sourceNodeToImageId) {
+        this.sourceNodeToImageId = new Map();
+      }
+      this.sourceNodeToImageId.set(sourceNode.id, imageId);
+    }
+
+    // Update the input content display with all inputs combined
+    this.updateInputContentDisplay();
+
+    // Check if the node is ready to process
+    const isReady = this.isReadyToProcess();
+
+    // Return whether the node is ready to process
+    return isReady;
+  }
+
+  // Update the input content display with all inputs combined
+  updateInputContentDisplay() {
+    // Get all inputs from the input sources
+    const inputs = Array.from(this.inputSources.values());
+
+    // If there are no inputs, don't update
+    if (inputs.length === 0) {
+      return;
+    }
+
+    // Prepare arrays for different types of inputs
+    const imageInputs = [];
+    const textInputs = [];
+    const combinedInputContent = [];
+
+    // Process each input and categorize it
+    for (const input of inputs) {
+      if (typeof input === 'string' && input.startsWith('img_')) {
+        // This is an image ID from our storage
+        const imageData = ImageStorage.getImage(input);
+        if (imageData) {
+          imageInputs.push(input);
+
+          // Add a placeholder for the image in the combined input content
+          combinedInputContent.push(`[Image ${imageInputs.length}]`);
+        }
+      } else if (Utils.isImageData(input)) {
+        // This is raw image data, store it and get an ID
+        const imageId = ImageStorage.storeImage(input);
+        imageInputs.push(imageId);
+
+        // Add a placeholder for the image in the combined input content
+        combinedInputContent.push(`[Image ${imageInputs.length}]`);
+      } else if (input) {
+        // This is a text input
+        textInputs.push(input);
+        combinedInputContent.push(input);
+      }
+    }
+
+    // Store the combined input content for display in the node
+    const combinedText = combinedInputContent.join('\n\n---\n\n');
+    this.inputContent = combinedText;
+
+    // Log the combined input
+    DebugManager.addLog(`Updated input content display with ${textInputs.length} text inputs and ${imageInputs.length} image inputs for node ${this.id}`, 'info');
+  }
+
+  // Check if the node is ready to process
+  isReadyToProcess() {
     // Get all incoming connections
     const incomingConnections = App.connections.filter(conn => conn.toNode === this);
 
@@ -917,37 +1507,160 @@ class Node {
 
   // Combine all inputs into a single input
   combineInputs() {
-    // If there's only one input, return it directly
-    if (this.inputSources.size === 1) {
-      return Array.from(this.inputSources.values())[0];
-    }
-
-    // Combine text inputs with newlines
+    // Get all inputs from the input sources
     const inputs = Array.from(this.inputSources.values());
 
-    // Check if any inputs are images
-    const hasImageInputs = inputs.some(input => Utils.isImageData(input));
+    // If there are no inputs, return empty string
+    if (inputs.length === 0) {
+      return '';
+    }
 
-    if (hasImageInputs) {
-      // If there are image inputs, prioritize the first image input
-      const imageInput = inputs.find(input => Utils.isImageData(input));
-      if (imageInput) {
-        return imageInput;
+    // If there's only one input, return it directly
+    if (inputs.length === 1) {
+      return inputs[0];
+    }
+
+    // Prepare arrays for different types of inputs
+    const imageInputs = [];
+    const textInputs = [];
+    const combinedInputContent = [];
+
+    // Process each input and categorize it
+    for (const input of inputs) {
+      if (typeof input === 'string' && input.startsWith('img_')) {
+        // This is an image ID from our storage
+        const imageData = ImageStorage.getImage(input);
+        if (imageData) {
+          imageInputs.push(input);
+
+          // Add a placeholder for the image in the combined input content
+          combinedInputContent.push(`[Image ${imageInputs.length}]`);
+        }
+      } else if (Utils.isImageData(input)) {
+        // This is raw image data, store it and get an ID
+        const imageId = ImageStorage.storeImage(input);
+        imageInputs.push(imageId);
+
+        // Add a placeholder for the image in the combined input content
+        combinedInputContent.push(`[Image ${imageInputs.length}]`);
+      } else if (input) {
+        // This is a text input
+        textInputs.push(input);
+        combinedInputContent.push(input);
       }
     }
 
-    // Otherwise, combine text inputs
-    return inputs.join('\n\n---\n\n');
+    // Store the combined input content for display in the node
+    const combinedText = combinedInputContent.join('\n\n---\n\n');
+    this.inputContent = combinedText;
+
+    // Log the combined input
+    DebugManager.addLog(`Combined ${textInputs.length} text inputs and ${imageInputs.length} image inputs for node ${this.id}`, 'info');
+
+    // Store image IDs for processing
+    if (imageInputs.length > 0) {
+      // Initialize the imageInputIds array if it doesn't exist
+      if (!this.imageInputIds) {
+        this.imageInputIds = [];
+      }
+
+      // Add any image IDs that aren't already in the array
+      for (const imgId of imageInputs) {
+        if (!this.imageInputIds.includes(imgId)) {
+          this.imageInputIds.push(imgId);
+        }
+      }
+
+      DebugManager.addLog(`Node ${this.id} has ${this.imageInputIds.length} total image inputs`, 'info');
+    }
+
+    // For image-to-image nodes, handle multiple images
+    if (this.aiProcessor === 'image-to-image' && imageInputs.length > 0) {
+      // Make sure additionalImageIds is initialized
+      if (!this.additionalImageIds) {
+        this.additionalImageIds = [];
+      }
+
+      // Update additionalImageIds with all images except the primary one
+      if (imageInputs.length > 1) {
+        this.additionalImageIds = [...new Set([...this.additionalImageIds, ...imageInputs.slice(1)])];
+        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images`, 'info');
+      }
+
+      // For image-to-image nodes, return the primary image ID
+      return imageInputs[0];
+    }
+
+    // For image-to-text nodes, handle images and text
+    if (this.aiProcessor === 'image-to-text' && imageInputs.length > 0) {
+      // Store additional images for reference
+      if (!this.additionalImageIds) {
+        this.additionalImageIds = [];
+      }
+
+      // Update additionalImageIds with all images except the primary one
+      if (imageInputs.length > 1) {
+        this.additionalImageIds = [...new Set([...this.additionalImageIds, ...imageInputs.slice(1)])];
+        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images for image-to-text`, 'info');
+      }
+
+      // For image-to-text nodes, return the primary image ID
+      return imageInputs[0];
+    }
+
+    // For text-to-text nodes with image capability
+    if (this.aiProcessor === 'text-to-text' &&
+        (this.systemPrompt.toLowerCase().includes('image') ||
+         this.systemPrompt.toLowerCase().includes('visual') ||
+         this.systemPrompt.toLowerCase().includes('picture')) &&
+        imageInputs.length > 0) {
+
+      // Store additional images for reference
+      if (!this.additionalImageIds) {
+        this.additionalImageIds = [];
+      }
+
+      // Update additionalImageIds with all images except the primary one
+      if (imageInputs.length > 1) {
+        this.additionalImageIds = [...new Set([...this.additionalImageIds, ...imageInputs.slice(1)])];
+        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images for text-to-text`, 'info');
+      }
+
+      // For text-to-text nodes with image capability, return the primary image ID
+      return imageInputs[0];
+    }
+
+    // For text-to-text nodes without images or with no image capability
+    if (this.aiProcessor === 'text-to-text' && textInputs.length > 0) {
+      // Return the combined text inputs
+      return combinedText;
+    }
+
+    // For text-to-image nodes
+    if (this.aiProcessor === 'text-to-image') {
+      // If we have text inputs, use those
+      if (textInputs.length > 0) {
+        return combinedText;
+      }
+
+      // If we have image inputs (for image-to-image processing), return the first one
+      if (imageInputs.length > 0) {
+        return imageInputs[0];
+      }
+    }
+
+    // Default case: return the combined text
+    return combinedText;
   }
 
   // Preload content for rendering
   preloadContent() {
-    // Special handling for text-to-image nodes
-    if (this.aiProcessor === 'text-to-image') {
+    // Special handling for image-related nodes
+    if (this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') {
       // Force content type to image
       this.contentType = 'image';
 
-      // If this is a text-to-image node that has been processed but has no content,
+      // If this is an image-related node that has been processed but has no content,
       // try to recover the image from contentImage
       if (this.hasBeenProcessed && !this.content && this.contentImage && this.contentImage.src) {
         this.content = this.contentImage.src;
@@ -960,34 +1673,60 @@ class Node {
 
     // Preload input image if needed
     if (isImageInput && !this.inputImage) {
-      this.inputImage = new Image();
-      this.inputImage.src = this.inputContent;
+      try {
+        this.inputImage = new Image();
 
-      // When input image loads, update node size if auto-sizing is enabled
-      this.inputImage.onload = () => {
-        if (this.autoSize) {
-          this.calculateOptimalSize();
+        // Add error handler
+        this.inputImage.onerror = () => {
+          DebugManager.addLog(`Error loading input image for node ${this.id}`, 'error');
+          this.inputImage = null; // Clear the broken image
           App.draw();
-        }
-      };
+        };
+
+        // When input image loads, update node size if auto-sizing is enabled
+        this.inputImage.onload = () => {
+          if (this.autoSize) {
+            this.calculateOptimalSize();
+            App.draw();
+          }
+        };
+
+        // Set the source after adding event handlers
+        this.inputImage.src = this.inputContent;
+      } catch (err) {
+        DebugManager.addLog(`Error creating input image for node ${this.id}: ${err.message}`, 'error');
+      }
     }
 
     // If output content exists and is not already preloaded
     if (this.content && !this.contentImage && (this.contentType === 'image' || this.aiProcessor === 'text-to-image')) {
-      this.contentImage = new Image();
-      this.contentImage.src = this.content;
+      try {
+        this.contentImage = new Image();
 
-      // When output image loads, update node size if auto-sizing is enabled
-      this.contentImage.onload = () => {
-        if (this.autoSize) {
-          this.calculateOptimalSize();
+        // Add error handler
+        this.contentImage.onerror = () => {
+          DebugManager.addLog(`Error loading output image for node ${this.id}`, 'error');
+          this.contentImage = null; // Clear the broken image
           App.draw();
-        }
-      };
+        };
 
-      // For text-to-image nodes, ensure we set the content type to image
-      if (this.aiProcessor === 'text-to-image') {
-        this.contentType = 'image';
+        // When output image loads, update node size if auto-sizing is enabled
+        this.contentImage.onload = () => {
+          if (this.autoSize) {
+            this.calculateOptimalSize();
+            App.draw();
+          }
+        };
+
+        // Set the source after adding event handlers
+        this.contentImage.src = this.content;
+
+        // For text-to-image nodes, ensure we set the content type to image
+        if (this.aiProcessor === 'text-to-image') {
+          this.contentType = 'image';
+        }
+      } catch (err) {
+        DebugManager.addLog(`Error creating output image for node ${this.id}: ${err.message}`, 'error');
       }
     }
 
@@ -1534,18 +2273,31 @@ class Node {
 
     // Preload image if needed
     if (!this.contentImage) {
-      // Create a new image object
-      this.contentImage = new Image();
-      this.contentImage.src = this.content;
+      try {
+        // Create a new image object
+        this.contentImage = new Image();
 
-      // Add load event listener to redraw when image loads
-      this.contentImage.onload = () => {
-        // When image loads, update node size if auto-sizing is enabled
-        if (this.autoSize) {
-          this.calculateOptimalSize();
-        }
-        App.draw();
-      };
+        // Add error handler
+        this.contentImage.onerror = () => {
+          DebugManager.addLog(`Error loading image for node ${this.id}`, 'error');
+          this.contentImage = null; // Clear the broken image
+          App.draw();
+        };
+
+        // Add load event listener to redraw when image loads
+        this.contentImage.onload = () => {
+          // When image loads, update node size if auto-sizing is enabled
+          if (this.autoSize) {
+            this.calculateOptimalSize();
+          }
+          App.draw();
+        };
+
+        // Set the source after adding event handlers
+        this.contentImage.src = this.content;
+      } catch (err) {
+        DebugManager.addLog(`Error creating image for node ${this.id}: ${err.message}`, 'error');
+      }
 
       // Draw placeholder while loading
       ctx.fillStyle = '#666';
@@ -1557,6 +2309,11 @@ class Node {
     // If image is loaded, draw it
     if (this.contentImage.complete) {
       try {
+        // Check if the image is in a valid state (has dimensions)
+        if (this.contentImage.width === 0 || this.contentImage.height === 0) {
+          throw new Error('Image has invalid dimensions');
+        }
+
         // Calculate aspect ratio to fit within content area
         const imgRatio = this.contentImage.width / this.contentImage.height;
         const areaRatio = width / height;
@@ -1590,6 +2347,9 @@ class Node {
         ctx.font = '12px Arial';
         ctx.fillText('Error loading image', x + 10, y + 20);
         console.error('Error drawing image:', err);
+
+        // Reset the image to force a reload next time
+        this.contentImage = null;
       }
     } else {
       // If image is still loading, show loading message
@@ -2278,6 +3038,10 @@ const App = {
         inputType.value = 'image';
         outputType.value = 'text';
         break;
+      case 'image-to-image':
+        inputType.value = 'image';
+        outputType.value = 'image';
+        break;
       case 'audio-to-text':
         inputType.value = 'audio';
         outputType.value = 'text';
@@ -2303,6 +3067,7 @@ const App = {
       case 'image':
         return `
           <option value="image-to-text">Image to Text</option>
+          <option value="image-to-image">Image to Image</option>
         `;
       case 'audio':
         return `
@@ -2840,16 +3605,18 @@ const App = {
     const nodeContent = document.getElementById('nodeContent');
     const imagePreview = document.getElementById('imagePreview');
 
-    // Special handling for text-to-image nodes
-    if (node.aiProcessor === 'text-to-image') {
-      // For text-to-image nodes, always show the image content section
+    // Special handling for image-related nodes
+    if (node.aiProcessor === 'text-to-image' || node.aiProcessor === 'image-to-image') {
+      // For image-related nodes, always show the image content section
       this.updateContentSection('image');
       document.getElementById('nodeModality').value = 'image';
 
-      // Set the image prompt field with the input content
-      const imagePrompt = document.getElementById('imagePrompt');
-      if (imagePrompt) {
-        imagePrompt.value = node.inputContent || '';
+      // Set the image prompt field with the input content for text-to-image nodes
+      if (node.aiProcessor === 'text-to-image') {
+        const imagePrompt = document.getElementById('imagePrompt');
+        if (imagePrompt) {
+          imagePrompt.value = node.inputContent || '';
+        }
       }
 
       // If the node has been processed, show the output image
@@ -2980,7 +3747,7 @@ const App = {
                 <div class="result-content">${node.content}</div>
               </div>
             `;
-          } else if (node.aiProcessor === 'text-to-image') {
+          } else if (node.aiProcessor === 'text-to-image' || node.aiProcessor === 'image-to-image') {
             // For image output, show the image
             processingLog.innerHTML += `
               <div class="log-entry success">
@@ -3000,7 +3767,7 @@ const App = {
     this.updatePreviewAreas(node.contentType);
 
     // For image nodes, set up the image prompt field
-    if (node.contentType === 'image' && node.aiProcessor === 'text-to-image') {
+    if (node.contentType === 'image' && (node.aiProcessor === 'text-to-image' || node.aiProcessor === 'image-to-image')) {
       const imagePrompt = document.getElementById('imagePrompt');
       if (imagePrompt) {
         imagePrompt.value = node.inputContent || '';
@@ -3534,6 +4301,21 @@ const App = {
                 </div>
               `;
             }
+          } else if (this.editingNode.aiProcessor === 'image-to-image') {
+            // For image-to-image, use the node's content as input
+            inputContent = this.editingNode.inputContent &&
+              (this.editingNode.inputContent.startsWith('http') || this.editingNode.inputContent.startsWith('data:image')) ?
+              this.editingNode.inputContent : this.editingNode.content;
+
+            // Show the image in the processing log
+            if (processingLog && inputContent) {
+              processingLog.innerHTML += `
+                <div class="log-entry">
+                  <div>Processing image:</div>
+                  <img src="${inputContent}" style="max-width: 100%; max-height: 200px; margin-top: 10px;">
+                </div>
+              `;
+            }
           } else {
             // For text-to-image, get the prompt from the image prompt field
             const imagePrompt = document.getElementById('imagePrompt');
@@ -3616,6 +4398,51 @@ const App = {
           result = await this.editingNode.processImageToText(inputContent);
           break;
 
+        case 'image-to-image':
+          result = await this.editingNode.processImageToImage(inputContent);
+
+          // Set content type to image for image-to-image nodes
+          this.editingNode.contentType = 'image';
+
+          // Store the result as the node's content
+          this.editingNode.content = result;
+
+          // Force recreate the image object to ensure it loads properly
+          this.editingNode.contentImage = new Image();
+          this.editingNode.contentImage.src = result;
+
+          // Add load event listener to redraw when image loads
+          this.editingNode.contentImage.onload = () => {
+            // When image loads, update node size if auto-sizing is enabled
+            if (this.editingNode.autoSize) {
+              this.editingNode.calculateOptimalSize();
+            }
+            // Force a redraw to show the image
+            this.draw();
+          };
+
+          // Auto-resize the node to fit the content
+          if (this.editingNode.autoSize) {
+            this.editingNode.calculateOptimalSize();
+          }
+
+          // Force a redraw to show the updated node
+          this.draw();
+
+          // Show the processed image in the processing log
+          if (processingLog && result) {
+            processingLog.innerHTML += `
+              <div class="log-entry success">
+                <div>Processed image:</div>
+                <img src="${result}" style="max-width: 100%; max-height: 200px; margin-top: 10px;">
+              </div>
+            `;
+          }
+
+          // Log success for debugging
+          DebugManager.addLog(`Image processed successfully for node ${this.editingNode.id}: ${result.substring(0, 30)}...`, 'success');
+          break;
+
         case 'audio-to-text':
           result = await this.editingNode.processAudioToText(inputContent);
           break;
@@ -3624,8 +4451,8 @@ const App = {
           throw new Error(`Unsupported processor type: ${this.editingNode.aiProcessor}`);
       }
 
-      // Store the output result in the node (already done for text-to-image in the switch case)
-      if (this.editingNode.aiProcessor !== 'text-to-image') {
+      // Store the output result in the node (already done for image-related nodes in the switch case)
+      if (this.editingNode.aiProcessor !== 'text-to-image' && this.editingNode.aiProcessor !== 'image-to-image') {
         this.editingNode.content = result;
       }
 
@@ -3633,7 +4460,9 @@ const App = {
       this.editingNode.hasBeenProcessed = true;
 
       // Show the result in the processing log
-      if (processingLog && this.editingNode.aiProcessor !== 'text-to-image') {
+      if (processingLog &&
+          this.editingNode.aiProcessor !== 'text-to-image' &&
+          this.editingNode.aiProcessor !== 'image-to-image') {
         processingLog.innerHTML += `
           <div class="log-entry success">
             <div>Result:</div>
@@ -3642,8 +4471,8 @@ const App = {
         `;
       }
 
-      // Special handling for text-to-image nodes after execution
-      if (this.editingNode.aiProcessor === 'text-to-image') {
+      // Special handling for image-related nodes after execution
+      if (this.editingNode.aiProcessor === 'text-to-image' || this.editingNode.aiProcessor === 'image-to-image') {
         // Ensure the content type is set to image
         this.editingNode.contentType = 'image';
 
@@ -3725,8 +4554,19 @@ const App = {
   async processNodeAndConnections(node, input, sourceNode = null) {
     if (!node) return;
 
+    // If this is a direct node execution (no source node), reset the node's input state
+    if (!sourceNode) {
+      // Reset the node's input state to clear any previous inputs
+      node.reset();
+      DebugManager.addLog(`Reset input state for node "${node.title}" (ID: ${node.id}) before processing`, 'info');
+
+      // If we have input, store it directly
+      if (input) {
+        node.inputContent = input;
+      }
+    }
     // If we have a source node, add this input to the node's input sources
-    if (sourceNode) {
+    else {
       // Add the input to the node's input sources
       const isReady = node.addInput(sourceNode, input);
 
@@ -3737,9 +4577,6 @@ const App = {
         this.draw(); // Redraw to show waiting status
         return;
       }
-    } else if (input) {
-      // If we don't have a source node but have input, store it directly
-      node.inputContent = input;
     }
 
     // Reset waiting status
@@ -3761,12 +4598,12 @@ const App = {
         DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
       }
 
-      // Special handling for text-to-image nodes
-      if (node.aiProcessor === 'text-to-image') {
-        // Set content type to image for text-to-image nodes
+      // Special handling for image-related nodes
+      if (node.aiProcessor === 'text-to-image' || node.aiProcessor === 'image-to-image') {
+        // Set content type to image for image-related nodes
         node.contentType = 'image';
 
-        // Store the input content for text-to-image nodes
+        // Store the input content for image-related nodes
         if (!node.inputContent && processInput) {
           node.inputContent = processInput;
         }
@@ -4030,7 +4867,9 @@ const App = {
 
     // Force all nodes to preload content after saving
     this.nodes.forEach(node => {
-      if (node.contentType === 'image' || node.aiProcessor === 'text-to-image') {
+      if (node.contentType === 'image' ||
+          node.aiProcessor === 'text-to-image' ||
+          node.aiProcessor === 'image-to-image') {
         // Ensure images are properly loaded
         node.preloadContent();
       }
