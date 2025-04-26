@@ -26,7 +26,12 @@ const workflowSchema = new mongoose.Schema({
     outputType: String,
     hasBeenProcessed: Boolean,
     autoSize: Boolean,
-    expanded: Boolean
+    expanded: Boolean,
+    workflowRole: {
+      type: String,
+      default: 'none',
+      enum: ['none', 'input', 'output']
+    }
   }],
   connections: [{
     fromNodeId: Number,

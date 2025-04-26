@@ -152,7 +152,7 @@ const WorkflowIO = {
     if (formGroups.length > 0) {
       // Create a new form group for node roles
       const nodeRoleGroup = document.createElement('div');
-      nodeRoleGroup.className = 'form-group';
+      nodeRoleGroup.className = 'form-group node-role-group';
       nodeRoleGroup.innerHTML = `
         <label>Node Role:</label>
         <div class="radio-group-container">

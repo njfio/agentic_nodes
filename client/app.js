@@ -386,11 +386,30 @@ class Node {
         max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
       };
 
-      // Call the API through our service
-      const data = await ApiService.openai.chat(requestData);
+      try {
+        // Call the API through our service
+        const data = await ApiService.openai.chat(requestData);
 
-      DebugManager.state.totalRequests++;
-      return data.choices[0].message.content;
+        DebugManager.state.totalRequests++;
+        return data.choices[0].message.content;
+      } catch (apiError) {
+        // Check if it's an API key error
+        if (apiError.message && (
+            apiError.message.includes('API key') ||
+            apiError.message.includes('not configured') ||
+            apiError.message.includes('Invalid OpenAI'))) {
+
+          // Show a more helpful error message
+          const errorMessage = 'OpenAI API key is not configured or is invalid.';
+          DebugManager.addLog(errorMessage, 'error');
+
+          // Return a helpful message as the output
+          return `⚠️ OpenAI API Error: ${errorMessage}\n\nTo fix this issue:\n1. Click the "Config" button in the toolbar\n2. Enter your OpenAI API key in the configuration modal\n3. Click "Save Configuration"\n4. Try again`;
+        }
+
+        // For other errors, throw normally
+        throw apiError;
+      }
     } catch (error) {
       DebugManager.addLog(`Text-to-text API error: ${error.message}`, 'error');
       throw error;
@@ -415,53 +434,110 @@ class Node {
         size: "1024x1024"
       };
 
-      // Call the API through our service
-      const data = await ApiService.openai.generateImage(requestData);
+      try {
+        // Call the API through our service
+        const data = await ApiService.openai.generateImage(requestData);
 
-      DebugManager.state.totalRequests++;
+        DebugManager.state.totalRequests++;
 
-      // Set content type to image
-      this.contentType = 'image';
+        // Set content type to image
+        this.contentType = 'image';
 
-      // Mark as processed
-      this.hasBeenProcessed = true;
+        // Mark as processed
+        this.hasBeenProcessed = true;
 
-      let imageUrl;
-      // Handle both response formats
-      // gpt-image-1 returns data.data[0].url or data.data[0].revised_prompt
-      if (data.data && data.data.length > 0) {
-        if (data.data[0].url) {
-          imageUrl = data.data[0].url;
-        } else if (data.data[0].b64_json) {
-          imageUrl = `data:image/png;base64,${data.data[0].b64_json}`;
-        } else {
-          throw new Error('No image URL or base64 data in the response');
-        }
-      } else {
-        throw new Error('Invalid response format from image generation API');
-      }
-
-      // Preload the image to ensure it's available for display
-      if (imageUrl) {
-        // Force recreate the image object to ensure it loads properly
-        this.contentImage = new Image();
-        this.contentImage.src = imageUrl;
-
-        // Add load event listener to redraw when image loads
-        this.contentImage.onload = () => {
-          // When image loads, update node size if auto-sizing is enabled
-          if (this.autoSize) {
-            this.calculateOptimalSize();
+        let imageUrl;
+        // Handle both response formats
+        // gpt-image-1 returns data.data[0].url or data.data[0].revised_prompt
+        if (data.data && data.data.length > 0) {
+          if (data.data[0].url) {
+            imageUrl = data.data[0].url;
+          } else if (data.data[0].b64_json) {
+            imageUrl = `data:image/png;base64,${data.data[0].b64_json}`;
+          } else {
+            throw new Error('No image URL or base64 data in the response');
           }
-          // Force a redraw to show the image
-          App.draw();
-        };
+        } else {
+          throw new Error('Invalid response format from image generation API');
+        }
 
-        // Log success for debugging
-        DebugManager.addLog(`Image generated successfully for node ${this.id}: ${imageUrl.substring(0, 30)}...`, 'success');
+        // Preload the image to ensure it's available for display
+        if (imageUrl) {
+          // Force recreate the image object to ensure it loads properly
+          this.contentImage = new Image();
+          this.contentImage.src = imageUrl;
+
+          // Add load event listener to redraw when image loads
+          this.contentImage.onload = () => {
+            // When image loads, update node size if auto-sizing is enabled
+            if (this.autoSize) {
+              this.calculateOptimalSize();
+            }
+            // Force a redraw to show the image
+            App.draw();
+          };
+
+          // Log success for debugging
+          DebugManager.addLog(`Image generated successfully for node ${this.id}: ${imageUrl.substring(0, 30)}...`, 'success');
+        }
+
+        return imageUrl;
+      } catch (apiError) {
+        // Check if it's an API key error
+        if (apiError.message && (
+            apiError.message.includes('API key') ||
+            apiError.message.includes('not configured') ||
+            apiError.message.includes('Invalid OpenAI'))) {
+
+          // Show a more helpful error message
+          const errorMessage = 'OpenAI API key is not configured or is invalid.';
+          DebugManager.addLog(errorMessage, 'error');
+
+          // Create a placeholder image with the error message
+          const canvas = document.createElement('canvas');
+          canvas.width = 400;
+          canvas.height = 300;
+          const ctx = canvas.getContext('2d');
+
+          // Fill background
+          ctx.fillStyle = '#333';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw error message
+          ctx.fillStyle = '#ff4444';
+          ctx.font = '16px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('⚠️ OpenAI API Error', canvas.width/2, 50);
+
+          ctx.fillStyle = '#fff';
+          ctx.font = '14px Arial';
+          ctx.fillText('API key is not configured or is invalid.', canvas.width/2, 100);
+          ctx.fillText('To fix this issue:', canvas.width/2, 140);
+          ctx.fillText('1. Click the "Config" button in the toolbar', canvas.width/2, 170);
+          ctx.fillText('2. Enter your OpenAI API key in the modal', canvas.width/2, 200);
+          ctx.fillText('3. Click "Save Configuration"', canvas.width/2, 230);
+          ctx.fillText('4. Try again', canvas.width/2, 260);
+
+          // Convert canvas to data URL
+          const errorImageUrl = canvas.toDataURL('image/png');
+
+          // Set as content image
+          this.contentImage = new Image();
+          this.contentImage.src = errorImageUrl;
+
+          // Set content type to image
+          this.contentType = 'image';
+
+          // Mark as processed with error
+          this.hasBeenProcessed = true;
+          this.error = errorMessage;
+
+          return errorImageUrl;
+        }
+
+        // For other errors, throw normally
+        throw apiError;
       }
-
-      return imageUrl;
     } catch (error) {
       // Log the error
       DebugManager.addLog(`Error generating image: ${error.message}`, 'error');
@@ -510,15 +586,35 @@ class Node {
         max_tokens: Config.defaultOpenAIConfig.maxTokens
       };
 
-      // Call the API through our service
-      const data = await ApiService.openai.chat(requestData);
+      try {
+        // Call the API through our service
+        const data = await ApiService.openai.chat(requestData);
 
-      DebugManager.state.totalRequests++;
+        DebugManager.state.totalRequests++;
 
-      // Set content type to text for image-to-text nodes
-      this.contentType = 'text';
+        // Set content type to text for image-to-text nodes
+        this.contentType = 'text';
 
-      return data.choices[0].message.content;
+        return data.choices[0].message.content;
+      } catch (apiError) {
+        // Check if it's an API key error
+        if (apiError.message && (
+            apiError.message.includes('API key') ||
+            apiError.message.includes('not configured') ||
+            apiError.message.includes('Invalid OpenAI'))) {
+
+          // Show a more helpful error message
+          const errorMessage = 'OpenAI API key is not configured or is invalid.';
+          DebugManager.addLog(errorMessage, 'error');
+
+          // Return a helpful message as the output
+          this.contentType = 'text';
+          return `⚠️ OpenAI API Error: ${errorMessage}\n\nTo fix this issue:\n1. Click the "Config" button in the toolbar\n2. Enter your OpenAI API key in the configuration modal\n3. Click "Save Configuration"\n4. Try again`;
+        }
+
+        // For other errors, throw normally
+        throw apiError;
+      }
     } catch (error) {
       DebugManager.addLog(`Image-to-text API error: ${error.message}`, 'error');
       this.error = error.message;
@@ -1443,6 +1539,7 @@ const App = {
 
     document.getElementById('addNodeBtn').addEventListener('click', () => this.addNode());
     document.getElementById('configBtn').addEventListener('click', () => ModalManager.openModal('configModal'));
+    document.getElementById('saveWorkflowBtn').addEventListener('click', () => this.handleSaveWorkflow());
     document.getElementById('saveBtn').addEventListener('click', () => this.handleSave());
     document.getElementById('loadBtn').addEventListener('click', () => this.handleLoad());
     document.getElementById('helpBtn').addEventListener('click', () => ModalManager.openModal('helpModal'));
@@ -1460,6 +1557,15 @@ const App = {
       content: document.getElementById('nodeContent'),
       processor: document.getElementById('aiProcessor'),
       systemPrompt: document.getElementById('systemPrompt')
+    };
+
+    // Save Workflow Modal
+    const saveWorkflowModal = {
+      modal: document.getElementById('saveWorkflowModal'),
+      name: document.getElementById('workflowName'),
+      description: document.getElementById('workflowDescription'),
+      save: document.getElementById('confirmSaveWorkflow'),
+      cancel: document.getElementById('cancelSaveWorkflow')
     };
 
     if (nodeEditor.modal) {
@@ -1521,8 +1627,10 @@ const App = {
 
     if (configModal.save) {
       configModal.save.addEventListener('click', () => {
-        this.saveConfig();
-        ModalManager.closeModal('configModal');
+        // Only close the modal if the config was saved successfully
+        if (this.saveConfig()) {
+          ModalManager.closeModal('configModal');
+        }
       });
     }
 
@@ -1558,6 +1666,22 @@ const App = {
       });
     }
 
+    // Save Workflow Modal
+    const confirmSaveWorkflow = document.getElementById('confirmSaveWorkflow');
+    const cancelSaveWorkflow = document.getElementById('cancelSaveWorkflow');
+
+    if (confirmSaveWorkflow) {
+      confirmSaveWorkflow.addEventListener('click', () => {
+        this.saveWorkflowToServer();
+      });
+    }
+
+    if (cancelSaveWorkflow) {
+      cancelSaveWorkflow.addEventListener('click', () => {
+        ModalManager.closeModal('saveWorkflowModal');
+      });
+    }
+
     // Help Modal
     const closeHelp = document.getElementById('closeHelp');
     if (closeHelp) {
@@ -1569,8 +1693,18 @@ const App = {
 
   // Save OpenAI config
   saveConfig() {
+    const apiKeyInput = document.getElementById('apiKey');
+    const apiKey = apiKeyInput.value.trim();
+
+    // Basic validation for OpenAI API key
+    if (apiKey && !apiKey.startsWith('sk-')) {
+      alert('OpenAI API keys should start with "sk-". Please check your API key.');
+      apiKeyInput.focus();
+      return false;
+    }
+
     const config = {
-      apiKey: document.getElementById('apiKey').value,
+      apiKey: apiKey,
       model: document.getElementById('model').value,
       temperature: parseFloat(document.getElementById('temperature').value) || Config.defaultOpenAIConfig.temperature,
       maxTokens: parseInt(document.getElementById('maxTokens').value) || Config.defaultOpenAIConfig.maxTokens
@@ -1578,6 +1712,20 @@ const App = {
 
     localStorage.setItem(Config.storageKeys.openAIConfig, JSON.stringify(config));
     DebugManager.addLog('OpenAI configuration saved', 'success');
+
+    // Show a confirmation message
+    const testResult = document.getElementById('testResult');
+    if (testResult) {
+      if (apiKey) {
+        testResult.textContent = 'Configuration saved. You can now test the API.';
+        testResult.className = 'test-result success';
+      } else {
+        testResult.textContent = 'Configuration saved without API key. API calls will fail.';
+        testResult.className = 'test-result warning';
+      }
+    }
+
+    return true;
   },
 
   // Update content section based on modality
@@ -2956,12 +3104,62 @@ const App = {
     return output;
   },
 
-  // Handle save button click
-  async handleSave() {
+  // Handle save workflow button click
+  handleSaveWorkflow() {
+    // Open the save workflow modal
+    ModalManager.openModal('saveWorkflowModal');
+
+    // Set default values
+    const workflowName = document.getElementById('workflowName');
+    const workflowDescription = document.getElementById('workflowDescription');
+
+    if (workflowName) {
+      workflowName.value = `Workflow ${new Date().toLocaleString()}`;
+    }
+
+    if (workflowDescription) {
+      workflowDescription.value = `Workflow created on ${new Date().toLocaleString()}`;
+    }
+  },
+
+  // Save workflow to server with name and description
+  async saveWorkflowToServer() {
+    // Check if the user is logged in
+    if (!this.isUserLoggedIn()) {
+      DebugManager.addLog('You must be logged in to save workflows to the server', 'error');
+
+      // Ask if the user wants to log in
+      if (confirm('You need to be logged in to save workflows. Would you like to go to the login page?')) {
+        // Save current state to localStorage before redirecting
+        this.handleSave();
+
+        // Redirect to login page
+        window.location.href = 'login.html';
+      }
+
+      return;
+    }
+
+    const workflowName = document.getElementById('workflowName');
+    const workflowDescription = document.getElementById('workflowDescription');
+
+    if (!workflowName || !workflowDescription) {
+      DebugManager.addLog('Error: Could not find workflow name or description fields', 'error');
+      return;
+    }
+
+    const name = workflowName.value.trim();
+    const description = workflowDescription.value.trim();
+
+    if (!name) {
+      DebugManager.addLog('Error: Workflow name is required', 'error');
+      return;
+    }
+
     // Create a JSON representation of the current state
     const state = {
-      name: 'Workflow ' + new Date().toLocaleString(),
-      description: 'Workflow created on ' + new Date().toLocaleString(),
+      name,
+      description,
       nodes: this.nodes.map(node => ({
         id: node.id,
         x: node.x,
@@ -2980,7 +3178,112 @@ const App = {
         autoSize: node.autoSize,
         selected: node.selected,
         expanded: node.expanded,
-        error: node.error
+        error: node.error,
+        workflowRole: node.workflowRole || 'none'
+      })),
+      connections: this.connections.map(conn => ({
+        fromNodeId: conn.fromNode.id,
+        toNodeId: conn.toNode.id
+      }))
+    };
+
+    // Close the modal
+    ModalManager.closeModal('saveWorkflowModal');
+
+    // Show saving indicator
+    DebugManager.addLog(`Saving workflow "${name}" to server...`, 'info');
+
+    try {
+      // First, verify that the user is still authenticated
+      try {
+        // Make a lightweight call to check authentication
+        await ApiService.users.getProfile();
+      } catch (authError) {
+        // If authentication fails, save locally and prompt to log in
+        this.handleSave();
+        DebugManager.addLog('Authentication failed. Saving workflow locally.', 'warning');
+
+        if (confirm('Your session has expired. Would you like to log in again to save to the server?')) {
+          window.location.href = 'login.html';
+        }
+        return;
+      }
+
+      // Save to server
+      const response = await ApiService.workflows.create(state);
+
+      // Store the workflow ID for future reference
+      if (response && response._id) {
+        localStorage.setItem('current_workflow_id', response._id);
+        DebugManager.addLog(`Workflow "${name}" saved to server with ID: ${response._id}`, 'success');
+
+        // Refresh workflow list if available
+        if (typeof this.refreshWorkflowList === 'function') {
+          setTimeout(() => {
+            this.refreshWorkflowList();
+          }, 500); // Give the server some time to process the save
+        }
+      }
+    } catch (error) {
+      console.error('Error saving to server:', error);
+
+      // Save locally as a fallback
+      this.handleSave();
+
+      // Show error message
+      DebugManager.addLog(`Failed to save workflow to server: ${error.message}. Saved locally instead.`, 'error');
+
+      // If the error is due to authentication, offer to log in
+      if (error.message && (
+          error.message.includes('authentication') ||
+          error.message.includes('token') ||
+          error.message.includes('unauthorized') ||
+          error.message.includes('access denied') ||
+          error.message.includes('not valid'))) {
+
+        if (confirm('Your session may have expired. Would you like to log in again?')) {
+          // Redirect to login page
+          window.location.href = 'login.html';
+        }
+      }
+    }
+  },
+
+  // Check if the user is logged in
+  isUserLoggedIn() {
+    // Check both localStorage and sessionStorage for the auth token
+    const localToken = localStorage.getItem(Config.storageKeys.authToken);
+    const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
+
+    return localToken !== null || sessionToken !== null;
+  },
+
+  // Handle save button click (local storage)
+  async handleSave() {
+    // Create a JSON representation of the current state
+    const state = {
+      name: `Workflow ${new Date().toLocaleString()}`,
+      description: `Workflow created on ${new Date().toLocaleString()}`,
+      nodes: this.nodes.map(node => ({
+        id: node.id,
+        x: node.x,
+        y: node.y,
+        width: node.width,
+        height: node.height,
+        title: node.title,
+        content: node.content,
+        inputContent: node.inputContent,
+        contentType: node.contentType,
+        systemPrompt: node.systemPrompt,
+        aiProcessor: node.aiProcessor,
+        inputType: node.inputType,
+        outputType: node.outputType,
+        hasBeenProcessed: node.hasBeenProcessed,
+        autoSize: node.autoSize,
+        selected: node.selected,
+        expanded: node.expanded,
+        error: node.error,
+        workflowRole: node.workflowRole || 'none'
       })),
       connections: this.connections.map(conn => ({
         fromNodeId: conn.fromNode.id,
@@ -2991,24 +3294,6 @@ const App = {
     // Save to localStorage for backward compatibility
     localStorage.setItem('canvas_state', JSON.stringify(state));
 
-    // Try to save to the server
-    try {
-      // Show saving indicator
-      DebugManager.addLog('Saving workflow to server...', 'info');
-
-      // Save to server
-      const response = await ApiService.workflows.create(state);
-
-      // Store the workflow ID for future reference
-      if (response && response._id) {
-        localStorage.setItem('current_workflow_id', response._id);
-        DebugManager.addLog(`Workflow saved to server with ID: ${response._id}`, 'success');
-      }
-    } catch (error) {
-      console.error('Error saving to server:', error);
-      DebugManager.addLog(`Failed to save to server: ${error.message}. Using local storage only.`, 'warning');
-    }
-
     // Force all nodes to preload content after saving
     this.nodes.forEach(node => {
       if (node.contentType === 'image' || node.aiProcessor === 'text-to-image') {
@@ -3017,7 +3302,7 @@ const App = {
       }
     });
 
-    DebugManager.addLog('Canvas state saved', 'success');
+    DebugManager.addLog('Canvas state saved to local storage', 'success');
   },
 
   // Handle load button click
@@ -3090,6 +3375,22 @@ const App = {
       node.expanded = nodeData.expanded || false;
       node.autoSize = nodeData.autoSize !== undefined ? nodeData.autoSize : true;
 
+      // Restore workflow role if it exists
+      if (nodeData.workflowRole) {
+        node.workflowRole = nodeData.workflowRole;
+
+        // Update WorkflowIO references if available
+        if (typeof WorkflowIO !== 'undefined') {
+          if (nodeData.workflowRole === 'input') {
+            WorkflowIO.inputNode = node;
+            DebugManager.addLog(`Restored node ${node.id} as input node`, 'info');
+          } else if (nodeData.workflowRole === 'output') {
+            WorkflowIO.outputNode = node;
+            DebugManager.addLog(`Restored node ${node.id} as output node`, 'info');
+          }
+        }
+      }
+
       // Restore dimensions if saved
       if (nodeData.width && nodeData.height) {
         node.width = nodeData.width;
@@ -3148,6 +3449,12 @@ const App = {
       // Preload content for all nodes again
       this.nodes.forEach(node => node.preloadContent());
       this.draw();
+
+      // Update WorkflowIO status if available
+      if (typeof WorkflowIO !== 'undefined') {
+        WorkflowIO.updateStatus();
+        DebugManager.addLog('Updated workflow I/O status', 'info');
+      }
     }, 500);
 
     DebugManager.updateCanvasStats();
