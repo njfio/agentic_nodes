@@ -258,7 +258,7 @@ class Node {
     // Input tracking for multiple inputs
     this.inputSources = new Map(); // Map of source node IDs to their inputs
     this.waitForAllInputs = true;  // Whether to wait for all inputs before processing
-    this.waitingForInputs = false; // Whether the node is waiting for inputs
+    this.waitingForInputs = true;  // Default to waiting for inputs until all are ready
 
     this.stats = {
       inputTokens: 0,
@@ -396,15 +396,22 @@ class Node {
     for (const connection of connections) {
       const toNode = connection.toNode;
 
+      // Skip if the node is already processing
+      if (toNode.processing) {
+        DebugManager.addLog(`Node ${toNode.id} is already processing, skipping`, 'info');
+        continue;
+      }
+
       // Add this node's output to the target node's input sources
       const isReady = toNode.addInput(this, this.content);
 
       // Log the input being passed
       DebugManager.addLog(`Passing output from node ${this.id} to node ${toNode.id}: ${this.content ? (typeof this.content === 'string' ? this.content.substring(0, 30) + '...' : 'non-text content') : 'empty content'}`, 'info');
 
-      // If the node is ready to process, trigger processing
+      // If the node is ready to process (all required inputs available), trigger processing
       if (isReady) {
-        DebugManager.addLog(`Node ${toNode.id} is ready to process`, 'info');
+        DebugManager.addLog(`Node ${toNode.id} has all required inputs and is ready to process`, 'info');
+
         // Process the node asynchronously to allow parallel processing
         this.processNodeAsync(toNode);
       } else {
@@ -840,8 +847,11 @@ class Node {
 
   // Check if all inputs are ready for processing
   areAllInputsReady() {
-    // If there are no input sources, the node is ready
-    if (this.inputSources.size === 0) {
+    // Get all incoming connections
+    const incomingConnections = App.connections.filter(conn => conn.toNode === this);
+
+    // If there are no incoming connections, the node is ready
+    if (incomingConnections.length === 0) {
       return true;
     }
 
@@ -850,26 +860,26 @@ class Node {
       return this.inputSources.size > 0;
     }
 
-    // Check if all input sources have provided input
-    const incomingConnections = App.connections.filter(conn => conn.toNode === this);
-
-    // If there are no incoming connections, the node is ready
-    if (incomingConnections.length === 0) {
-      return true;
+    // For nodes that wait for all inputs, check if we have all required inputs
+    // We need to have an input from every connected node
+    if (this.inputSources.size < incomingConnections.length) {
+      return false;
     }
 
     // Check if all connected nodes have been processed
     for (const conn of incomingConnections) {
+      // Check if the source node has been processed
       if (!conn.fromNode.hasBeenProcessed) {
         return false;
       }
 
-      // Check if this input source is in our map
+      // Check if we have an input from this source node
       if (!this.inputSources.has(conn.fromNode.id)) {
         return false;
       }
     }
 
+    // All checks passed, the node is ready to process
     return true;
   }
 
@@ -878,16 +888,31 @@ class Node {
     // Store the input in the map
     this.inputSources.set(sourceNode.id, input);
 
-    // If we're waiting for all inputs, check if we're ready
+    // Get all incoming connections
+    const incomingConnections = App.connections.filter(conn => conn.toNode === this);
+
+    // Default to waiting for inputs
+    this.waitingForInputs = true;
+
+    // Check if we have all required inputs
     if (this.waitForAllInputs) {
-      const incomingConnections = App.connections.filter(conn => conn.toNode === this);
+      // We need all inputs to be ready
       this.waitingForInputs = incomingConnections.length > this.inputSources.size;
+
+      DebugManager.addLog(`Node ${this.id} has ${this.inputSources.size}/${incomingConnections.length} inputs ready`, 'info');
     } else {
       // If we're not waiting for all inputs, we're ready as soon as we have one
-      this.waitingForInputs = false;
+      this.waitingForInputs = this.inputSources.size === 0;
     }
 
-    return this.areAllInputsReady();
+    // Return true only if all required inputs are ready and the node hasn't been processed yet
+    const isReady = this.areAllInputsReady() && !this.processing;
+
+    if (isReady) {
+      DebugManager.addLog(`Node ${this.id} has all required inputs and is ready to process`, 'info');
+    }
+
+    return isReady;
   }
 
   // Combine all inputs into a single input
