@@ -364,6 +364,10 @@ class Node {
       DebugManager.state.totalTokens += this.stats.outputTokens;
 
       DebugManager.addLog(`Node "${this.title}" (ID: ${this.id}) processed successfully`, 'success');
+
+      // Clear waiting status for any nodes that depend on this one
+      this.updateDependentNodes();
+
       return output;
     } catch (err) {
       this.error = err.message;
@@ -374,6 +378,42 @@ class Node {
       DebugManager.state.processingNodes--;
       DebugManager.updateUsageStats();
     }
+  }
+
+  // Update nodes that depend on this node
+  updateDependentNodes() {
+    // Find all connections from this node
+    const connections = App.connections.filter(conn => conn.fromNode === this);
+
+    // For each connected node, update its input sources
+    for (const connection of connections) {
+      const toNode = connection.toNode;
+
+      // Add this node's output to the target node's input sources
+      toNode.addInput(this, this.content);
+
+      // If the node is ready to process, trigger processing
+      if (toNode.areAllInputsReady() && toNode.waitingForInputs) {
+        // Process the node asynchronously to allow parallel processing
+        this.processNodeAsync(toNode);
+      }
+    }
+  }
+
+  // Process a node asynchronously
+  processNodeAsync(node) {
+    // Use setTimeout with 0 delay to process in the next event loop iteration
+    // This allows multiple nodes to start processing in parallel
+    setTimeout(() => {
+      // Get the combined input
+      const processInput = node.inputSources.size > 0 ? node.combineInputs() : node.inputContent;
+
+      // Process the node
+      App.processNodeAndConnections(node, processInput)
+        .catch(err => {
+          DebugManager.addLog(`Failed to process node "${node.title}" (ID: ${node.id}): ${err.message}`, 'error');
+        });
+    }, 0);
   }
 
   async processTextToText(input) {
@@ -395,8 +435,13 @@ class Node {
       };
 
       try {
-        // Call the API through our service
+        // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.chat(requestData);
+
+        // Check if we have a valid response
+        if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+          throw new Error('Invalid response from OpenAI API. Please try again.');
+        }
 
         DebugManager.state.totalRequests++;
         return data.choices[0].message.content;
@@ -415,8 +460,24 @@ class Node {
           return `⚠️ OpenAI API Error: ${errorMessage}\n\nTo fix this issue:\n1. Click the "Config" button in the toolbar\n2. Enter your OpenAI API key in the configuration modal\n3. Click "Save Configuration"\n4. Try again`;
         }
 
-        // For other errors, throw normally
-        throw apiError;
+        // Create more user-friendly error messages for common errors
+        let errorMessage = apiError.message;
+
+        if (errorMessage === 'API request failed') {
+          errorMessage = 'OpenAI API request failed. The service may be temporarily unavailable. Please try again later.';
+        } else if (errorMessage.includes('rate limit')) {
+          errorMessage = 'OpenAI API rate limit exceeded. Please wait a moment before trying again.';
+        } else if (errorMessage.includes('timeout')) {
+          errorMessage = 'OpenAI API request timed out. The service may be busy. Please try again later.';
+        } else if (errorMessage.includes('NetworkError')) {
+          errorMessage = 'Network error while connecting to OpenAI. Please check your internet connection and try again.';
+        }
+
+        // Log the user-friendly error
+        DebugManager.addLog(`Text-to-text API error: ${errorMessage}`, 'error');
+
+        // For other errors, throw with improved message
+        throw new Error(errorMessage);
       }
     } catch (error) {
       DebugManager.addLog(`Text-to-text API error: ${error.message}`, 'error');
@@ -443,8 +504,13 @@ class Node {
       };
 
       try {
-        // Call the API through our service
+        // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.generateImage(requestData);
+
+        // Check if we have a valid response
+        if (!data || !data.data || !data.data.length) {
+          throw new Error('Invalid response from OpenAI API. Please try again.');
+        }
 
         DebugManager.state.totalRequests++;
 
@@ -543,8 +609,78 @@ class Node {
           return errorImageUrl;
         }
 
-        // For other errors, throw normally
-        throw apiError;
+        // Create more user-friendly error messages for common errors
+        let errorMessage = apiError.message;
+
+        if (errorMessage === 'API request failed') {
+          errorMessage = 'OpenAI API request failed. The service may be temporarily unavailable. Please try again later.';
+        } else if (errorMessage.includes('rate limit')) {
+          errorMessage = 'OpenAI API rate limit exceeded. Please wait a moment before trying again.';
+        } else if (errorMessage.includes('timeout')) {
+          errorMessage = 'OpenAI API request timed out. The service may be busy. Please try again later.';
+        } else if (errorMessage.includes('NetworkError')) {
+          errorMessage = 'Network error while connecting to OpenAI. Please check your internet connection and try again.';
+        } else if (errorMessage.includes('content policy')) {
+          errorMessage = 'Your image prompt may violate OpenAI\'s content policy. Please modify your prompt and try again.';
+        }
+
+        // Log the user-friendly error
+        DebugManager.addLog(`Text-to-image API error: ${errorMessage}`, 'error');
+
+        // Create an error image with the message
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 300;
+        const ctx = canvas.getContext('2d');
+
+        // Fill background
+        ctx.fillStyle = '#333';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw error message
+        ctx.fillStyle = '#ff4444';
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ Image Generation Error', canvas.width/2, 50);
+
+        // Split error message into multiple lines
+        const words = errorMessage.split(' ');
+        let line = '';
+        let y = 100;
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Arial';
+
+        for (const word of words) {
+          const testLine = line + word + ' ';
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > 350 && line !== '') {
+            ctx.fillText(line, canvas.width/2, y);
+            line = word + ' ';
+            y += 25;
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) {
+          ctx.fillText(line, canvas.width/2, y);
+        }
+
+        // Convert canvas to data URL
+        const errorImageUrl = canvas.toDataURL('image/png');
+
+        // Set as content image
+        this.contentImage = new Image();
+        this.contentImage.src = errorImageUrl;
+
+        // Set content type to image
+        this.contentType = 'image';
+
+        // Mark as processed with error
+        this.hasBeenProcessed = true;
+        this.error = errorMessage;
+
+        // For other errors, throw with improved message
+        throw new Error(errorMessage);
       }
     } catch (error) {
       // Log the error
@@ -595,8 +731,13 @@ class Node {
       };
 
       try {
-        // Call the API through our service
+        // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.chat(requestData);
+
+        // Check if we have a valid response
+        if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+          throw new Error('Invalid response from OpenAI API. Please try again.');
+        }
 
         DebugManager.state.totalRequests++;
 
@@ -620,8 +761,28 @@ class Node {
           return `⚠️ OpenAI API Error: ${errorMessage}\n\nTo fix this issue:\n1. Click the "Config" button in the toolbar\n2. Enter your OpenAI API key in the configuration modal\n3. Click "Save Configuration"\n4. Try again`;
         }
 
-        // For other errors, throw normally
-        throw apiError;
+        // Create more user-friendly error messages for common errors
+        let errorMessage = apiError.message;
+
+        if (errorMessage === 'API request failed') {
+          errorMessage = 'OpenAI API request failed. The service may be temporarily unavailable. Please try again later.';
+        } else if (errorMessage.includes('rate limit')) {
+          errorMessage = 'OpenAI API rate limit exceeded. Please wait a moment before trying again.';
+        } else if (errorMessage.includes('timeout')) {
+          errorMessage = 'OpenAI API request timed out. The service may be busy. Please try again later.';
+        } else if (errorMessage.includes('NetworkError')) {
+          errorMessage = 'Network error while connecting to OpenAI. Please check your internet connection and try again.';
+        } else if (errorMessage.includes('Invalid image')) {
+          errorMessage = 'The image format is not supported or the image is corrupted. Please try a different image.';
+        } else if (errorMessage.includes('image_url')) {
+          errorMessage = 'There was a problem with the image URL. Please ensure the image is accessible.';
+        }
+
+        // Log the user-friendly error
+        DebugManager.addLog(`Image-to-text API error: ${errorMessage}`, 'error');
+
+        // For other errors, throw with improved message
+        throw new Error(errorMessage);
       }
     } catch (error) {
       DebugManager.addLog(`Image-to-text API error: ${error.message}`, 'error');
@@ -3536,80 +3697,86 @@ const App = {
     // Get the combined input if we have multiple inputs
     const processInput = node.inputSources.size > 0 ? node.combineInputs() : (input || node.inputContent);
 
-    // Process the current node
-    const output = await node.process(processInput);
+    try {
+      // Process the current node
+      const output = await node.process(processInput);
 
-    // Store the output in the node's content
-    if (output && node.content !== output) {
-      node.content = output;
-      node.hasBeenProcessed = true;
-
-      // Log for debugging
-      DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
-    }
-
-    // Special handling for text-to-image nodes
-    if (node.aiProcessor === 'text-to-image') {
-      // Set content type to image for text-to-image nodes
-      node.contentType = 'image';
-
-      // Store the input content for text-to-image nodes
-      if (!node.inputContent && processInput) {
-        node.inputContent = processInput;
-      }
-
-      if (node.hasBeenProcessed) {
-        // Make sure the image is preloaded for display
-        if (node.content) {
-          // Force recreate the image object to ensure it loads properly
-          node.contentImage = null;
-          node.preloadContent();
-
-          // Log success for debugging
-          DebugManager.addLog(`Image content set for node ${node.id} in workflow: ${node.content.substring(0, 30)}...`, 'info');
-        } else {
-          DebugManager.addLog(`Warning: No image content for node ${node.id} in workflow`, 'warning');
-        }
-      }
-    }
-
-    // Find all connections from this node
-    const connections = this.connections.filter(conn => conn.fromNode === node);
-
-    // Process each connected node
-    for (const connection of connections) {
-      const toNode = connection.toNode;
-
-      // If the output is an image and the next node can handle images
-      if (node.contentType === 'image' &&
-          (toNode.aiProcessor === 'image-to-text' ||
-           (toNode.aiProcessor === 'text-to-text' &&
-            (toNode.systemPrompt.toLowerCase().includes('image') ||
-             toNode.systemPrompt.toLowerCase().includes('visual') ||
-             toNode.systemPrompt.toLowerCase().includes('picture'))))) {
-
-        // Clear any existing input image cache
-        toNode.inputImage = null;
-      }
-
-      // Process the connected node with the output from the current node
-      // Pass the current node as the source node
-      await this.processNodeAndConnections(toNode, output, node);
-    }
-
-    // Special handling for workflow output nodes
-    if (node.workflowRole === 'output') {
-      // Ensure the content is set
+      // Store the output in the node's content
       if (output && node.content !== output) {
         node.content = output;
         node.hasBeenProcessed = true;
+
+        // Log for debugging
+        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
       }
 
-      // Log for debugging
-      DebugManager.addLog(`Output node "${node.title}" (ID: ${node.id}) final content: ${node.content ? (node.content.substring ? node.content.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
-    }
+      // Special handling for text-to-image nodes
+      if (node.aiProcessor === 'text-to-image') {
+        // Set content type to image for text-to-image nodes
+        node.contentType = 'image';
 
-    return output;
+        // Store the input content for text-to-image nodes
+        if (!node.inputContent && processInput) {
+          node.inputContent = processInput;
+        }
+
+        if (node.hasBeenProcessed) {
+          // Make sure the image is preloaded for display
+          if (node.content) {
+            // Force recreate the image object to ensure it loads properly
+            node.contentImage = null;
+            node.preloadContent();
+
+            // Log success for debugging
+            DebugManager.addLog(`Image content set for node ${node.id} in workflow: ${node.content.substring(0, 30)}...`, 'info');
+          } else {
+            DebugManager.addLog(`Warning: No image content for node ${node.id} in workflow`, 'warning');
+          }
+        }
+      }
+
+      // Special handling for workflow output nodes
+      if (node.workflowRole === 'output') {
+        // Ensure the content is set
+        if (output && node.content !== output) {
+          node.content = output;
+          node.hasBeenProcessed = true;
+        }
+
+        // Log for debugging
+        DebugManager.addLog(`Output node "${node.title}" (ID: ${node.id}) final content: ${node.content ? (node.content.substring ? node.content.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
+      }
+
+      // The node's updateDependentNodes method will handle processing connected nodes
+      // This allows for parallel processing of nodes that are ready
+
+      return output;
+    } catch (error) {
+      // Handle errors gracefully
+      node.error = error.message;
+
+      // Create a more user-friendly error message
+      let errorMessage = error.message;
+
+      // Check for common API errors and provide more helpful messages
+      if (errorMessage === 'API request failed') {
+        errorMessage = 'API request failed. The server may be temporarily unavailable. Please try again later.';
+      } else if (errorMessage.includes('NetworkError')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (errorMessage.includes('timeout')) {
+        errorMessage = 'Request timed out. The server may be busy. Please try again later.';
+      } else if (errorMessage.includes('rate limit')) {
+        errorMessage = 'API rate limit exceeded. Please wait a moment before trying again.';
+      }
+
+      // Log the error
+      DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) error: ${errorMessage}`, 'error');
+
+      // Redraw to show error state
+      this.draw();
+
+      throw new Error(errorMessage);
+    }
   },
 
   // Handle save workflow button click

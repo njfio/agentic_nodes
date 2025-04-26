@@ -29,15 +29,19 @@ const ApiService = {
   },
 
   /**
-   * Make a request to the API
+   * Make a request to the API with retry capability
    * @param {string} endpoint - API endpoint
    * @param {string} method - HTTP method
    * @param {object} data - Request data
    * @param {boolean} retry - Whether to retry the request if token is invalid
    * @param {object} customHeaders - Additional headers to include in the request
+   * @param {number} maxRetries - Maximum number of retries (default: 3)
+   * @param {number} retryDelay - Delay between retries in ms (default: 1000)
+   * @param {number} retryCount - Current retry count (used internally)
    * @returns {Promise} - Promise with response data
    */
-  async request(endpoint, method = 'GET', data = null, retry = true, customHeaders = {}) {
+  async request(endpoint, method = 'GET', data = null, retry = true, customHeaders = {},
+                maxRetries = 3, retryDelay = 1000, retryCount = 0) {
     const url = `${Config.apiBaseUrl}${endpoint}`;
 
     const options = {
@@ -72,7 +76,13 @@ const ApiService = {
     }
 
     try {
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      options.signal = controller.signal;
+
       const response = await fetch(url, options);
+      clearTimeout(timeoutId);
 
       // Handle non-JSON responses
       const contentType = response.headers.get('content-type');
@@ -102,18 +112,71 @@ const ApiService = {
             }
           }
 
-          throw new Error(responseData.message || 'API request failed');
+          // For server errors (5xx) or rate limiting (429), retry if we haven't exceeded max retries
+          if ((response.status >= 500 || response.status === 429) && retryCount < maxRetries) {
+            console.warn(`API request failed with status ${response.status}. Retrying (${retryCount + 1}/${maxRetries})...`);
+
+            // Calculate exponential backoff delay
+            const backoffDelay = retryDelay * Math.pow(2, retryCount);
+
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+
+            // Retry the request with incremented retry count
+            return this.request(endpoint, method, data, retry, customHeaders, maxRetries, retryDelay, retryCount + 1);
+          }
+
+          throw new Error(responseData.message || `API request failed with status ${response.status}`);
         }
 
         return responseData;
       } else {
         if (!response.ok) {
-          throw new Error('API request failed');
+          // For server errors (5xx) or rate limiting (429), retry if we haven't exceeded max retries
+          if ((response.status >= 500 || response.status === 429) && retryCount < maxRetries) {
+            console.warn(`API request failed with status ${response.status}. Retrying (${retryCount + 1}/${maxRetries})...`);
+
+            // Calculate exponential backoff delay
+            const backoffDelay = retryDelay * Math.pow(2, retryCount);
+
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+
+            // Retry the request with incremented retry count
+            return this.request(endpoint, method, data, retry, customHeaders, maxRetries, retryDelay, retryCount + 1);
+          }
+
+          throw new Error(`API request failed with status ${response.status}`);
         }
 
         return await response.text();
       }
     } catch (error) {
+      // Handle network errors, timeouts, and aborts
+      if (error.name === 'AbortError') {
+        console.error(`API request to ${endpoint} timed out`);
+        throw new Error('API request timed out. Please try again.');
+      }
+
+      if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
+        console.error(`Network error for API request to ${endpoint}`);
+        throw new Error('Network error. Please check your internet connection and try again.');
+      }
+
+      // For network errors, retry if we haven't exceeded max retries
+      if ((error.name === 'TypeError' || error.name === 'NetworkError') && retryCount < maxRetries) {
+        console.warn(`Network error for API request to ${endpoint}. Retrying (${retryCount + 1}/${maxRetries})...`);
+
+        // Calculate exponential backoff delay
+        const backoffDelay = retryDelay * Math.pow(2, retryCount);
+
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+
+        // Retry the request with incremented retry count
+        return this.request(endpoint, method, data, retry, customHeaders, maxRetries, retryDelay, retryCount + 1);
+      }
+
       console.error(`API Error (${endpoint}):`, error);
       throw error;
     }
