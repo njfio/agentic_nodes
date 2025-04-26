@@ -27,6 +27,8 @@ const workflowSchema = new mongoose.Schema({
     hasBeenProcessed: Boolean,
     autoSize: Boolean,
     expanded: Boolean,
+    inputCollapsed: Boolean,
+    outputCollapsed: Boolean,
     workflowRole: {
       type: String,
       default: 'none',

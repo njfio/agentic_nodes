@@ -252,6 +252,8 @@ class Node {
     this.expanded = false;    // Track if node is expanded to show more content
     this.hasBeenProcessed = false; // Track if node has been processed
     this.autoSize = true;     // Whether to automatically resize based on content
+    this.inputCollapsed = false;  // Whether the input section is collapsed
+    this.outputCollapsed = false; // Whether the output section is collapsed
     this.stats = {
       inputTokens: 0,
       outputTokens: 0,
@@ -857,20 +859,44 @@ class Node {
     const inputAreaY = this.y + 40;
     const outputAreaY = this.y + this.height / 2 + 5;
     const contentAreaWidth = this.width - 20;
-    const inputAreaHeight = (this.height / 2) - 50;
-    const outputAreaHeight = (this.height / 2) - 25;
+    const inputAreaHeight = this.inputCollapsed ? 20 : (this.height / 2) - 50;
+    const outputAreaHeight = this.outputCollapsed ? 20 : (this.height / 2) - 25;
 
     // Draw input area
     ctx.fillStyle = '#1e1e1e';
     ctx.fillRect(contentAreaX, inputAreaY, contentAreaWidth, inputAreaHeight);
 
-    // Draw input label
+    // Draw input label and collapse/expand button
     ctx.fillStyle = '#888';
     ctx.font = '10px Arial';
     ctx.fillText('INPUT:', contentAreaX + 5, inputAreaY - 2);
 
-    // Draw input content
-    this.drawInputContent(ctx, contentAreaX, inputAreaY, contentAreaWidth, inputAreaHeight);
+    // Draw input collapse/expand button
+    const inputCollapseButtonX = contentAreaX + contentAreaWidth - 20;
+    const inputCollapseButtonY = inputAreaY - 10;
+    ctx.fillStyle = '#555';
+    ctx.fillRect(inputCollapseButtonX, inputCollapseButtonY, 15, 15);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '12px Arial';
+    ctx.fillText(this.inputCollapsed ? '+' : '-', inputCollapseButtonX + 4, inputCollapseButtonY + 12);
+
+    // Store button position for click detection
+    this.inputCollapseButton = {
+      x: inputCollapseButtonX,
+      y: inputCollapseButtonY,
+      width: 15,
+      height: 15
+    };
+
+    // Draw input content if not collapsed
+    if (!this.inputCollapsed) {
+      this.drawInputContent(ctx, contentAreaX, inputAreaY, contentAreaWidth, inputAreaHeight);
+    } else {
+      // Draw collapsed indicator
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Arial';
+      ctx.fillText('(collapsed)', contentAreaX + 50, inputAreaY + 15);
+    }
 
     // Draw input border
     ctx.strokeStyle = '#333';
@@ -881,28 +907,52 @@ class Node {
     ctx.fillStyle = '#222';
     ctx.fillRect(contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
 
-    // Draw output label
+    // Draw output label and collapse/expand button
     ctx.fillStyle = this.hasBeenProcessed ? '#4a90e2' : '#888';
     ctx.font = '10px Arial';
     ctx.fillText('OUTPUT:', contentAreaX + 5, outputAreaY - 2);
 
+    // Draw output collapse/expand button
+    const outputCollapseButtonX = contentAreaX + contentAreaWidth - 20;
+    const outputCollapseButtonY = outputAreaY - 10;
+    ctx.fillStyle = '#555';
+    ctx.fillRect(outputCollapseButtonX, outputCollapseButtonY, 15, 15);
+    ctx.fillStyle = '#ccc';
+    ctx.font = '12px Arial';
+    ctx.fillText(this.outputCollapsed ? '+' : '-', outputCollapseButtonX + 4, outputCollapseButtonY + 12);
+
+    // Store button position for click detection
+    this.outputCollapseButton = {
+      x: outputCollapseButtonX,
+      y: outputCollapseButtonY,
+      width: 15,
+      height: 15
+    };
+
     // Make sure content is preloaded
     this.preloadContent();
 
-    // Draw output content based on type
-    switch (this.contentType) {
-      case 'text':
-        this.drawTextContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
-        break;
-      case 'image':
-        this.drawImageContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
-        break;
-      case 'video':
-        this.drawVideoContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
-        break;
-      case 'audio':
-        this.drawAudioContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
-        break;
+    // Draw output content based on type if not collapsed
+    if (!this.outputCollapsed) {
+      switch (this.contentType) {
+        case 'text':
+          this.drawTextContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
+          break;
+        case 'image':
+          this.drawImageContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
+          break;
+        case 'video':
+          this.drawVideoContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
+          break;
+        case 'audio':
+          this.drawAudioContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
+          break;
+      }
+    } else {
+      // Draw collapsed indicator
+      ctx.fillStyle = '#666';
+      ctx.font = '10px Arial';
+      ctx.fillText('(collapsed)', contentAreaX + 50, outputAreaY + 15);
     }
 
     // Draw output border
@@ -1499,6 +1549,15 @@ const App = {
   CONNECTOR_HOVER_RADIUS: 10,
   CONNECTION_HOVER_DISTANCE: 5,
 
+  // Pan and zoom properties
+  offsetX: 0,
+  offsetY: 0,
+  scale: 1,
+  isPanning: false,
+  lastPanPoint: { x: 0, y: 0 },
+  MIN_SCALE: 0.1,
+  MAX_SCALE: 3,
+
   init() {
     this.canvas = document.getElementById('canvas');
     this.ctx = this.canvas.getContext('2d');
@@ -1530,10 +1589,14 @@ const App = {
       this.draw();
     });
 
+    this.canvas.addEventListener('click', this.handleClick.bind(this));
     this.canvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
     this.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
     this.canvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
     this.canvas.addEventListener('dblclick', this.handleDoubleClick.bind(this));
+
+    // Add wheel event for zooming
+    this.canvas.addEventListener('wheel', this.handleWheel.bind(this));
 
     window.addEventListener('keydown', (e) => this.handleKeyDown(e));
 
@@ -1924,30 +1987,135 @@ const App = {
     }
   },
 
+  handleClick(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Check if a collapse/expand button was clicked
+    for (const node of this.nodes) {
+      // Check input collapse button
+      if (node.inputCollapseButton &&
+          x >= node.inputCollapseButton.x &&
+          x <= node.inputCollapseButton.x + node.inputCollapseButton.width &&
+          y >= node.inputCollapseButton.y &&
+          y <= node.inputCollapseButton.y + node.inputCollapseButton.height) {
+
+        // Toggle input collapsed state
+        node.inputCollapsed = !node.inputCollapsed;
+
+        // If auto-sizing is enabled, recalculate the node size
+        if (node.autoSize) {
+          node.calculateOptimalSize();
+        }
+
+        this.draw();
+        return;
+      }
+
+      // Check output collapse button
+      if (node.outputCollapseButton &&
+          x >= node.outputCollapseButton.x &&
+          x <= node.outputCollapseButton.x + node.outputCollapseButton.width &&
+          y >= node.outputCollapseButton.y &&
+          y <= node.outputCollapseButton.y + node.outputCollapseButton.height) {
+
+        // Toggle output collapsed state
+        node.outputCollapsed = !node.outputCollapsed;
+
+        // If auto-sizing is enabled, recalculate the node size
+        if (node.autoSize) {
+          node.calculateOptimalSize();
+        }
+
+        this.draw();
+        return;
+      }
+    }
+  },
+
   handleMouseDown(e) {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (x - this.offsetX) / this.scale;
+    const canvasY = (y - this.offsetY) / this.scale;
+
+    // Check if middle mouse button is pressed (for panning)
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      this.isPanning = true;
+      this.lastPanPoint = { x: e.clientX, y: e.clientY };
+      this.canvas.style.cursor = 'grabbing';
+      return;
+    }
+
+    // First check if a collapse/expand button was clicked
     for (const node of this.nodes) {
-      if (node.outputConnectorContainsPoint(x, y)) {
+      // Check input collapse button
+      if (node.inputCollapseButton &&
+          canvasX >= node.inputCollapseButton.x &&
+          canvasX <= node.inputCollapseButton.x + node.inputCollapseButton.width &&
+          canvasY >= node.inputCollapseButton.y &&
+          canvasY <= node.inputCollapseButton.y + node.inputCollapseButton.height) {
+
+        // Toggle input collapsed state
+        node.inputCollapsed = !node.inputCollapsed;
+
+        // If auto-sizing is enabled, recalculate the node size
+        if (node.autoSize) {
+          node.calculateOptimalSize();
+        }
+
+        this.draw();
+        return;
+      }
+
+      // Check output collapse button
+      if (node.outputCollapseButton &&
+          canvasX >= node.outputCollapseButton.x &&
+          canvasX <= node.outputCollapseButton.x + node.outputCollapseButton.width &&
+          canvasY >= node.outputCollapseButton.y &&
+          canvasY <= node.outputCollapseButton.y + node.outputCollapseButton.height) {
+
+        // Toggle output collapsed state
+        node.outputCollapsed = !node.outputCollapsed;
+
+        // If auto-sizing is enabled, recalculate the node size
+        if (node.autoSize) {
+          node.calculateOptimalSize();
+        }
+
+        this.draw();
+        return;
+      }
+    }
+
+    for (const node of this.nodes) {
+      if (node.outputConnectorContainsPoint(canvasX, canvasY)) {
         this.connectingNode = node;
         DebugManager.addLog(`Starting connection from node ${node.id}`, 'info');
         return;
       }
     }
 
-    const clickedNode = this.nodes.find(node => node.containsPoint(x, y));
+    const clickedNode = this.nodes.find(node => node.containsPoint(canvasX, canvasY));
     if (clickedNode) {
       this.isDragging = true;
       this.dragNode = clickedNode;
       this.dragNode.selected = true;
-      this.dragOffsetX = x - clickedNode.x;
-      this.dragOffsetY = y - clickedNode.y;
+      this.dragOffsetX = canvasX - clickedNode.x;
+      this.dragOffsetY = canvasY - clickedNode.y;
       this.nodes.forEach(n => {
         if (n !== clickedNode) n.selected = false;
       });
     } else {
+      // If no node was clicked, start panning
+      this.isPanning = true;
+      this.lastPanPoint = { x: e.clientX, y: e.clientY };
+      this.canvas.style.cursor = 'grabbing';
+
       this.nodes.forEach(n => n.selected = false);
     }
     this.draw();
@@ -1958,14 +2126,28 @@ const App = {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (x - this.offsetX) / this.scale;
+    const canvasY = (y - this.offsetY) / this.scale;
+
     this.hoveredNode = null;
     this.hoveredConnector = null;
     this.hoveredConnection = null;
     this.canvas.style.cursor = 'default';
 
+    // Handle panning
+    if (this.isPanning) {
+      this.offsetX += e.clientX - this.lastPanPoint.x;
+      this.offsetY += e.clientY - this.lastPanPoint.y;
+      this.lastPanPoint = { x: e.clientX, y: e.clientY };
+      this.canvas.style.cursor = 'grabbing';
+      this.draw();
+      return;
+    }
+
     if (this.isDragging && this.dragNode) {
-      this.dragNode.x = x - this.dragOffsetX;
-      this.dragNode.y = y - this.dragOffsetY;
+      this.dragNode.x = canvasX - this.dragOffsetX;
+      this.dragNode.y = canvasY - this.dragOffsetY;
       this.draw();
     } else if (this.connectingNode) {
       this.draw();
@@ -1976,9 +2158,14 @@ const App = {
 
       const startX = this.connectingNode.x + this.connectingNode.width;
       const startY = this.connectingNode.y + this.connectingNode.height/2;
-      const endX = isHoveringValidInput ? this.hoveredNode.x : x;
+      const endX = isHoveringValidInput ? this.hoveredNode.x : canvasX;
       const endY = isHoveringValidInput ?
-                  this.hoveredNode.y + this.hoveredNode.height/2 : y;
+                  this.hoveredNode.y + this.hoveredNode.height/2 : canvasY;
+
+      // Save context to apply transformations
+      this.ctx.save();
+      this.ctx.translate(this.offsetX, this.offsetY);
+      this.ctx.scale(this.scale, this.scale);
 
       Utils.drawConnection(
         this.ctx,
@@ -1990,8 +2177,11 @@ const App = {
         isHoveringValidInput
       );
 
+      // Restore context
+      this.ctx.restore();
+
       for (const node of this.nodes) {
-        if (node !== this.connectingNode && node.inputConnectorContainsPoint(x, y)) {
+        if (node !== this.connectingNode && node.inputConnectorContainsPoint(canvasX, canvasY)) {
           this.hoveredNode = node;
           this.hoveredConnector = 'input';
           this.canvas.style.cursor = 'pointer';
@@ -2001,7 +2191,7 @@ const App = {
       }
     } else {
       for (const conn of this.connections) {
-        if (conn.containsPoint(x, y)) {
+        if (conn.containsPoint(canvasX, canvasY)) {
           this.hoveredConnection = conn;
           this.canvas.style.cursor = 'pointer';
           this.draw();
@@ -2010,21 +2200,21 @@ const App = {
       }
 
       for (const node of this.nodes) {
-        if (node.outputConnectorContainsPoint(x, y)) {
+        if (node.outputConnectorContainsPoint(canvasX, canvasY)) {
           this.hoveredNode = node;
           this.hoveredConnector = 'output';
           this.canvas.style.cursor = 'pointer';
           this.draw();
           return;
         }
-        if (node.inputConnectorContainsPoint(x, y)) {
+        if (node.inputConnectorContainsPoint(canvasX, canvasY)) {
           this.hoveredNode = node;
           this.hoveredConnector = 'input';
           this.canvas.style.cursor = 'pointer';
           this.draw();
           return;
         }
-        if (node.containsPoint(x, y)) {
+        if (node.containsPoint(canvasX, canvasY)) {
           this.hoveredNode = node;
           this.canvas.style.cursor = 'move';
           this.draw();
@@ -2041,9 +2231,20 @@ const App = {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (x - this.offsetX) / this.scale;
+    const canvasY = (y - this.offsetY) / this.scale;
+
+    // Stop panning
+    if (this.isPanning) {
+      this.isPanning = false;
+      this.canvas.style.cursor = 'default';
+      return;
+    }
+
     if (this.connectingNode) {
       for (const node of this.nodes) {
-        if (node !== this.connectingNode && node.inputConnectorContainsPoint(x, y)) {
+        if (node !== this.connectingNode && node.inputConnectorContainsPoint(canvasX, canvasY)) {
           if (node.canAcceptInput(this.connectingNode)) {
             const connection = new Connection(this.connectingNode, node);
             this.connections.push(connection);
@@ -2063,6 +2264,8 @@ const App = {
             const endY = node.y + node.height/2;
 
             this.ctx.save();
+            this.ctx.translate(this.offsetX, this.offsetY);
+            this.ctx.scale(this.scale, this.scale);
             Utils.drawConnection(this.ctx, startX, startY, endX, endY, '#e74c3c', true);
             this.ctx.restore();
 
@@ -2084,9 +2287,48 @@ const App = {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const clickedNode = this.nodes.find(node => node.containsPoint(x, y));
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (x - this.offsetX) / this.scale;
+    const canvasY = (y - this.offsetY) / this.scale;
+
+    const clickedNode = this.nodes.find(node => node.containsPoint(canvasX, canvasY));
     if (clickedNode) {
       this.openNodeEditor(clickedNode);
+    }
+  },
+
+  // Handle wheel event for zooming
+  handleWheel(e) {
+    e.preventDefault();
+
+    // Get mouse position relative to canvas
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Calculate zoom factor based on wheel delta
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+
+    // Calculate new scale
+    const newScale = Math.max(
+      this.MIN_SCALE,
+      Math.min(this.MAX_SCALE, this.scale * zoomFactor)
+    );
+
+    // Calculate new offsets to zoom toward mouse position
+    if (newScale !== this.scale) {
+      // Calculate mouse position in world space before zoom
+      const worldX = (mouseX - this.offsetX) / this.scale;
+      const worldY = (mouseY - this.offsetY) / this.scale;
+
+      // Update scale
+      this.scale = newScale;
+
+      // Calculate new offsets to keep mouse position fixed
+      this.offsetX = mouseX - worldX * this.scale;
+      this.offsetY = mouseY - worldY * this.scale;
+
+      this.draw();
     }
   },
 
@@ -2118,6 +2360,15 @@ const App = {
         DebugManager.updateCanvasStats();
         this.draw();
       }
+    }
+
+    // Reset view with 'R' key
+    if (e.key === 'r' || e.key === 'R') {
+      this.scale = 1;
+      this.offsetX = 0;
+      this.offsetY = 0;
+      this.draw();
+      DebugManager.addLog('View reset', 'info');
     }
   },
 
@@ -3178,6 +3429,8 @@ const App = {
         autoSize: node.autoSize,
         selected: node.selected,
         expanded: node.expanded,
+        inputCollapsed: node.inputCollapsed,
+        outputCollapsed: node.outputCollapsed,
         error: node.error,
         workflowRole: node.workflowRole || 'none'
       })),
@@ -3282,6 +3535,8 @@ const App = {
         autoSize: node.autoSize,
         selected: node.selected,
         expanded: node.expanded,
+        inputCollapsed: node.inputCollapsed,
+        outputCollapsed: node.outputCollapsed,
         error: node.error,
         workflowRole: node.workflowRole || 'none'
       })),
@@ -3373,6 +3628,8 @@ const App = {
       node.error = nodeData.error || null;
       node.selected = nodeData.selected || false;
       node.expanded = nodeData.expanded || false;
+      node.inputCollapsed = nodeData.inputCollapsed || false;
+      node.outputCollapsed = nodeData.outputCollapsed || false;
       node.autoSize = nodeData.autoSize !== undefined ? nodeData.autoSize : true;
 
       // Restore workflow role if it exists
@@ -3474,8 +3731,59 @@ const App = {
 
   draw() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Apply pan and zoom transformations
+    this.ctx.save();
+    this.ctx.translate(this.offsetX, this.offsetY);
+    this.ctx.scale(this.scale, this.scale);
+
+    // Draw grid background
+    this.drawGrid();
+
+    // Draw connections and nodes
     this.connections.forEach(conn => conn.draw(this.ctx));
     this.nodes.forEach(node => node.draw(this.ctx));
+
+    // Restore the context
+    this.ctx.restore();
+
+    // Draw zoom level indicator
+    this.drawZoomIndicator();
+  },
+
+  // Draw a grid background
+  drawGrid() {
+    const gridSize = 20;
+    const offsetX = this.offsetX % (gridSize * this.scale);
+    const offsetY = this.offsetY % (gridSize * this.scale);
+
+    this.ctx.strokeStyle = '#333';
+    this.ctx.lineWidth = 0.5;
+
+    // Draw vertical lines
+    for (let x = offsetX / this.scale; x < this.canvas.width / this.scale; x += gridSize) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(x, 0);
+      this.ctx.lineTo(x, this.canvas.height / this.scale);
+      this.ctx.stroke();
+    }
+
+    // Draw horizontal lines
+    for (let y = offsetY / this.scale; y < this.canvas.height / this.scale; y += gridSize) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, y);
+      this.ctx.lineTo(this.canvas.width / this.scale, y);
+      this.ctx.stroke();
+    }
+  },
+
+  // Draw zoom level indicator
+  drawZoomIndicator() {
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    this.ctx.fillRect(10, 10, 80, 25);
+    this.ctx.fillStyle = '#fff';
+    this.ctx.font = '12px Arial';
+    this.ctx.fillText(`Zoom: ${Math.round(this.scale * 100)}%`, 15, 25);
   }
 };
 
