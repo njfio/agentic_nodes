@@ -357,11 +357,11 @@ class Node {
       this.stats.outputTokens = await Utils.countTokens(output);
       DebugManager.state.totalTokens += this.stats.outputTokens;
 
-      DebugManager.addLog(`Node ${this.id} processed successfully`, 'success');
+      DebugManager.addLog(`Node "${this.title}" (ID: ${this.id}) processed successfully`, 'success');
       return output;
     } catch (err) {
       this.error = err.message;
-      DebugManager.addLog(`Node ${this.id} error: ${err.message}`, 'error');
+      DebugManager.addLog(`Node "${this.title}" (ID: ${this.id}) error: ${err.message}`, 'error');
       throw err;
     } finally {
       this.processing = false;
@@ -1395,6 +1395,9 @@ class Node {
     ctx.fillStyle = '#ccc';
     ctx.fillText(this.getContentTypeIcon(), this.x + this.width - 25, this.y + 20);
 
+    // Draw the node toolbar
+    this.drawNodeToolbar(ctx);
+
     // Draw content preview
     this.drawContent(ctx);
 
@@ -2163,7 +2166,7 @@ const App = {
     // Remove the node
     this.nodes = this.nodes.filter(n => n !== node);
 
-    DebugManager.addLog(`Deleted node ${node.id}`, 'info');
+    DebugManager.addLog(`Deleted node "${node.title}" (ID: ${node.id})`, 'info');
     DebugManager.updateCanvasStats();
     this.draw();
   },
@@ -2381,7 +2384,7 @@ const App = {
           if (node.canAcceptInput(this.connectingNode)) {
             const connection = new Connection(this.connectingNode, node);
             this.connections.push(connection);
-            DebugManager.addLog(`Connected node ${this.connectingNode.id} to node ${node.id}`, 'success');
+            DebugManager.addLog(`Connected node "${this.connectingNode.title}" (ID: ${this.connectingNode.id}) to node "${node.title}" (ID: ${node.id})`, 'success');
             // Process the node chain with the new connection
             this.processNodeAndConnections(this.connectingNode, this.connectingNode.content).catch(err => {
               DebugManager.addLog(`Failed to process chain: ${err.message}`, 'error');
@@ -3419,7 +3422,7 @@ const App = {
       node.hasBeenProcessed = true;
 
       // Log for debugging
-      DebugManager.addLog(`Node ${node.id} processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
+      DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
     }
 
     // Special handling for text-to-image nodes
@@ -3482,7 +3485,7 @@ const App = {
       }
 
       // Log for debugging
-      DebugManager.addLog(`Output node ${node.id} final content: ${node.content ? (node.content.substring ? node.content.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
+      DebugManager.addLog(`Output node "${node.title}" (ID: ${node.id}) final content: ${node.content ? (node.content.substring ? node.content.substring(0, 30) + '...' : 'non-text content') : 'empty'}`, 'info');
     }
 
     return output;
@@ -3857,7 +3860,7 @@ const App = {
     const y = window.innerHeight/2 - 40;
     const node = new Node(x, y, id);
     this.nodes.push(node);
-    DebugManager.addLog(`Added new node ${id}`, 'info');
+    DebugManager.addLog(`Added new node "Node ${id}" (ID: ${id})`, 'info');
     DebugManager.updateCanvasStats();
     this.draw();
   },
