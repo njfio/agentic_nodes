@@ -345,27 +345,61 @@ Object.defineProperty(Node.prototype, 'selectable', {
   }
 });
 
-// Modify the Node's draw method to show selection highlight
-const originalNodeDraw = Node.prototype.draw;
-Node.prototype.draw = function(ctx) {
-  // Call the original draw method
-  originalNodeDraw.call(this, ctx);
-
-  // If the node is selectable, draw a highlight
-  if (this.selectable) {
-    ctx.save();
-    ctx.strokeStyle = '#f1c40f';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 3]);
-    ctx.strokeRect(this.x, this.y, this.width, this.height);
-    ctx.restore();
-  }
-};
+// We'll modify the Node's draw method when the DOM is loaded and App is available
+// This will be done in the initialization code below
 
 // Initialize the workflow test functionality when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize after the App is initialized
   setTimeout(() => {
-    WorkflowTest.init();
+    // Make sure App and Node are defined before using them
+    if (typeof App !== 'undefined' && typeof Node !== 'undefined') {
+      // Modify the Node's draw method to show selection highlight
+      const originalNodeDraw = Node.prototype.draw;
+      Node.prototype.draw = function(ctx) {
+        // Call the original draw method
+        originalNodeDraw.call(this, ctx);
+
+        // If the node is selectable, draw a highlight
+        if (this.selectable) {
+          ctx.save();
+          ctx.strokeStyle = '#f1c40f';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 3]);
+          ctx.strokeRect(this.x, this.y, this.width, this.height);
+          ctx.restore();
+        }
+      };
+
+      // Initialize workflow test
+      WorkflowTest.init();
+    } else {
+      console.warn('App or Node not defined yet, workflow test initialization delayed');
+      // Try again after a longer delay
+      setTimeout(() => {
+        if (typeof App !== 'undefined' && typeof Node !== 'undefined') {
+          // Modify the Node's draw method to show selection highlight
+          const originalNodeDraw = Node.prototype.draw;
+          Node.prototype.draw = function(ctx) {
+            // Call the original draw method
+            originalNodeDraw.call(this, ctx);
+
+            // If the node is selectable, draw a highlight
+            if (this.selectable) {
+              ctx.save();
+              ctx.strokeStyle = '#f1c40f';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([5, 3]);
+              ctx.strokeRect(this.x, this.y, this.width, this.height);
+              ctx.restore();
+            }
+          };
+
+          WorkflowTest.init();
+        } else {
+          console.error('App or Node still not defined, workflow test initialization failed');
+        }
+      }, 500);
+    }
   }, 100);
 });
