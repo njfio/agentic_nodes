@@ -829,17 +829,61 @@ class Node {
     DebugManager.state.lastRequestTime = Date.now();
 
     try {
-      // Ensure input is a valid image URL or base64 data
+      // Ensure input is a valid image URL, base64 data, or image ID
       if (!input) {
         throw new Error('No image provided');
       }
 
-      // For image-to-text nodes, the input might be the content of the node itself
-      // This happens when the node is directly edited
-      const imageUrl = this.aiProcessor === 'image-to-text' && this.content ? this.content : input;
+      // Check if input is an image ID from our storage
+      let imageUrl;
+      if (typeof input === 'string' && input.startsWith('img_')) {
+        // This is an image ID, get the actual image data
+        const imageData = ImageStorage.getImage(input);
+        if (!imageData) {
+          throw new Error(`Image with ID ${input} not found in storage`);
+        }
+        imageUrl = imageData;
+        DebugManager.addLog(`Retrieved image data for ID ${input}`, 'info');
+      } else {
+        // Use the input directly
+        imageUrl = input;
+      }
 
       // Log the image URL for debugging
-      DebugManager.addLog(`Processing image: ${imageUrl.substring(0, 50)}...`, 'info');
+      DebugManager.addLog(`Processing image: ${typeof imageUrl === 'string' ? imageUrl.substring(0, 50) + '...' : 'non-string image data'}`, 'info');
+
+      // Prepare the content array for the request
+      const contentArray = [];
+
+      // Add the system prompt as text
+      contentArray.push({
+        type: "text",
+        text: this.systemPrompt || "Describe this image in detail."
+      });
+
+      // Add the primary image
+      contentArray.push({
+        type: "image_url",
+        image_url: {
+          url: imageUrl
+        }
+      });
+
+      // Add any additional images if available
+      if (this.additionalImageIds && this.additionalImageIds.length > 0) {
+        for (const imgId of this.additionalImageIds) {
+          const imgData = ImageStorage.getImage(imgId);
+          if (imgData) {
+            contentArray.push({
+              type: "image_url",
+              image_url: {
+                url: imgData
+              }
+            });
+            DebugManager.addLog(`Added additional image ${imgId} to request`, 'info');
+          }
+        }
+      }
 
       // Prepare the request data
       const requestData = {
@@ -847,15 +891,7 @@ class Node {
         messages: [
           {
             role: "user",
-            content: [
-              { type: "text", text: this.systemPrompt || "Describe this image in detail." },
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageUrl
-                }
-              }
-            ]
+            content: contentArray
           }
         ],
         max_tokens: Config.defaultOpenAIConfig.maxTokens
