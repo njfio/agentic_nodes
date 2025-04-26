@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   app:
     build: .
@@ -6,12 +8,11 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=8732
-      - MONGODB_URI=mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/multimodal-ai-agent?authSource=admin
+      - MONGODB_URI=mongodb://mongodb:27017/multimodal-ai-agent
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
     depends_on:
-      mongodb:
-        condition: service_healthy
+      - mongodb
     volumes:
       - ./client:/app/client
       - ./controllers:/app/controllers
@@ -20,8 +21,6 @@ services:
       - ./server.js:/app/server.js
       - ./.env:/app/.env
     restart: unless-stopped
-    networks:
-      - app-network
 
   mongodb:
     image: mongo:6
@@ -32,38 +31,7 @@ services:
       - ./mongo-init:/docker-entrypoint-initdb.d
     environment:
       - MONGO_INITDB_DATABASE=multimodal-ai-agent
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
     restart: unless-stopped
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  mongo-express:
-    image: mongo-express:latest
-    ports:
-      - "8081:8081"
-    environment:
-      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_USERNAME}
-      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_PASSWORD}
-      - ME_CONFIG_MONGODB_SERVER=mongodb
-      - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USERNAME}
-      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD}
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
 
 volumes:
   mongodb_data:

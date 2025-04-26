@@ -17,7 +17,7 @@ async function startMemoryServer() {
   try {
     console.log('Starting in-memory MongoDB server...');
 
-    // Create a new MongoDB memory server without authentication
+    // Create a new MongoDB memory server
     mongoServer = await MongoMemoryServer.create({
       instance: {
         dbName: 'multimodal-ai-agent'

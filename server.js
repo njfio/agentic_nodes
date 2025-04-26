@@ -24,11 +24,6 @@ app.use(morgan('dev'));
 // Serve static files from the 'client' directory
 app.use(express.static(path.join(__dirname, 'client')));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
 // API routes
 app.use('/api', apiRoutes);
 
@@ -47,6 +42,8 @@ const createDefaultUser = async () => {
     const existingUser = await User.findOne({ username: 'testuser' });
 
     if (!existingUser) {
+      console.log('Creating default test user...');
+
       // Hash the password manually
       const hashedPassword = await bcrypt.hash('password123', 10);
 
@@ -56,22 +53,18 @@ const createDefaultUser = async () => {
         password: hashedPassword,
         email: 'test@example.com',
         isVerified: true,
-        role: 'user',
-        tokens: []
+        role: 'user'
       });
 
       // Save the user (this will skip password hashing since it's already hashed)
       user.isNew = true; // Ensure it's treated as a new document
       await user.save();
       console.log('Default test user created successfully');
-      return user;
     } else {
       console.log('Default test user already exists');
-      return existingUser;
     }
   } catch (error) {
     console.error('Error creating default user:', error);
-    return null;
   }
 };
 
@@ -80,60 +73,57 @@ const connectWithRetry = async () => {
   console.log('Attempting to connect to MongoDB...');
 
   try {
-    // First, try to connect to the in-memory MongoDB server
-    console.log('Starting in-memory MongoDB server...');
-    const mongoUri = await startMemoryServer();
-
-    await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000
-    });
-
-    console.log('Connected to in-memory MongoDB successfully');
-
-    // Create default test user
-    await createDefaultUser();
-
-    return;
-  } catch (memoryErr) {
-    console.error('Failed to start in-memory MongoDB server:', memoryErr.message);
-    console.log('Falling back to local MongoDB...');
-
-    try {
-      // Try to connect to local MongoDB
-      await mongoose.connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
-        connectTimeoutMS: 5000
-      });
-
-      console.log('Connected to local MongoDB successfully');
-
-      // Create default test user
-      await createDefaultUser();
-
-      return;
-    } catch (localErr) {
-      console.error('Local MongoDB connection error:', localErr.message);
-      console.log('Falling back to Docker MongoDB...');
-
+    // First, try to connect to the Docker MongoDB
+    if (process.env.MONGODB_DOCKER_URI) {
       try {
-        // Try to connect to Docker MongoDB
         await mongoose.connect(process.env.MONGODB_DOCKER_URI, {
           serverSelectionTimeoutMS: 5000,
           connectTimeoutMS: 5000
         });
-
         console.log('Connected to Docker MongoDB successfully');
 
         // Create default test user
         await createDefaultUser();
-
         return;
       } catch (dockerErr) {
         console.error('Docker MongoDB connection error:', dockerErr.message);
-        throw new Error('All MongoDB connection methods failed');
       }
     }
+
+    // If Docker connection fails, try local MongoDB
+    try {
+      await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000
+      });
+      console.log('Connected to local MongoDB successfully');
+
+      // Create default test user
+      await createDefaultUser();
+      return;
+    } catch (localErr) {
+      console.error('Local MongoDB connection error:', localErr.message);
+    }
+
+    // If both Docker and local MongoDB fail, use in-memory MongoDB
+    console.log('Starting in-memory MongoDB server...');
+
+    // Start in-memory MongoDB server
+    const mongoUri = await startMemoryServer();
+
+    // Connect to in-memory MongoDB
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000
+    });
+    console.log('Connected to in-memory MongoDB successfully');
+
+    // Default user is already created in the in-memory server
+    return;
+  } catch (err) {
+    console.error('Failed to connect to MongoDB:', err);
+    console.log('Retrying connection in 5 seconds...');
+    setTimeout(connectWithRetry, 5000);
   }
 };
 

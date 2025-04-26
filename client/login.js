@@ -149,25 +149,35 @@ async function checkCredentials(username, password) {
   try {
     // Special case for default test user
     if (username === 'testuser' && password === 'password123') {
-      // Always use mock data for the default test user to avoid MongoDB connection issues
-      console.log('Using mock data for default test user');
+      try {
+        // Try to log in via API first
+        const userData = await ApiService.users.login({
+          username,
+          password
+        });
 
-      // Create a mock user and token for the default test user
-      const mockToken = `default-test-user-token-${Date.now()}`;
-      const mockUser = {
-        id: `default-${Date.now()}`,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'user',
-        isVerified: true,
-        createdAt: new Date()
-      };
+        return userData;
+      } catch (defaultUserError) {
+        console.warn('Default user API login failed, using mock data:', defaultUserError);
 
-      // Return mock user data and token
-      return {
-        user: mockUser,
-        token: mockToken
-      };
+        // Create a mock user and token for the default test user
+        const mockToken = `default-test-user-token-${Date.now()}`;
+        const mockUser = {
+          id: `default-${Date.now()}`,
+          username: 'testuser',
+          email: 'test@example.com',
+          role: 'user',
+          isVerified: true,
+          tokens: [],
+          createdAt: new Date()
+        };
+
+        // Return mock user data and token
+        return {
+          user: mockUser,
+          token: mockToken
+        };
+      }
     }
 
     // For other users, try the API first
