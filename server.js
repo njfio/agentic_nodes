@@ -24,6 +24,11 @@ app.use(morgan('dev'));
 // Serve static files from the 'client' directory
 app.use(express.static(path.join(__dirname, 'client')));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // API routes
 app.use('/api', apiRoutes);
 
@@ -71,30 +76,88 @@ const createDefaultUser = async () => {
 // Connect to MongoDB with retry logic
 const connectWithRetry = async () => {
   console.log('Attempting to connect to MongoDB...');
+  const maxRetries = 5;
+  let retries = 0;
+  let connected = false;
 
-  try {
-    // Check if MongoDB is available
+  while (!connected && retries < maxRetries) {
     try {
-      await mongoose.connect(process.env.MONGODB_URI);
-      console.log('Connected to MongoDB successfully');
+      // First try to connect to the MongoDB Docker container
+      if (process.env.MONGODB_URI.includes('mongodb:')) {
+        try {
+          await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000, // 5 seconds timeout
+            connectTimeoutMS: 5000
+          });
+          console.log('Connected to MongoDB Docker container successfully');
+          connected = true;
+        } catch (dockerErr) {
+          console.error('MongoDB Docker connection error:', dockerErr.message);
+
+          // If Docker connection fails, try local MongoDB
+          try {
+            // Use the local MongoDB URI if available, otherwise replace the hostname in the Docker URI
+            const localMongoURI = process.env.MONGODB_LOCAL_URI || process.env.MONGODB_URI.replace('mongodb:', 'localhost');
+            console.log(`Trying local MongoDB at ${localMongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`);
+
+            await mongoose.connect(localMongoURI, {
+              serverSelectionTimeoutMS: 5000,
+              connectTimeoutMS: 5000
+            });
+            console.log('Connected to local MongoDB successfully');
+            connected = true;
+          } catch (localErr) {
+            console.error('Local MongoDB connection error:', localErr.message);
+            throw new Error('Failed to connect to both Docker and local MongoDB');
+          }
+        }
+      } else {
+        // Direct connection to the specified URI
+        await mongoose.connect(process.env.MONGODB_URI, {
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 5000
+        });
+        console.log('Connected to MongoDB successfully');
+        connected = true;
+      }
+
+      // If we reach here, we're connected
+      if (connected) {
+        // Create default test user
+        await createDefaultUser();
+        return;
+      }
     } catch (err) {
-      console.error('MongoDB connection error:', err);
-      console.log('Starting in-memory MongoDB server...');
+      retries++;
+      console.error(`MongoDB connection attempt ${retries}/${maxRetries} failed:`, err.message);
 
-      // Start in-memory MongoDB server
-      await startMemoryServer();
+      if (retries >= maxRetries) {
+        console.log('Maximum retries reached. Starting in-memory MongoDB server...');
 
-      // Connect to in-memory MongoDB
-      await mongoose.connect(process.env.MONGODB_URI);
-      console.log('Connected to in-memory MongoDB successfully');
+        try {
+          // Start in-memory MongoDB server as a last resort
+          await startMemoryServer();
 
-      // Create default test user
-      await createDefaultUser();
+          // Connect to in-memory MongoDB
+          await mongoose.connect(process.env.MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000,
+            connectTimeoutMS: 5000
+          });
+          console.log('Connected to in-memory MongoDB successfully');
+
+          // Create default test user
+          await createDefaultUser();
+          return;
+        } catch (memoryErr) {
+          console.error('Failed to start in-memory MongoDB server:', memoryErr.message);
+          throw new Error('All MongoDB connection methods failed');
+        }
+      } else {
+        // Wait before retrying
+        console.log(`Retrying connection in 3 seconds... (${retries}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
     }
-  } catch (err) {
-    console.error('Failed to connect to MongoDB:', err);
-    console.log('Retrying connection in 5 seconds...');
-    setTimeout(connectWithRetry, 5000);
   }
 };
 

@@ -16,11 +16,10 @@ async function startMemoryServer() {
   try {
     console.log('Starting in-memory MongoDB server...');
 
-    // Create a new MongoDB memory server with authentication
+    // Create a new MongoDB memory server without authentication first
     mongoServer = await MongoMemoryServer.create({
       instance: {
-        dbName: 'multimodal-ai-agent',
-        auth: true
+        dbName: 'multimodal-ai-agent'
       }
     });
 
@@ -29,41 +28,50 @@ async function startMemoryServer() {
 
     console.log(`MongoDB Memory Server running at ${mongoUri}`);
 
-    // Connect to set up admin user
+    // Connect to the in-memory MongoDB
     const conn = await mongoose.createConnection(mongoUri);
 
-    // Create admin user
+    // Get the database
+    const db = conn.db;
+
+    // Create collections
     try {
-      await conn.db.addUser(
-        process.env.MONGO_USERNAME || 'multimodal_admin',
-        process.env.MONGO_PASSWORD || 'multimodal_password_secure123',
-        {
-          roles: [
-            { role: 'readWrite', db: 'multimodal-ai-agent' },
-            { role: 'dbAdmin', db: 'multimodal-ai-agent' }
-          ]
-        }
-      );
-      console.log('Created admin user in memory MongoDB');
+      await db.createCollection('users');
+      await db.createCollection('workflows');
+      await db.createCollection('nodes');
+      await db.createCollection('images');
+      await db.createCollection('logs');
+      console.log('Collections created in memory MongoDB');
+    } catch (collErr) {
+      console.log('Error creating collections (may already exist):', collErr.message);
+    }
+
+    // Create a default user directly in the database
+    try {
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash('password123', 10);
+
+      await db.collection('users').insertOne({
+        username: 'testuser',
+        password: hashedPassword,
+        email: 'test@example.com',
+        isVerified: true,
+        role: 'user',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      console.log('Created test user in memory MongoDB');
     } catch (userError) {
-      // User might already exist
-      console.log('Admin user setup error (may already exist):', userError.message);
+      console.log('User creation error (may already exist):', userError.message);
     }
 
     // Close the connection
     await conn.close();
 
-    // Set the authenticated URI
-    const username = process.env.MONGO_USERNAME || 'multimodal_admin';
-    const password = process.env.MONGO_PASSWORD || 'multimodal_password_secure123';
-    const authUri = mongoUri.replace('mongodb://', `mongodb://${username}:${password}@`);
-
-    console.log(`MongoDB Memory Server configured with authentication`);
-
     // Set the MongoDB URI in the environment
-    process.env.MONGODB_URI = authUri;
+    process.env.MONGODB_URI = mongoUri;
 
-    return authUri;
+    return mongoUri;
   } catch (error) {
     console.error('Failed to start MongoDB Memory Server:', error);
     throw error;
