@@ -928,7 +928,7 @@ class Node {
     ctx.strokeStyle = this.hasBeenProcessed ? '#4a90e2' : '#333';
     ctx.lineWidth = 1;
     ctx.strokeRect(contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
-  },
+  }
 
   // Draw node toolbar
   drawNodeToolbar(ctx) {
