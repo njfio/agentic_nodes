@@ -138,10 +138,10 @@ const connectWithRetry = async () => {
 
         try {
           // Start in-memory MongoDB server as a last resort
-          await startMemoryServer();
+          const mongoUri = await startMemoryServer();
 
           // Connect to in-memory MongoDB
-          await mongoose.connect(process.env.MONGODB_URI, {
+          await mongoose.connect(mongoUri, {
             serverSelectionTimeoutMS: 5000,
             connectTimeoutMS: 5000
           });
@@ -149,6 +149,9 @@ const connectWithRetry = async () => {
 
           // Create default test user
           await createDefaultUser();
+
+          // Set connected flag to true
+          connected = true;
           return;
         } catch (memoryErr) {
           console.error('Failed to start in-memory MongoDB server:', memoryErr.message);
