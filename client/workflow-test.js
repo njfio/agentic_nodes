@@ -3,8 +3,7 @@
  * Allows testing entire workflows by selecting a starting node
  */
 
-// Import DebugManager from debug.js
-const DebugManager = window.DebugManager;
+// DebugManager is already available globally
 
 const WorkflowTest = {
   // Properties
