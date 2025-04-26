@@ -146,6 +146,16 @@ This script will:
 - `npm start`: Start the server
 - `npm run dev`: Start the server with nodemon for development
 - `npm test`: Run tests
+- `npm run docker:build`: Build Docker containers
+- `npm run docker:up`: Start Docker containers
+- `npm run docker:down`: Stop Docker containers
+- `npm run docker:logs`: View Docker container logs
+- `npm run docker:restart`: Restart Docker containers
+- `npm run db:check`: Check MongoDB connection
+- `npm run db:backup`: Backup MongoDB database
+- `npm run db:restore`: Restore MongoDB database
+- `npm run db:monitor`: Monitor MongoDB status
+- `npm run setup:dev`: Set up development environment
 
 ## License
 
