@@ -1047,7 +1047,6 @@ class Node {
       Utils.drawTooltip(ctx, App.hoveredButton.tooltip, tooltipX, tooltipY);
     }
   }
-  }
 
   // Draw input content (can be text or image)
   drawInputContent(ctx, x, y, width, height) {
