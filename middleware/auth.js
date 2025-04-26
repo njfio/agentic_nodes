@@ -12,30 +12,66 @@ const User = require('../models/User');
  * @param {Object} res - Express response object
  * @param {Function} next - Express next function
  */
+/**
+ * Validate JWT token format
+ * @param {string} token - The token to validate
+ * @returns {boolean} - Whether the token is valid
+ */
+const isValidTokenFormat = (token) => {
+  if (!token) return false;
+
+  // Basic JWT format check: should be three parts separated by dots
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  // Each part should be base64url encoded
+  try {
+    for (const part of parts) {
+      // Check if it's valid base64url format (may contain only A-Z, a-z, 0-9, -, _, = padding)
+      if (!/^[A-Za-z0-9_-]+={0,2}$/.test(part)) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
 const auth = async (req, res, next) => {
   try {
     // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+    const authHeader = req.header('Authorization');
+
+    if (!authHeader) {
+      return res.status(401).json({ message: 'No authentication token, access denied' });
+    }
+
+    // Extract token from Bearer format
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
     if (!token) {
       return res.status(401).json({ message: 'No authentication token, access denied' });
     }
-    
+
+    // Validate token format
+    if (!isValidTokenFormat(token)) {
+      return res.status(401).json({ message: 'Token format is invalid' });
+    }
+
     try {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+
       // Find user by id
       const user = await User.findById(decoded.id);
-      
+
       if (!user) {
         return res.status(401).json({ message: 'User not found' });
       }
-      
+
       // Attach user to request
       req.user = user;
       req.token = token;
-      
+
       next();
     } catch (error) {
       console.error('Token verification error:', error);
@@ -57,27 +93,43 @@ const auth = async (req, res, next) => {
 const optionalAuth = async (req, res, next) => {
   try {
     // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+    const authHeader = req.header('Authorization');
+
+    if (!authHeader) {
+      // No token, but that's okay
+      next();
+      return;
+    }
+
+    // Extract token from Bearer format
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
     if (!token) {
       // No token, but that's okay
       next();
       return;
     }
-    
+
+    // Validate token format
+    if (!isValidTokenFormat(token)) {
+      // Invalid token format, but that's okay for optional auth
+      next();
+      return;
+    }
+
     try {
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+
       // Find user by id
       const user = await User.findById(decoded.id);
-      
+
       if (user) {
         // Attach user to request
         req.user = user;
         req.token = token;
       }
-      
+
       next();
     } catch (error) {
       // Invalid token, but that's okay for optional auth

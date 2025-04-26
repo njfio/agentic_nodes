@@ -165,19 +165,36 @@
 }
 
 /* Node role radio buttons */
+.node-role-group {
+  margin-bottom: 15px;
+}
+
+.node-role-group label {
+  display: block;
+  margin-bottom: 8px;
+}
+
 .radio-group-container {
   display: flex;
-  gap: 15px;
+  gap: 20px;
+  padding: 5px 0;
 }
 
 .radio-group {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
 .radio-group input[type="radio"] {
   margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.radio-group label {
+  margin-bottom: 0;
+  font-weight: normal;
 }
 
 /* Workflow interface button */

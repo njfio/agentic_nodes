@@ -21,19 +21,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize login functionality
 function initLogin() {
-  console.log('Login init called');
-
   // Check if the user is already logged in
   if (isLoggedIn()) {
-    console.log('User already logged in, redirecting to app');
     redirectToApp();
     return;
   }
 
-  console.log('User not logged in, setting up login form');
-
   // Set up event listeners
   setupEventListeners();
+
+  // Show default login credentials hint
+  const loginForm = document.querySelector('.login-form');
+  if (loginForm) {
+    const credentialsHint = document.createElement('div');
+    credentialsHint.className = 'credentials-hint';
+    credentialsHint.innerHTML = `
+      <p>Default login: <strong>testuser</strong> / <strong>password123</strong></p>
+    `;
+    loginForm.appendChild(credentialsHint);
+  }
 }
 
 // Set up event listeners
@@ -111,8 +117,8 @@ async function handleLogin() {
       // Redirect to the main app
       redirectToApp();
     } else {
-      // Show error
-      showError('Invalid username or password');
+      // Show error with hint about default user
+      showError('Invalid username or password. Try using testuser/password123');
 
       // Shake the form
       const loginForm = document.querySelector('.login-form');
@@ -141,7 +147,39 @@ async function handleLogin() {
 // Check if the credentials are valid
 async function checkCredentials(username, password) {
   try {
-    // Try to call the login API
+    // Special case for default test user
+    if (username === 'testuser' && password === 'password123') {
+      try {
+        // Try to log in via API first
+        const userData = await ApiService.users.login({
+          username,
+          password
+        });
+
+        return userData;
+      } catch (defaultUserError) {
+        console.warn('Default user API login failed, using mock data:', defaultUserError);
+
+        // Create a mock user and token for the default test user
+        const mockToken = `default-test-user-token-${Date.now()}`;
+        const mockUser = {
+          id: `default-${Date.now()}`,
+          username: 'testuser',
+          email: 'test@example.com',
+          role: 'user',
+          isVerified: true,
+          createdAt: new Date()
+        };
+
+        // Return mock user data and token
+        return {
+          user: mockUser,
+          token: mockToken
+        };
+      }
+    }
+
+    // For other users, try the API first
     try {
       // Call the login API
       const userData = await ApiService.users.login({
@@ -173,6 +211,7 @@ async function checkCredentials(username, password) {
           id: `local-${Date.now()}`,
           username,
           email: `${username}@example.com`,
+          role: username === 'admin' ? 'admin' : 'user',
           createdAt: new Date()
         };
 
@@ -200,6 +239,26 @@ function showError(message) {
   }
 }
 
+// Validate JWT token format
+function isValidTokenFormat(token) {
+  if (!token) return false;
+
+  // Basic JWT format check: should be three parts separated by dots
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+
+  // Each part should be base64url encoded
+  try {
+    for (const part of parts) {
+      // Check if it's valid base64url format (may contain only A-Z, a-z, 0-9, -, _, = padding)
+      if (!/^[A-Za-z0-9_-]+={0,2}$/.test(part)) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Set the logged in state
 function setLoggedIn(userData, rememberMe) {
   // Get the token from the response
@@ -210,17 +269,24 @@ function setLoggedIn(userData, rememberMe) {
     return;
   }
 
+  // Validate token format
+  if (!isValidTokenFormat(token)) {
+    console.error('Invalid token format received from server');
+    showError('Invalid authentication token received from server. Please try again.');
+    return;
+  }
+
   // Store user data
-  localStorage.setItem('user_profile', JSON.stringify(user));
+  localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(user));
 
   if (rememberMe) {
     // Store in localStorage (persists between sessions)
-    localStorage.setItem('auth_token', token);
+    localStorage.setItem(Config.storageKeys.authToken, token);
     localStorage.setItem('rememberMe', 'true');
     localStorage.setItem('savedUsername', user.username);
   } else {
     // Store in sessionStorage (cleared when browser is closed)
-    sessionStorage.setItem('auth_token', token);
+    sessionStorage.setItem(Config.storageKeys.authToken, token);
     localStorage.setItem('rememberMe', 'false');
     localStorage.removeItem('savedUsername');
   }
@@ -229,8 +295,8 @@ function setLoggedIn(userData, rememberMe) {
 // Check if the user is logged in
 function isLoggedIn() {
   // Check both localStorage and sessionStorage for the auth token
-  const localToken = localStorage.getItem('auth_token');
-  const sessionToken = sessionStorage.getItem('auth_token');
+  const localToken = localStorage.getItem(Config.storageKeys.authToken);
+  const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
 
   return localToken !== null || sessionToken !== null;
 }

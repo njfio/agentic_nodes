@@ -13,29 +13,21 @@ if (typeof Config === 'undefined') {
       userProfile: 'user_profile'
     }
   };
-
-  console.warn('Config object not loaded yet, using default values');
 }
 
 const Auth = {
   // Initialize the authentication system
   init() {
-    console.log('Auth init called');
-
     // Check if we're on the login page
     if (window.location.pathname.includes('login.html')) {
-      console.log('On login page, skipping auth check');
       return;
     }
 
     // Check if the user is logged in
     if (!this.isLoggedIn()) {
-      console.log('User not logged in, redirecting to login');
       this.redirectToLogin();
       return;
     }
-
-    console.log('User is logged in, adding user info to toolbar');
 
     // Add the user info and logout button to the toolbar
     this.addUserInfoToToolbar();
@@ -44,17 +36,15 @@ const Auth = {
   // Check if the user is logged in
   isLoggedIn() {
     // Check both localStorage and sessionStorage
-    const localToken = localStorage.getItem('auth_token');
-    const sessionToken = sessionStorage.getItem('auth_token');
-
-    console.log('Checking login status:', { localToken, sessionToken });
+    const localToken = localStorage.getItem(Config.storageKeys.authToken);
+    const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
 
     return localToken !== null || sessionToken !== null;
   },
 
   // Get the current user data
   getUserData() {
-    const userData = localStorage.getItem('user_profile');
+    const userData = localStorage.getItem(Config.storageKeys.userProfile);
     return userData ? JSON.parse(userData) : { username: 'User' };
   },
 
@@ -79,9 +69,9 @@ const Auth = {
       console.error('Error logging out:', error);
     } finally {
       // Clear the auth data
-      localStorage.removeItem('auth_token');
-      sessionStorage.removeItem('auth_token');
-      localStorage.removeItem('user_profile');
+      localStorage.removeItem(Config.storageKeys.authToken);
+      sessionStorage.removeItem(Config.storageKeys.authToken);
+      localStorage.removeItem(Config.storageKeys.userProfile);
 
       // Redirect to the login page
       this.redirectToLogin();

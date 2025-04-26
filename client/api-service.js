@@ -5,26 +5,65 @@
 
 const ApiService = {
   /**
+   * Validate a JWT token format
+   * @param {string} token - The token to validate
+   * @returns {boolean} - Whether the token is valid
+   */
+  isValidTokenFormat(token) {
+    if (!token) return false;
+
+    // Basic JWT format check: should be three parts separated by dots
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+
+    // Each part should be base64url encoded
+    try {
+      for (const part of parts) {
+        // Check if it's valid base64url format (may contain only A-Z, a-z, 0-9, -, _, = padding)
+        if (!/^[A-Za-z0-9_-]+={0,2}$/.test(part)) return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
    * Make a request to the API
    * @param {string} endpoint - API endpoint
    * @param {string} method - HTTP method
    * @param {object} data - Request data
+   * @param {boolean} retry - Whether to retry the request if token is invalid
+   * @param {object} customHeaders - Additional headers to include in the request
    * @returns {Promise} - Promise with response data
    */
-  async request(endpoint, method = 'GET', data = null) {
+  async request(endpoint, method = 'GET', data = null, retry = true, customHeaders = {}) {
     const url = `${Config.apiBaseUrl}${endpoint}`;
 
     const options = {
       method,
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...customHeaders
       }
     };
 
-    // Add auth token if available
-    const token = localStorage.getItem(Config.storageKeys.authToken);
+    // Add auth token if available (check both localStorage and sessionStorage)
+    let token = localStorage.getItem(Config.storageKeys.authToken) ||
+                sessionStorage.getItem(Config.storageKeys.authToken);
+
+    // Validate token format
+    if (token && !this.isValidTokenFormat(token)) {
+      console.warn('Found malformed token in storage, clearing it');
+      localStorage.removeItem(Config.storageKeys.authToken);
+      sessionStorage.removeItem(Config.storageKeys.authToken);
+      token = null;
+    }
+
     if (token) {
       options.headers['Authorization'] = `Bearer ${token}`;
+    } else if (!endpoint.includes('/users/login') && !endpoint.includes('/users/register')) {
+      console.warn('No auth token found for API request to:', endpoint);
     }
 
     // Add request body for non-GET requests
@@ -41,6 +80,28 @@ const ApiService = {
         const responseData = await response.json();
 
         if (!response.ok) {
+          // Handle authentication errors
+          if (response.status === 401 && retry) {
+            // Token might be invalid, try to refresh or redirect to login
+            if (responseData.message === 'Token is not valid' ||
+                responseData.message === 'No authentication token, access denied') {
+
+              console.warn('Authentication token invalid or expired');
+
+              // Clear the invalid token
+              localStorage.removeItem(Config.storageKeys.authToken);
+              sessionStorage.removeItem(Config.storageKeys.authToken);
+
+              // If this is a login or register endpoint, don't redirect
+              if (!endpoint.includes('/users/login') && !endpoint.includes('/users/register')) {
+                // Notify the user and redirect to login
+                if (confirm('Your session has expired. Please log in again.')) {
+                  window.location.href = 'login.html';
+                }
+              }
+            }
+          }
+
           throw new Error(responseData.message || 'API request failed');
         }
 
@@ -61,12 +122,28 @@ const ApiService = {
   // OpenAI API calls
   openai: {
     /**
+     * Get the OpenAI API key from localStorage
+     * @returns {string|null} - The API key or null if not found
+     */
+    getApiKey() {
+      try {
+        const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
+        return config.apiKey || null;
+      } catch (error) {
+        console.error('Error getting OpenAI API key:', error);
+        return null;
+      }
+    },
+
+    /**
      * Call the OpenAI Chat API
      * @param {object} data - Request data
      * @returns {Promise} - Promise with response data
      */
     async chat(data) {
-      return ApiService.request('/openai/chat', 'POST', data);
+      const apiKey = this.getApiKey();
+      const headers = apiKey ? { 'x-openai-api-key': apiKey } : {};
+      return ApiService.request('/openai/chat', 'POST', data, true, headers);
     },
 
     /**
@@ -75,7 +152,9 @@ const ApiService = {
      * @returns {Promise} - Promise with response data
      */
     async generateImage(data) {
-      return ApiService.request('/openai/images', 'POST', data);
+      const apiKey = this.getApiKey();
+      const headers = apiKey ? { 'x-openai-api-key': apiKey } : {};
+      return ApiService.request('/openai/images', 'POST', data, true, headers);
     }
   },
 

@@ -32,15 +32,37 @@ router.post('/migrate', async (req, res) => {
 // OpenAI API proxy routes
 router.post('/openai/chat', async (req, res) => {
   try {
+    // Get API key from request headers or fall back to env variable
+    const apiKey = req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY;
+
+    // Check if OpenAI API key is set
+    if (!apiKey || apiKey === 'sk-your-actual-openai-api-key' || apiKey === 'REPLACE_WITH_YOUR_OPENAI_API_KEY') {
+      return res.status(401).json({
+        error: {
+          message: 'OpenAI API key is not configured. Please set your API key in the OpenAI Configuration modal.'
+        }
+      });
+    }
+
     const response = await axios.post('https://api.openai.com/v1/chat/completions', req.body, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       }
     });
     res.json(response.data);
   } catch (error) {
     console.error('OpenAI API error:', error.response?.data || error.message);
+
+    // Check for API key errors
+    if (error.response?.data?.error?.message?.includes('API key')) {
+      return res.status(401).json({
+        error: {
+          message: 'Invalid OpenAI API key. Please update your API key in the OpenAI Configuration modal.'
+        }
+      });
+    }
+
     res.status(error.response?.status || 500).json({
       error: {
         message: error.response?.data?.error?.message || 'An error occurred with the OpenAI API'
@@ -51,15 +73,37 @@ router.post('/openai/chat', async (req, res) => {
 
 router.post('/openai/images', async (req, res) => {
   try {
+    // Get API key from request headers or fall back to env variable
+    const apiKey = req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY;
+
+    // Check if OpenAI API key is set
+    if (!apiKey || apiKey === 'sk-your-actual-openai-api-key' || apiKey === 'REPLACE_WITH_YOUR_OPENAI_API_KEY') {
+      return res.status(401).json({
+        error: {
+          message: 'OpenAI API key is not configured. Please set your API key in the OpenAI Configuration modal.'
+        }
+      });
+    }
+
     const response = await axios.post('https://api.openai.com/v1/images/generations', req.body, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       }
     });
     res.json(response.data);
   } catch (error) {
     console.error('OpenAI Image API error:', error.response?.data || error.message);
+
+    // Check for API key errors
+    if (error.response?.data?.error?.message?.includes('API key')) {
+      return res.status(401).json({
+        error: {
+          message: 'Invalid OpenAI API key. Please update your API key in the OpenAI Configuration modal.'
+        }
+      });
+    }
+
     res.status(error.response?.status || 500).json({
       error: {
         message: error.response?.data?.error?.message || 'An error occurred with the OpenAI Image API'

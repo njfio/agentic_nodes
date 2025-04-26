@@ -37,6 +37,7 @@
       </div>
     </div>
 
+    <button id="saveWorkflowBtn" type="button">Save Workflow</button>
     <button id="saveBtn" type="button">Save Canvas</button>
     <button id="loadBtn" type="button">Load Canvas</button>
     <button id="exportBtn" type="button">Export</button>
@@ -265,6 +266,25 @@
         <button id="loadCanvas" class="primary-btn" type="button">Load Data</button>
         <button id="exportJSON" class="secondary-btn" type="button">Export JSON</button>
         <button id="cancelSaveLoad" class="secondary-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Workflow Modal -->
+  <div id="saveWorkflowModal" class="modal">
+    <div class="modal-content">
+      <h2>Save Workflow</h2>
+      <div class="form-group">
+        <label for="workflowName">Workflow Name:</label>
+        <input type="text" id="workflowName" placeholder="Enter a name for your workflow">
+      </div>
+      <div class="form-group">
+        <label for="workflowDescription">Description:</label>
+        <textarea id="workflowDescription" placeholder="Enter a description for your workflow"></textarea>
+      </div>
+      <div class="button-group">
+        <button id="confirmSaveWorkflow" class="primary-btn" type="button">Save</button>
+        <button id="cancelSaveWorkflow" class="secondary-btn" type="button">Cancel</button>
       </div>
     </div>
   </div>

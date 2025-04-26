@@ -144,9 +144,12 @@ userSchema.statics.findByCredentials = async (username, password) => {
 userSchema.pre('save', async function(next) {
   const user = this;
 
-  // Only hash the password if it's modified
+  // Only hash the password if it's modified and not already hashed
   if (user.isModified('password')) {
-    user.password = await bcrypt.hash(user.password, 10);
+    // Check if the password is already hashed (starts with $2a$ or $2b$)
+    if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
+      user.password = await bcrypt.hash(user.password, 10);
+    }
   }
 
   // Update the updatedAt timestamp
