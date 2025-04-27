@@ -553,16 +553,84 @@ class Node {
     try {
       const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
 
+      // Check if we have image inputs
+      const hasImageInput = Utils.isImageData(input) ||
+                           (this.imageInputIds && this.imageInputIds.length > 0);
+
       // Prepare the request data
-      const requestData = {
-        model: config.model || Config.defaultOpenAIConfig.model,
-        messages: [
-          { role: 'system', content: this.systemPrompt || 'You are a helpful assistant.' },
-          { role: 'user', content: input }
-        ],
-        temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
-        max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
-      };
+      let requestData;
+
+      if (hasImageInput) {
+        // Handle text-to-text with image inputs (similar to image-to-text)
+        DebugManager.addLog(`Node ${this.id} has image inputs, using multimodal format`, 'info');
+
+        // Prepare the content array for the request
+        const contentArray = [];
+
+        // Add the system prompt as text
+        contentArray.push({
+          type: "text",
+          text: this.systemPrompt || "You are a helpful assistant that can analyze both text and images."
+        });
+
+        // If the input is text, add it
+        if (typeof input === 'string' && !Utils.isImageData(input)) {
+          contentArray.push({
+            type: "text",
+            text: input
+          });
+        }
+
+        // If the input is an image, add it
+        if (Utils.isImageData(input)) {
+          contentArray.push({
+            type: "image_url",
+            image_url: {
+              url: input
+            }
+          });
+        }
+
+        // Add any additional images from imageInputIds
+        if (this.imageInputIds && this.imageInputIds.length > 0) {
+          for (const imgId of this.imageInputIds) {
+            const imgData = ImageStorage.getImage(imgId);
+            if (imgData) {
+              contentArray.push({
+                type: "image_url",
+                image_url: {
+                  url: imgData
+                }
+              });
+              DebugManager.addLog(`Added image ${imgId} to text-to-text request`, 'info');
+            }
+          }
+        }
+
+        // Create the request with the content array
+        requestData = {
+          model: Config.imageAnalysisModel || "gpt-4o",
+          messages: [
+            {
+              role: "user",
+              content: contentArray
+            }
+          ],
+          temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
+          max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
+        };
+      } else {
+        // Standard text-to-text request
+        requestData = {
+          model: config.model || Config.defaultOpenAIConfig.model,
+          messages: [
+            { role: 'system', content: this.systemPrompt || 'You are a helpful assistant.' },
+            { role: 'user', content: input }
+          ],
+          temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
+          max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
+        };
+      }
 
       // Store the request payload and timestamp
       this.lastRequestPayload = JSON.parse(JSON.stringify(requestData));
@@ -2225,6 +2293,13 @@ class Node {
     ctx.fillStyle = '#aaa';
     ctx.font = '11px Arial';
 
+    // Check if inputContent is a string before trying to split it
+    if (typeof this.inputContent !== 'string') {
+      // Handle non-string input content
+      ctx.fillText('Non-text input content', x + 5, y + 15);
+      return;
+    }
+
     // Split text into lines
     const maxLineWidth = width - 10;
     const lineHeight = 14;
@@ -2273,6 +2348,13 @@ class Node {
 
     ctx.fillStyle = '#ccc';
     ctx.font = '12px Arial';
+
+    // Check if content is a string before trying to split it
+    if (typeof this.content !== 'string') {
+      // Handle non-string content
+      ctx.fillText('Non-text content', x + 10, y + 20);
+      return;
+    }
 
     // Split text into lines
     const maxLineWidth = width - 20;
