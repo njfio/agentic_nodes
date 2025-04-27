@@ -21,14 +21,69 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
 
-// Serve static files from the 'client' directory
-app.use(express.static(path.join(__dirname, 'client')));
+// Serve static files from the 'client' directory with cache control
+app.use(express.static(path.join(__dirname, 'client'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res, path) => {
+    // Set cache control headers to prevent caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
+}));
 
 // API routes
 app.use('/api', apiRoutes);
 
+// Add a route to force a browser refresh
+app.get('/refresh', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Refreshing...</title>
+      <script>
+        // Clear browser cache and storage
+        function clearCache() {
+          // Clear localStorage
+          localStorage.clear();
+
+          // Clear sessionStorage
+          sessionStorage.clear();
+
+          // Clear cache using cache API if available
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              for (let name of names) caches.delete(name);
+            });
+          }
+
+          // Redirect to index with a cache-busting parameter
+          window.location.href = '/index.html?cache=' + Date.now();
+        }
+
+        // Run the clear cache function
+        clearCache();
+      </script>
+    </head>
+    <body>
+      <h1>Refreshing application...</h1>
+      <p>If you are not redirected automatically, <a href="/index.html">click here</a>.</p>
+    </body>
+    </html>
+  `);
+});
+
 // Serve the main HTML file for any other routes
 app.get('*', (req, res) => {
+  // Add cache control headers
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+
   res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
 
