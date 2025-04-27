@@ -12,7 +12,8 @@ const Config = {
   defaultOpenAIConfig: {
     model: 'gpt-4o',
     temperature: 0.7,
-    maxTokens: 2000
+    maxTokens: 2000,
+    timeout: 120 // Default timeout in seconds
   },
 
   // Available models

@@ -28,10 +28,16 @@ function initLogin() {
   // Check if we're in the middle of auto-login to prevent loops
   const autoLoginAttempted = sessionStorage.getItem('loginAutoLoginAttempted') === 'true';
 
+  // Check if the user manually logged out
+  const manualLogout = localStorage.getItem('manualLogout') === 'true';
+
   // Check if we already have a user profile and auth token
   const hasUserProfile = localStorage.getItem(Config.storageKeys.userProfile) !== null;
   const hasAuthToken = localStorage.getItem(Config.storageKeys.authToken) !== null ||
                       sessionStorage.getItem(Config.storageKeys.authToken) !== null;
+
+  // Check if this is a logout redirect
+  const isLogoutRedirect = window.location.search.includes('logout=true');
 
   // If we're already logged in, redirect to app
   if (isLoggedIn()) {
@@ -39,8 +45,8 @@ function initLogin() {
     return;
   }
 
-  // If in Docker and haven't attempted auto-login yet
-  if (isDockerEnv && !autoLoginAttempted) {
+  // If in Docker and haven't attempted auto-login yet and not a manual logout
+  if (isDockerEnv && !autoLoginAttempted && !manualLogout && !isLogoutRedirect) {
     // Set flag to prevent infinite loops
     sessionStorage.setItem('loginAutoLoginAttempted', 'true');
 
@@ -349,6 +355,9 @@ function setLoggedIn(userData, rememberMe) {
     localStorage.setItem('rememberMe', 'false');
     localStorage.removeItem('savedUsername');
   }
+
+  // Clear any manual logout flag since we're now logging in
+  localStorage.removeItem('manualLogout');
 }
 
 // Check if the user is logged in

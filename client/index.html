@@ -226,6 +226,11 @@
         <label for="maxTokens">Max Tokens:</label>
         <input type="number" id="maxTokens" value="2000" min="1" max="8192">
       </div>
+      <div class="form-group">
+        <label for="timeout">API Timeout (seconds):</label>
+        <input type="number" id="timeout" value="120" min="30" max="600" step="30">
+        <div class="tooltip">Longer timeouts are useful for complex requests and image generation.</div>
+      </div>
 
       <!-- API Test Section -->
       <div class="test-section">

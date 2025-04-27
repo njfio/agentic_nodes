@@ -96,12 +96,16 @@ const Auth = {
   // Log out the user
   async logout() {
     try {
+      // Check if we're in Docker environment
+      const isDockerEnv = window.location.hostname === 'localhost' &&
+                         (window.location.port === '8732' || window.location.port === '8731');
+
       // Call the logout API if available
       if (typeof ApiService !== 'undefined') {
         try {
           await ApiService.users.logout();
         } catch (apiError) {
-          console.log('API logout failed, continuing with local logout');
+          console.warn('API logout failed, continuing with local logout');
         }
       }
     } catch (error) {
@@ -114,11 +118,17 @@ const Auth = {
       localStorage.removeItem('rememberMe');
       localStorage.removeItem('savedUsername');
 
+      // Clear Docker auto-login flag to prevent immediate re-login
+      localStorage.removeItem('dockerAutoLogin');
+
+      // Set a flag to prevent auto-login on the next page load
+      localStorage.setItem('manualLogout', 'true');
+
       // Clear any other potential auth-related data
       sessionStorage.clear();
 
-      // Redirect to the login page
-      window.location.href = 'login.html';
+      // Redirect to the login page with a parameter to prevent auto-login
+      window.location.href = 'login.html?logout=true&t=' + Date.now();
     }
   },
 

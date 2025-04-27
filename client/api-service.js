@@ -220,14 +220,57 @@ const ApiService = {
     },
 
     /**
+     * Get the OpenAI configuration from localStorage
+     * @returns {object} - The OpenAI configuration
+     */
+    getConfig() {
+      try {
+        // Try to get the config from the correct storage key
+        const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
+
+        // Apply defaults for any missing values
+        return {
+          apiKey: config.apiKey || null,
+          model: config.model || Config.defaultOpenAIConfig.model,
+          temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
+          maxTokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens,
+          timeout: config.timeout || Config.defaultOpenAIConfig.timeout
+        };
+      } catch (error) {
+        console.error('Error getting OpenAI config:', error);
+        return {
+          apiKey: null,
+          model: Config.defaultOpenAIConfig.model,
+          temperature: Config.defaultOpenAIConfig.temperature,
+          maxTokens: Config.defaultOpenAIConfig.maxTokens,
+          timeout: Config.defaultOpenAIConfig.timeout
+        };
+      }
+    },
+
+    /**
      * Call the OpenAI Chat API
      * @param {object} data - Request data
      * @returns {Promise} - Promise with response data
      */
     async chat(data) {
-      const apiKey = this.getApiKey();
-      const headers = apiKey ? { 'x-openai-api-key': apiKey } : {};
-      return ApiService.request('/openai/chat', 'POST', data, true, headers);
+      const config = this.getConfig();
+      const headers = config.apiKey ? { 'x-openai-api-key': config.apiKey } : {};
+
+      // Convert timeout from seconds to milliseconds
+      const timeout = (config.timeout || 120) * 1000;
+
+      return ApiService.request(
+        '/openai/chat',
+        'POST',
+        data,
+        true,
+        headers,
+        3,    // maxRetries
+        1000, // retryDelay
+        0,    // retryCount
+        timeout
+      );
     },
 
     /**
@@ -236,12 +279,14 @@ const ApiService = {
      * @returns {Promise} - Promise with response data
      */
     async generateImage(data) {
-      const apiKey = this.getApiKey();
-      const headers = apiKey ? { 'x-openai-api-key': apiKey } : {};
+      const config = this.getConfig();
+      const headers = config.apiKey ? { 'x-openai-api-key': config.apiKey } : {};
 
-      // Use a longer timeout (240 seconds) for image generation
+      // Use a longer timeout for image generation
       // Image generation can take significantly longer than text generation
-      const IMAGE_GENERATION_TIMEOUT = 240_000; // 240 seconds (4 minutes)
+      // Use the configured timeout but multiply it by 2 for image generation, with a minimum of 4 minutes
+      const configuredTimeoutMs = (config.timeout || 120) * 1000;
+      const IMAGE_GENERATION_TIMEOUT = Math.max(configuredTimeoutMs * 2, 240_000); // At least 4 minutes
 
       return ApiService.request(
         '/openai/images',
