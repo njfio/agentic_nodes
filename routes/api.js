@@ -143,6 +143,7 @@ router.post('/users/reset-password', userController.resetPassword);
 
 // Docker environment routes
 router.get('/docker/auto-login', dockerController.autoLogin);
+router.get('/docker/status', dockerController.checkStatus);
 
 // Image routes
 router.get('/images/workflow/:workflowId', imageController.getWorkflowImages);

@@ -414,8 +414,18 @@
     const isDockerEnv = window.location.hostname === 'localhost' &&
                         (window.location.port === '8732' || window.location.port === '8731');
 
-    // If in Docker, check if we're logged in
-    if (isDockerEnv) {
+    // Check if we already have a user profile and auth token
+    const hasUserProfile = localStorage.getItem('userProfile') !== null;
+    const hasAuthToken = localStorage.getItem('authToken') !== null;
+
+    // Check if we're in the middle of auto-login to prevent loops
+    const autoLoginAttempted = sessionStorage.getItem('dockerAutoLoginAttempted') === 'true';
+
+    // If in Docker and not already logged in and haven't attempted auto-login yet
+    if (isDockerEnv && (!hasUserProfile || !hasAuthToken) && !autoLoginAttempted) {
+      // Set flag to prevent infinite loops
+      sessionStorage.setItem('dockerAutoLoginAttempted', 'true');
+
       // Show loading indicator while we check
       document.body.innerHTML = `
         <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
@@ -443,15 +453,28 @@
           // Store the auth data
           localStorage.setItem('userProfile', JSON.stringify(data.user));
           localStorage.setItem('authToken', data.token);
+          localStorage.setItem('dockerAutoLogin', 'true');
+
+          // Clear the attempt flag since we succeeded
+          sessionStorage.removeItem('dockerAutoLoginAttempted');
 
           // Reload the page to show the app
-          window.location.reload();
+          window.location.href = 'index.html?dockerLogin=success&t=' + Date.now();
         })
         .catch(error => {
           console.error('Docker auto-login error:', error);
+          // Clear the attempt flag since we failed
+          sessionStorage.removeItem('dockerAutoLoginAttempted');
           // Redirect to login page if auto-login fails
-          window.location.href = 'login.html';
+          window.location.href = 'login.html?dockerLogin=failed&t=' + Date.now();
         });
+    } else if (isDockerEnv && autoLoginAttempted) {
+      // If we've already attempted auto-login but still don't have credentials,
+      // clear the flag and redirect to login page to prevent loops
+      sessionStorage.removeItem('dockerAutoLoginAttempted');
+      if (!hasUserProfile || !hasAuthToken) {
+        window.location.href = 'login.html?dockerLogin=retry&t=' + Date.now();
+      }
     }
   </script>
 

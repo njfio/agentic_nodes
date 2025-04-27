@@ -44,8 +44,19 @@ const Auth = {
     const isDockerEnv = window.location.hostname === 'localhost' &&
                         (window.location.port === '8732' || window.location.port === '8731');
 
-    if (isDockerEnv && !userProfile) {
-      // Create a mock user profile for Docker environment
+    // Check if we're in Docker environment and have the Docker auto-login flag
+    const isDockerAutoLogin = localStorage.getItem('dockerAutoLogin') === 'true';
+
+    // If we're in Docker environment and don't have credentials yet
+    if (isDockerEnv && (!userProfile || (!localToken && !sessionToken))) {
+      // If we haven't tried auto-login yet, redirect to login page
+      if (!isDockerAutoLogin) {
+        // We'll let the login page handle the auto-login
+        return false;
+      }
+
+      // If we've already tried auto-login but still don't have credentials,
+      // create mock credentials as a fallback
       const mockUserProfile = {
         username: 'testuser',
         email: 'test@example.com',
@@ -56,7 +67,7 @@ const Auth = {
       localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(mockUserProfile));
 
       // Create a mock token
-      const mockToken = 'docker-test-token-' + Date.now();
+      const mockToken = `docker-test-token-${Date.now()}`;
       localStorage.setItem(Config.storageKeys.authToken, mockToken);
 
       return true;

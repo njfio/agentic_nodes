@@ -25,8 +25,24 @@ function initLogin() {
   const isDockerEnv = window.location.hostname === 'localhost' &&
                       (window.location.port === '8732' || window.location.port === '8731');
 
-  if (isDockerEnv) {
-    console.log('Docker environment detected, attempting auto-login...');
+  // Check if we're in the middle of auto-login to prevent loops
+  const autoLoginAttempted = sessionStorage.getItem('loginAutoLoginAttempted') === 'true';
+
+  // Check if we already have a user profile and auth token
+  const hasUserProfile = localStorage.getItem(Config.storageKeys.userProfile) !== null;
+  const hasAuthToken = localStorage.getItem(Config.storageKeys.authToken) !== null ||
+                      sessionStorage.getItem(Config.storageKeys.authToken) !== null;
+
+  // If we're already logged in, redirect to app
+  if (isLoggedIn()) {
+    redirectToApp();
+    return;
+  }
+
+  // If in Docker and haven't attempted auto-login yet
+  if (isDockerEnv && !autoLoginAttempted) {
+    // Set flag to prevent infinite loops
+    sessionStorage.setItem('loginAutoLoginAttempted', 'true');
 
     // Show loading indicator
     document.body.innerHTML = `
@@ -52,38 +68,39 @@ function initLogin() {
         return response.json();
       })
       .then(data => {
+        // Clear the attempt flag since we succeeded
+        sessionStorage.removeItem('loginAutoLoginAttempted');
+
         // Auto-login with test user from server
         setLoggedIn(data, true);
-        redirectToApp();
+
+        // Set a flag to indicate Docker auto-login
+        localStorage.setItem('dockerAutoLogin', 'true');
+
+        // Redirect to app with cache-busting parameter
+        window.location.href = `index.html?dockerLogin=success&t=${Date.now()}`;
       })
       .catch(error => {
-        console.error('Docker auto-login error:', error);
+        // Clear the attempt flag since we failed
+        sessionStorage.removeItem('loginAutoLoginAttempted');
 
-        // Fallback to mock login if the endpoint fails
-        const mockUserData = {
-          user: {
-            username: 'testuser',
-            email: 'test@example.com',
-            role: 'user',
-            id: 'docker-test-user'
-          },
-          token: 'docker-test-token-' + Date.now()
-        };
-
-        // Auto-login with test user
-        setLoggedIn(mockUserData, true);
-        redirectToApp();
+        // Show the login form with error message
+        setupLoginForm();
+        showError('Docker auto-login failed. Please log in manually.');
       });
 
     return;
+  } else if (isDockerEnv && autoLoginAttempted) {
+    // If we've already attempted auto-login, clear the flag to allow manual login
+    sessionStorage.removeItem('loginAutoLoginAttempted');
   }
 
-  // Check if the user is already logged in
-  if (isLoggedIn()) {
-    redirectToApp();
-    return;
-  }
+  // Set up the login form for manual login
+  setupLoginForm();
+}
 
+// Set up the login form for manual login
+function setupLoginForm() {
   // Set up event listeners
   setupEventListeners();
 
