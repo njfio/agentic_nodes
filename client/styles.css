@@ -669,7 +669,7 @@ kbd {
 
 #miniMapCanvas {
   width: 100%;
-  height: calc(100% - 30px);
+  height: calc(100% - 70px); /* Adjusted for controls */
   background-color: #1e1e1e;
 }
 
@@ -678,6 +678,35 @@ kbd {
   border: 2px solid #4a90e2;
   background-color: rgba(74, 144, 226, 0.1);
   pointer-events: none;
+}
+
+.mini-map-controls {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px;
+  background-color: #2a2a2a;
+  border-top: 1px solid #444;
+  height: 30px;
+}
+
+.mini-map-btn {
+  background-color: #333;
+  border: 1px solid #555;
+  color: #eee;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 5px;
+  margin: 0 2px;
+  transition: background-color 0.2s;
+}
+
+.mini-map-btn:hover {
+  background-color: #444;
+}
+
+.mini-map-btn:active {
+  background-color: #4a90e2;
 }
 
 /* Status indicators */

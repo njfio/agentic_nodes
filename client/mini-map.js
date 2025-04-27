@@ -61,6 +61,66 @@ const MiniMap = {
       });
     }
 
+    // Zoom in button
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', () => {
+        if (App.zoomIn) {
+          App.zoomIn();
+          DebugManager.addLog('Zoomed in', 'info');
+        }
+      });
+    }
+
+    // Zoom out button
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', () => {
+        if (App.zoomOut) {
+          App.zoomOut();
+          DebugManager.addLog('Zoomed out', 'info');
+        }
+      });
+    }
+
+    // Reset zoom button
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    if (resetZoomBtn) {
+      resetZoomBtn.addEventListener('click', () => {
+        if (App.resetZoom) {
+          App.resetZoom();
+          DebugManager.addLog('Zoom reset', 'info');
+        }
+      });
+    }
+
+    // Auto arrange button
+    const autoArrangeBtn = document.getElementById('autoArrangeBtn');
+    if (autoArrangeBtn) {
+      autoArrangeBtn.addEventListener('click', () => {
+        this.autoArrangeNodes();
+        DebugManager.addLog('Auto-arranged nodes', 'info');
+      });
+    }
+
+    // Horizontal layout button
+    const horizontalLayoutBtn = document.getElementById('horizontalLayoutBtn');
+    if (horizontalLayoutBtn) {
+      horizontalLayoutBtn.addEventListener('click', () => {
+        this.arrangeNodesHorizontally();
+        DebugManager.addLog('Arranged nodes horizontally', 'info');
+      });
+    }
+
+    // Vertical layout button
+    const verticalLayoutBtn = document.getElementById('verticalLayoutBtn');
+    if (verticalLayoutBtn) {
+      verticalLayoutBtn.addEventListener('click', () => {
+        this.arrangeNodesVertically();
+        DebugManager.addLog('Arranged nodes vertically', 'info');
+      });
+    }
+
     // Make mini-map draggable
     const miniMapHeader = document.querySelector('.mini-map-header');
     if (miniMapHeader) {
@@ -174,7 +234,7 @@ const MiniMap = {
     const rect = miniMap.getBoundingClientRect();
 
     this.canvas.width = rect.width;
-    this.canvas.height = rect.height - 30; // Subtract header height
+    this.canvas.height = rect.height - 70; // Subtract header and controls height
   },
 
   // Draw the mini-map
@@ -354,6 +414,270 @@ const MiniMap = {
     ) {
       this.draw();
     }
+  },
+
+  // Auto arrange nodes in a force-directed layout
+  autoArrangeNodes() {
+    if (!App.nodes || App.nodes.length === 0) return;
+
+    // Constants for the force-directed layout
+    const REPULSION = 10000; // Repulsion force between nodes
+    const ATTRACTION = 0.05; // Attraction force for connections
+    const DAMPING = 0.9;     // Damping factor to prevent oscillation
+    const ITERATIONS = 50;   // Number of iterations for the simulation
+    const MIN_DISTANCE = 200; // Minimum distance between nodes
+
+    // Initialize velocities
+    const velocities = {};
+    App.nodes.forEach(node => {
+      velocities[node.id] = { x: 0, y: 0 };
+    });
+
+    // Run the simulation for a fixed number of iterations
+    for (let iter = 0; iter < ITERATIONS; iter++) {
+      // Calculate forces for each node
+      App.nodes.forEach(node1 => {
+        let forceX = 0;
+        let forceY = 0;
+
+        // Repulsion forces from other nodes
+        App.nodes.forEach(node2 => {
+          if (node1 !== node2) {
+            const dx = node1.x - node2.x;
+            const dy = node1.y - node2.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1; // Avoid division by zero
+
+            // Apply repulsion force (inverse square law)
+            if (distance < MIN_DISTANCE) {
+              const force = REPULSION / (distance * distance);
+              forceX += (dx / distance) * force;
+              forceY += (dy / distance) * force;
+            }
+          }
+        });
+
+        // Attraction forces from connections
+        App.connections.forEach(conn => {
+          if (conn.fromNode === node1) {
+            const toNode = conn.toNode;
+            const dx = node1.x - toNode.x;
+            const dy = node1.y - toNode.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+
+            // Apply attraction force (linear)
+            forceX -= (dx / distance) * distance * ATTRACTION;
+            forceY -= (dy / distance) * distance * ATTRACTION;
+          } else if (conn.toNode === node1) {
+            const fromNode = conn.fromNode;
+            const dx = node1.x - fromNode.x;
+            const dy = node1.y - fromNode.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+
+            // Apply attraction force (linear)
+            forceX -= (dx / distance) * distance * ATTRACTION;
+            forceY -= (dy / distance) * distance * ATTRACTION;
+          }
+        });
+
+        // Update velocity with damping
+        velocities[node1.id].x = (velocities[node1.id].x + forceX) * DAMPING;
+        velocities[node1.id].y = (velocities[node1.id].y + forceY) * DAMPING;
+      });
+
+      // Apply velocities to node positions
+      App.nodes.forEach(node => {
+        node.x += velocities[node.id].x;
+        node.y += velocities[node.id].y;
+      });
+    }
+
+    // Center the layout in the viewport
+    this.centerLayout();
+
+    // Redraw the canvas
+    App.draw();
+  },
+
+  // Arrange nodes horizontally based on connections
+  arrangeNodesHorizontally() {
+    if (!App.nodes || App.nodes.length === 0) return;
+
+    // Find root nodes (nodes with no incoming connections)
+    const rootNodes = App.nodes.filter(node => {
+      return !App.connections.some(conn => conn.toNode === node);
+    });
+
+    // If no root nodes, use the leftmost node
+    if (rootNodes.length === 0) {
+      rootNodes.push(App.nodes.reduce((leftmost, node) =>
+        node.x < leftmost.x ? node : leftmost, App.nodes[0]));
+    }
+
+    // Reset visited flag
+    App.nodes.forEach(node => {
+      node.visited = false;
+    });
+
+    // Arrange nodes in levels
+    const levels = [];
+    let currentLevel = rootNodes;
+
+    // Mark root nodes as visited
+    rootNodes.forEach(node => {
+      node.visited = true;
+    });
+
+    // Add root nodes to the first level
+    levels.push(currentLevel);
+
+    // Build levels based on connections
+    while (currentLevel.length > 0) {
+      const nextLevel = [];
+
+      currentLevel.forEach(node => {
+        // Find all nodes connected from this node
+        App.connections.forEach(conn => {
+          if (conn.fromNode === node && !conn.toNode.visited) {
+            conn.toNode.visited = true;
+            nextLevel.push(conn.toNode);
+          }
+        });
+      });
+
+      if (nextLevel.length > 0) {
+        levels.push(nextLevel);
+      }
+
+      currentLevel = nextLevel;
+    }
+
+    // Check for any unvisited nodes and add them to a new level
+    const unvisitedNodes = App.nodes.filter(node => !node.visited);
+    if (unvisitedNodes.length > 0) {
+      levels.push(unvisitedNodes);
+    }
+
+    // Position nodes based on levels
+    const LEVEL_SPACING = 300;
+    const NODE_SPACING = 200;
+
+    levels.forEach((level, levelIndex) => {
+      const levelWidth = level.length * NODE_SPACING;
+      const startX = -levelWidth / 2 + NODE_SPACING / 2;
+
+      level.forEach((node, nodeIndex) => {
+        node.x = startX + nodeIndex * NODE_SPACING;
+        node.y = levelIndex * LEVEL_SPACING;
+      });
+    });
+
+    // Center the layout in the viewport
+    this.centerLayout();
+
+    // Redraw the canvas
+    App.draw();
+  },
+
+  // Arrange nodes vertically based on connections
+  arrangeNodesVertically() {
+    if (!App.nodes || App.nodes.length === 0) return;
+
+    // Find root nodes (nodes with no incoming connections)
+    const rootNodes = App.nodes.filter(node => {
+      return !App.connections.some(conn => conn.toNode === node);
+    });
+
+    // If no root nodes, use the topmost node
+    if (rootNodes.length === 0) {
+      rootNodes.push(App.nodes.reduce((topmost, node) =>
+        node.y < topmost.y ? node : topmost, App.nodes[0]));
+    }
+
+    // Reset visited flag
+    App.nodes.forEach(node => {
+      node.visited = false;
+    });
+
+    // Arrange nodes in levels
+    const levels = [];
+    let currentLevel = rootNodes;
+
+    // Mark root nodes as visited
+    rootNodes.forEach(node => {
+      node.visited = true;
+    });
+
+    // Add root nodes to the first level
+    levels.push(currentLevel);
+
+    // Build levels based on connections
+    while (currentLevel.length > 0) {
+      const nextLevel = [];
+
+      currentLevel.forEach(node => {
+        // Find all nodes connected from this node
+        App.connections.forEach(conn => {
+          if (conn.fromNode === node && !conn.toNode.visited) {
+            conn.toNode.visited = true;
+            nextLevel.push(conn.toNode);
+          }
+        });
+      });
+
+      if (nextLevel.length > 0) {
+        levels.push(nextLevel);
+      }
+
+      currentLevel = nextLevel;
+    }
+
+    // Check for any unvisited nodes and add them to a new level
+    const unvisitedNodes = App.nodes.filter(node => !node.visited);
+    if (unvisitedNodes.length > 0) {
+      levels.push(unvisitedNodes);
+    }
+
+    // Position nodes based on levels
+    const LEVEL_SPACING = 300;
+    const NODE_SPACING = 200;
+
+    levels.forEach((level, levelIndex) => {
+      const levelHeight = level.length * NODE_SPACING;
+      const startY = -levelHeight / 2 + NODE_SPACING / 2;
+
+      level.forEach((node, nodeIndex) => {
+        node.x = levelIndex * LEVEL_SPACING;
+        node.y = startY + nodeIndex * NODE_SPACING;
+      });
+    });
+
+    // Center the layout in the viewport
+    this.centerLayout();
+
+    // Redraw the canvas
+    App.draw();
+  },
+
+  // Center the layout in the viewport
+  centerLayout() {
+    if (!App.nodes || App.nodes.length === 0) return;
+
+    // Find the bounds of all nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    App.nodes.forEach(node => {
+      minX = Math.min(minX, node.x);
+      minY = Math.min(minY, node.y);
+      maxX = Math.max(maxX, node.x + node.width);
+      maxY = Math.max(maxY, node.y + node.height);
+    });
+
+    // Calculate the center of the layout
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Center the view on this point
+    App.centerViewOn(centerX, centerY);
   }
 };
 
