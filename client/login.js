@@ -147,18 +147,32 @@ async function handleLogin() {
 // Check if the credentials are valid
 async function checkCredentials(username, password) {
   try {
-    // Special case for default test user
-    if (username === 'testuser' && password === 'password123') {
-      // Always use mock data for the default test user to avoid MongoDB connection issues
-      console.log('Using mock data for default test user');
+    // IMPORTANT: For development, we'll bypass the API and use mock data for all users
+    // This ensures the application works even if MongoDB is not available
 
-      // Create a mock user and token for the default test user
-      const mockToken = `default-test-user-token-${Date.now()}`;
+    // List of valid test users
+    const validCredentials = [
+      { username: 'testuser', password: 'password123', role: 'user' },
+      { username: 'admin', password: 'password', role: 'admin' },
+      { username: 'user', password: 'user123', role: 'user' },
+      { username: 'demo', password: 'demo', role: 'user' }
+    ];
+
+    // Check if the credentials match any of our test users
+    const matchedUser = validCredentials.find(cred =>
+      cred.username === username && cred.password === password
+    );
+
+    if (matchedUser) {
+      console.log(`Using mock data for ${username}`);
+
+      // Create a mock user and token
+      const mockToken = `mock-user-token-${Date.now()}`;
       const mockUser = {
-        id: `default-${Date.now()}`,
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'user',
+        id: `mock-${Date.now()}`,
+        username: matchedUser.username,
+        email: `${matchedUser.username}@example.com`,
+        role: matchedUser.role,
         isVerified: true,
         tokens: [],
         createdAt: new Date()
@@ -171,7 +185,7 @@ async function checkCredentials(username, password) {
       };
     }
 
-    // For other users, try the API first
+    // If we get here, try the API as a fallback (but we shouldn't need this in development)
     try {
       // Call the login API
       const userData = await ApiService.users.login({
@@ -182,38 +196,7 @@ async function checkCredentials(username, password) {
       // Return the user data and token
       return userData;
     } catch (apiError) {
-      console.warn('API login failed, falling back to local validation:', apiError);
-
-      // Fallback to local validation if API fails
-      // This is temporary until the server is fully set up
-      const validCredentials = [
-        { username: 'admin', password: 'password' },
-        { username: 'user', password: 'user123' },
-        { username: 'demo', password: 'demo' }
-      ];
-
-      const isValid = validCredentials.some(cred =>
-        cred.username === username && cred.password === password
-      );
-
-      if (isValid) {
-        // Create mock user data and token
-        const mockToken = `local-token-${Date.now()}`;
-        const mockUser = {
-          id: `local-${Date.now()}`,
-          username,
-          email: `${username}@example.com`,
-          role: username === 'admin' ? 'admin' : 'user',
-          createdAt: new Date()
-        };
-
-        // Return mock user data and token
-        return {
-          user: mockUser,
-          token: mockToken
-        };
-      }
-
+      console.warn('API login failed:', apiError);
       return null;
     }
   } catch (error) {
