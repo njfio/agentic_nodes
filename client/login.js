@@ -26,20 +26,55 @@ function initLogin() {
                       (window.location.port === '8732' || window.location.port === '8731');
 
   if (isDockerEnv) {
-    // Create mock user data for Docker environment
-    const mockUserData = {
-      user: {
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'user',
-        id: 'docker-test-user'
-      },
-      token: 'docker-test-token-' + Date.now()
-    };
+    console.log('Docker environment detected, attempting auto-login...');
 
-    // Auto-login with test user
-    setLoggedIn(mockUserData, true);
-    redirectToApp();
+    // Show loading indicator
+    document.body.innerHTML = `
+      <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+        <h2>Docker Environment Detected</h2>
+        <p>Auto-logging in as test user...</p>
+        <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite;"></div>
+      </div>
+      <style>
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      </style>
+    `;
+
+    // Use the Docker auto-login endpoint
+    fetch('/api/docker/auto-login')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Auto-login failed');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // Auto-login with test user from server
+        setLoggedIn(data, true);
+        redirectToApp();
+      })
+      .catch(error => {
+        console.error('Docker auto-login error:', error);
+
+        // Fallback to mock login if the endpoint fails
+        const mockUserData = {
+          user: {
+            username: 'testuser',
+            email: 'test@example.com',
+            role: 'user',
+            id: 'docker-test-user'
+          },
+          token: 'docker-test-token-' + Date.now()
+        };
+
+        // Auto-login with test user
+        setLoggedIn(mockUserData, true);
+        redirectToApp();
+      });
+
     return;
   }
 

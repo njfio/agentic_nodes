@@ -7,6 +7,7 @@ const workflowController = require('../controllers/workflowController');
 const nodeController = require('../controllers/nodeController');
 const userController = require('../controllers/userController');
 const imageController = require('../controllers/imageController');
+const dockerController = require('../controllers/dockerController');
 
 // Import utilities
 const dataMigration = require('../utils/data-migration');
@@ -139,6 +140,9 @@ router.post('/users/logoutAll', auth, userController.logoutAll);
 router.get('/users/verify-email', userController.verifyEmail);
 router.post('/users/request-password-reset', userController.requestPasswordReset);
 router.post('/users/reset-password', userController.resetPassword);
+
+// Docker environment routes
+router.get('/docker/auto-login', dockerController.autoLogin);
 
 // Image routes
 router.get('/images/workflow/:workflowId', imageController.getWorkflowImages);
