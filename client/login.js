@@ -162,38 +162,12 @@ async function checkCredentials(username, password) {
     const validCredentials = [
       { username: 'testuser', password: 'password123', role: 'user' },
       { username: 'admin', password: 'password', role: 'admin' },
+      { username: 'multimodal_admin', password: 'multimodal_password_secure123', role: 'admin' },
       { username: 'user', password: 'user123', role: 'user' },
       { username: 'demo', password: 'demo', role: 'user' }
     ];
 
-    // Check if the credentials match any of our test users
-    const matchedUser = validCredentials.find(cred =>
-      cred.username === username && cred.password === password
-    );
-
-    if (matchedUser) {
-      console.log(`Using mock data for ${username}`);
-
-      // Create a mock user and token
-      const mockToken = `mock-user-token-${Date.now()}`;
-      const mockUser = {
-        id: `mock-${Date.now()}`,
-        username: matchedUser.username,
-        email: `${matchedUser.username}@example.com`,
-        role: matchedUser.role,
-        isVerified: true,
-        tokens: [],
-        createdAt: new Date()
-      };
-
-      // Return mock user data and token
-      return {
-        user: mockUser,
-        token: mockToken
-      };
-    }
-
-    // If we get here, try the API as a fallback (but we shouldn't need this in development)
+    // First try the API (for Docker environment)
     try {
       // Call the login API
       const userData = await ApiService.users.login({
@@ -201,10 +175,38 @@ async function checkCredentials(username, password) {
         password
       });
 
-      // Return the user data and token
+      // If we get here, the API login was successful
       return userData;
     } catch (apiError) {
-      console.warn('API login failed:', apiError);
+      // API login failed, fall back to local validation
+      console.warn('API login failed, falling back to local validation');
+
+      // Check if the credentials match any of our test users
+      const matchedUser = validCredentials.find(cred =>
+        cred.username === username && cred.password === password
+      );
+
+      if (matchedUser) {
+        // Create a mock user and token
+        const mockToken = `mock-user-token-${Date.now()}`;
+        const mockUser = {
+          id: `mock-${Date.now()}`,
+          username: matchedUser.username,
+          email: `${matchedUser.username}@example.com`,
+          role: matchedUser.role,
+          isVerified: true,
+          tokens: [],
+          createdAt: new Date()
+        };
+
+        // Return mock user data and token
+        return {
+          user: mockUser,
+          token: mockToken
+        };
+      }
+
+      // If we get here, neither API nor local validation worked
       return null;
     }
   } catch (error) {
