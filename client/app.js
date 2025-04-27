@@ -1532,7 +1532,8 @@ class Node {
     // Special handling for image inputs
     if (Utils.isImageData(input)) {
       // Store the image in ImageStorage and get a reference ID
-      const imageId = ImageStorage.storeImage(input);
+      // Use the synchronous version to avoid Promise objects
+      const imageId = ImageStorage.storeImageSync(input);
 
       // Initialize the imageInputIds array if it doesn't exist
       if (!this.imageInputIds) {
@@ -1609,7 +1610,8 @@ class Node {
         }
       } else if (Utils.isImageData(input)) {
         // This is raw image data, store it and get an ID
-        const imageId = ImageStorage.storeImage(input);
+        // Use the synchronous version to avoid Promise objects
+        const imageId = ImageStorage.storeImageSync(input);
         imageInputs.push(imageId);
 
         // Add a placeholder for the image in the combined input content
@@ -1694,7 +1696,8 @@ class Node {
         }
       } else if (Utils.isImageData(input)) {
         // This is raw image data, store it and get an ID
-        const imageId = ImageStorage.storeImage(input);
+        // Use the synchronous version to avoid Promise objects
+        const imageId = ImageStorage.storeImageSync(input);
         imageInputs.push(imageId);
 
         // Add a placeholder for the image in the combined input content

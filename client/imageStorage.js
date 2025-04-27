@@ -8,7 +8,7 @@ const ImageStorage = {
   // Counter for generating unique image IDs
   counter: 0,
 
-  // Store an image and return a reference ID
+  // Store an image and return a reference ID (async version)
   async storeImage(imageData, workflowId = null, nodeId = null) {
     try {
       // Generate a unique ID for this image
@@ -67,6 +67,37 @@ const ImageStorage = {
       return imageId;
     } catch (error) {
       console.error('Error storing image:', error);
+      return null;
+    }
+  },
+
+  // Synchronous version of storeImage that only stores in cache
+  storeImageSync(imageData) {
+    try {
+      // Generate a unique ID for this image
+      const imageId = `img_${Date.now()}_${this.counter++}`;
+
+      // Store in local cache
+      this.imageCache.set(imageId, imageData);
+
+      // Schedule async storage in the database for later
+      setTimeout(() => {
+        this.storeImage(imageData)
+          .then(asyncImageId => {
+            if (asyncImageId && asyncImageId !== imageId) {
+              // If the async storage generated a different ID, update our cache mapping
+              this.imageCache.set(asyncImageId, imageData);
+            }
+          })
+          .catch(err => {
+            console.warn('Background image storage failed:', err);
+          });
+      }, 0);
+
+      // Return the image ID immediately
+      return imageId;
+    } catch (error) {
+      console.error('Error in synchronous image storage:', error);
       return null;
     }
   },
