@@ -594,7 +594,8 @@ class Node {
         // Add any additional images from imageInputIds
         if (this.imageInputIds && this.imageInputIds.length > 0) {
           for (const imgId of this.imageInputIds) {
-            const imgData = ImageStorage.getImage(imgId);
+            // Use the synchronous version to avoid Promise objects
+            const imgData = ImageStorage.getImageSync(imgId);
             if (imgData) {
               contentArray.push({
                 type: "image_url",
@@ -603,6 +604,8 @@ class Node {
                 }
               });
               DebugManager.addLog(`Added image ${imgId} to text-to-text request`, 'info');
+            } else {
+              DebugManager.addLog(`Warning: Image ${imgId} not found in cache, skipping`, 'warning');
             }
           }
         }
@@ -958,7 +961,8 @@ class Node {
       // Add any additional images if available
       if (this.additionalImageIds && this.additionalImageIds.length > 0) {
         for (const imgId of this.additionalImageIds) {
-          const imgData = ImageStorage.getImage(imgId);
+          // Use the synchronous version to avoid Promise objects
+          const imgData = ImageStorage.getImageSync(imgId);
           if (imgData) {
             contentArray.push({
               type: "image_url",
@@ -967,6 +971,8 @@ class Node {
               }
             });
             DebugManager.addLog(`Added additional image ${imgId} to request`, 'info');
+          } else {
+            DebugManager.addLog(`Warning: Image ${imgId} not found in cache, skipping`, 'warning');
           }
         }
       }
@@ -1066,10 +1072,11 @@ class Node {
       if (typeof input === 'string' && input.startsWith('img_')) {
         // This is an image ID
         inputImageId = input;
-        inputImageData = ImageStorage.getImage(inputImageId);
+        // Use the synchronous version to avoid Promise objects
+        inputImageData = ImageStorage.getImageSync(inputImageId);
 
         if (!inputImageData) {
-          throw new Error(`Image with ID ${inputImageId} not found in storage`);
+          throw new Error(`Image with ID ${inputImageId} not found in cache`);
         }
       } else if (Utils.isImageData(input)) {
         // This is raw image data, store it and get an ID
@@ -1145,11 +1152,12 @@ class Node {
       // Retrieve the actual image data from storage
       const allImageData = [];
       for (const imgId of allImageIds) {
-        const imgData = ImageStorage.getImage(imgId);
+        // Use the synchronous version to avoid Promise objects
+        const imgData = ImageStorage.getImageSync(imgId);
         if (imgData) {
           allImageData.push(imgData);
         } else {
-          DebugManager.addLog(`Warning: Image with ID ${imgId} not found in storage`, 'warning');
+          DebugManager.addLog(`Warning: Image with ID ${imgId} not found in cache, skipping`, 'warning');
         }
       }
 
@@ -1166,12 +1174,13 @@ class Node {
       // Get the actual image data for each image ID
       const imageDataArray = [];
       for (const imageId of allImageIds) {
-        const imageData = ImageStorage.getImage(imageId);
+        // Use the synchronous version to avoid Promise objects
+        const imageData = ImageStorage.getImageSync(imageId);
         if (imageData) {
           imageDataArray.push(imageData);
           DebugManager.addLog(`Retrieved image data for ID ${imageId}`, 'info');
         } else {
-          DebugManager.addLog(`Warning: Could not find image data for ID ${imageId}`, 'warning');
+          DebugManager.addLog(`Warning: Could not find image data for ID ${imageId} in cache, skipping`, 'warning');
         }
       }
 

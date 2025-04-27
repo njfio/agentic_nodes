@@ -100,6 +100,15 @@ const ImageStorage = {
     }
   },
 
+  // Synchronous version that only checks the cache
+  getImageSync(imageId) {
+    // Check if the image exists in cache
+    if (this.imageCache.has(imageId)) {
+      return this.imageCache.get(imageId);
+    }
+    return null;
+  },
+
   // Check if an image exists
   async hasImage(imageId) {
     // Check cache first
