@@ -107,6 +107,11 @@ async function handleLogin() {
   }
 
   try {
+    // First, clear any existing auth data to prevent conflicts
+    localStorage.removeItem(Config.storageKeys.authToken);
+    sessionStorage.removeItem(Config.storageKeys.authToken);
+    localStorage.removeItem(Config.storageKeys.userProfile);
+
     // Try to login with the API
     const userData = await checkCredentials(username, password);
 
@@ -114,8 +119,11 @@ async function handleLogin() {
       // Save login state
       setLoggedIn(userData, rememberMe);
 
-      // Redirect to the main app
-      redirectToApp();
+      // Add a small delay to ensure storage is updated before redirect
+      setTimeout(() => {
+        // Redirect to the main application with a cache-busting parameter
+        window.location.href = 'index.html?nocache=' + Date.now();
+      }, 100);
     } else {
       // Show error with hint about default user
       showError('Invalid username or password. Try using testuser/password123');
@@ -278,5 +286,6 @@ function isLoggedIn() {
 
 // Redirect to the main application
 function redirectToApp() {
-  window.location.href = 'index.html';
+  // Add a cache-busting parameter to prevent caching issues
+  window.location.href = `index.html?nocache=${Date.now()}`;
 }

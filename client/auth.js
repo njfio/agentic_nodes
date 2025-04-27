@@ -35,11 +35,13 @@ const Auth = {
 
   // Check if the user is logged in
   isLoggedIn() {
-    // For simplicity, just check if we have a user profile
+    // Check for both user profile and token
     const userProfile = localStorage.getItem(Config.storageKeys.userProfile);
+    const localToken = localStorage.getItem(Config.storageKeys.authToken);
+    const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
 
-    // Return true if we have user profile data
-    return userProfile !== null;
+    // Return true if we have both user profile and a token
+    return userProfile !== null && (localToken !== null || sessionToken !== null);
   },
 
   // Get the current user data
