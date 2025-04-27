@@ -927,7 +927,8 @@ class Node {
       let imageUrl;
       if (typeof input === 'string' && input.startsWith('img_')) {
         // This is an image ID, get the actual image data
-        const imageData = ImageStorage.getImage(input);
+        // Use the synchronous version to avoid Promise objects
+        const imageData = ImageStorage.getImageSync(input);
         if (!imageData) {
           throw new Error(`Image with ID ${input} not found in storage`);
         }
