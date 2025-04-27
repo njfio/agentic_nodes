@@ -2,52 +2,144 @@
 // This utility handles storing and retrieving images for OpenAI API integration
 
 const ImageStorage = {
-  // In-memory storage for images
-  images: new Map(),
+  // In-memory cache for images
+  imageCache: new Map(),
 
   // Counter for generating unique image IDs
   counter: 0,
 
   // Store an image and return a reference ID
-  storeImage(imageData) {
-    // Generate a unique ID for this image
-    const imageId = `img_${Date.now()}_${this.counter++}`;
+  async storeImage(imageData, workflowId = null, nodeId = null) {
+    try {
+      // Generate a unique ID for this image
+      const imageId = `img_${Date.now()}_${this.counter++}`;
 
-    // Store the image data
-    this.images.set(imageId, imageData);
+      // Get image dimensions if possible
+      let width = 0;
+      let height = 0;
 
-    // Log the storage
-    console.log(`Stored image with ID: ${imageId}`);
+      if (typeof window !== 'undefined' && imageData.startsWith('data:image')) {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = () => {
+            width = img.width;
+            height = img.height;
+            resolve();
+          };
+          img.onerror = reject;
+          img.src = imageData;
+        });
+      }
 
-    // Return the image ID
-    return imageId;
+      // Store in local cache first
+      this.imageCache.set(imageId, imageData);
+
+      // Try to store in the database
+      try {
+        const response = await fetch('/api/images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            imageId,
+            data: imageData,
+            contentType: this.getContentTypeFromDataURL(imageData),
+            size: imageData.length,
+            width,
+            height,
+            workflow: workflowId,
+            node: nodeId
+          })
+        });
+
+        if (!response.ok) {
+          console.warn(`Failed to store image in database: ${response.statusText}`);
+        }
+      } catch (apiError) {
+        console.warn('Failed to store image in database, using in-memory storage only:', apiError);
+      }
+
+      // Log the storage
+      console.log(`Stored image with ID: ${imageId}`);
+
+      // Return the image ID
+      return imageId;
+    } catch (error) {
+      console.error('Error storing image:', error);
+      return null;
+    }
   },
 
   // Retrieve an image by its ID
-  getImage(imageId) {
-    // Check if the image exists
-    if (!this.images.has(imageId)) {
-      console.error(`Image with ID ${imageId} not found`);
-      return null;
+  async getImage(imageId) {
+    // Check if the image exists in cache
+    if (this.imageCache.has(imageId)) {
+      return this.imageCache.get(imageId);
     }
 
-    // Return the image data
-    return this.images.get(imageId);
+    // Try to fetch from the database
+    try {
+      const response = await fetch(`/api/images/${imageId}`);
+
+      if (response.ok) {
+        const imageData = await response.json();
+
+        // Store in cache for future use
+        this.imageCache.set(imageId, imageData.data);
+
+        // Return the image data
+        return imageData.data;
+      } else {
+        console.error(`Image with ID ${imageId} not found in database`);
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error fetching image ${imageId} from database:`, error);
+      return null;
+    }
   },
 
   // Check if an image exists
-  hasImage(imageId) {
-    return this.images.has(imageId);
+  async hasImage(imageId) {
+    // Check cache first
+    if (this.imageCache.has(imageId)) {
+      return true;
+    }
+
+    // Try to fetch from the database
+    try {
+      const response = await fetch(`/api/images/${imageId}`);
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
   },
 
   // Delete an image
-  deleteImage(imageId) {
-    if (this.images.has(imageId)) {
-      this.images.delete(imageId);
-      console.log(`Deleted image with ID: ${imageId}`);
-      return true;
+  async deleteImage(imageId) {
+    // Remove from cache
+    if (this.imageCache.has(imageId)) {
+      this.imageCache.delete(imageId);
     }
-    return false;
+
+    // Try to delete from the database
+    try {
+      const response = await fetch(`/api/images/${imageId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        console.log(`Deleted image with ID: ${imageId}`);
+        return true;
+      } else {
+        console.warn(`Failed to delete image ${imageId} from database: ${response.statusText}`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Error deleting image ${imageId} from database:`, error);
+      return false;
+    }
   },
 
   // Extract base64 data from a data URL
@@ -152,6 +244,41 @@ const ImageStorage = {
     } catch (error) {
       console.error(`Error fetching image from URL: ${error.message}`);
       return null;
+    }
+  },
+
+  // Load all images for a workflow
+  async loadWorkflowImages(workflowId) {
+    if (!workflowId) return [];
+
+    try {
+      // Fetch all images for this workflow
+      const response = await fetch(`/api/images/workflow/${workflowId}`);
+
+      if (!response.ok) {
+        console.warn(`Failed to load workflow images: ${response.statusText}`);
+        return [];
+      }
+
+      const images = await response.json();
+
+      // Load each image into the cache
+      for (const imageMetadata of images) {
+        // Only fetch if not already in cache
+        if (!this.imageCache.has(imageMetadata.imageId)) {
+          const imageResponse = await fetch(`/api/images/${imageMetadata.imageId}`);
+
+          if (imageResponse.ok) {
+            const imageData = await imageResponse.json();
+            this.imageCache.set(imageMetadata.imageId, imageData.data);
+          }
+        }
+      }
+
+      return images.map(img => img.imageId);
+    } catch (error) {
+      console.error('Error loading workflow images:', error);
+      return [];
     }
   }
 };

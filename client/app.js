@@ -5114,10 +5114,22 @@ const App = {
   },
 
   // Load workflow state
-  loadWorkflowState(state) {
+  async loadWorkflowState(state) {
     // Clear the current state
     this.nodes = [];
     this.connections = [];
+
+    // Load workflow images if this is a server workflow
+    if (state._id) {
+      try {
+        DebugManager.addLog('Loading workflow images...', 'info');
+        await ImageStorage.loadWorkflowImages(state._id);
+        DebugManager.addLog('Workflow images loaded', 'success');
+      } catch (error) {
+        console.warn('Error loading workflow images:', error);
+        // Continue even if image loading fails
+      }
+    }
 
     // Recreate the nodes
     state.nodes.forEach(nodeData => {
@@ -5174,8 +5186,54 @@ const App = {
           node.contentType = 'image';
         }
 
-        // Preload the image content
-        if (node.content) {
+        // Check if this is a truncated image reference
+        if (node.content && node.content.includes('[image data truncated]')) {
+          // This is a truncated image, try to load from ImageStorage
+          DebugManager.addLog(`Loading truncated image for node ${node.id}...`, 'info');
+
+          // We'll try to load the image asynchronously
+          (async () => {
+            try {
+              // Try to find an image for this node in the workflow
+              const images = await fetch(`/api/images/workflow/${state._id}`);
+              if (images.ok) {
+                const imageList = await images.json();
+                const nodeImage = imageList.find(img => img.node === node.id);
+
+                if (nodeImage) {
+                  // Load the image data
+                  const imageResponse = await fetch(`/api/images/${nodeImage.imageId}`);
+                  if (imageResponse.ok) {
+                    const imageData = await imageResponse.json();
+
+                    // Update the node content with the actual image data
+                    node.content = imageData.data;
+
+                    // Preload the image
+                    node.contentImage = new Image();
+                    node.contentImage.src = node.content;
+
+                    // Add load event listener to redraw when image loads
+                    node.contentImage.onload = () => {
+                      // When image loads, update node size if auto-sizing is enabled
+                      if (node.autoSize) {
+                        node.calculateOptimalSize();
+                      }
+                      // Force a redraw to show the image
+                      App.draw();
+                    };
+
+                    DebugManager.addLog(`Image loaded for node ${node.id}`, 'success');
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn(`Error loading image for node ${node.id}:`, error);
+            }
+          })();
+        }
+        // Regular image content
+        else if (node.content) {
           // Force recreate the image object to ensure it loads properly
           node.contentImage = new Image();
           node.contentImage.src = node.content;
@@ -5211,7 +5269,7 @@ const App = {
     // Redraw the canvas
     this.draw();
 
-    // Force another redraw after a short delay to ensure images are properly loaded
+    // Force another redraw after a longer delay to ensure images are properly loaded
     setTimeout(() => {
       // Preload content for all nodes again
       this.nodes.forEach(node => node.preloadContent());
@@ -5222,7 +5280,7 @@ const App = {
         WorkflowIO.updateStatus();
         DebugManager.addLog('Updated workflow I/O status', 'info');
       }
-    }, 500);
+    }, 1000); // Increased timeout to allow for image loading
 
     DebugManager.updateCanvasStats();
   },

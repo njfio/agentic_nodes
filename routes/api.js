@@ -6,6 +6,7 @@ const axios = require('axios');
 const workflowController = require('../controllers/workflowController');
 const nodeController = require('../controllers/nodeController');
 const userController = require('../controllers/userController');
+const imageController = require('../controllers/imageController');
 
 // Import utilities
 const dataMigration = require('../utils/data-migration');
@@ -138,5 +139,11 @@ router.post('/users/logoutAll', auth, userController.logoutAll);
 router.get('/users/verify-email', userController.verifyEmail);
 router.post('/users/request-password-reset', userController.requestPasswordReset);
 router.post('/users/reset-password', userController.resetPassword);
+
+// Image routes
+router.get('/images/:id', imageController.getImageById);
+router.post('/images', optionalAuth, imageController.saveImage);
+router.get('/images/workflow/:workflowId', imageController.getWorkflowImages);
+router.delete('/images/:id', optionalAuth, imageController.deleteImage);
 
 module.exports = router;
