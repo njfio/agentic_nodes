@@ -3310,6 +3310,11 @@ const App = {
   },
 
   handleMouseDown(e) {
+    // Check if we're interacting with the minimap
+    if (window.miniMapInteraction) {
+      return;
+    }
+
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -3358,6 +3363,11 @@ const App = {
   },
 
   handleMouseMove(e) {
+    // Check if we're interacting with the minimap
+    if (window.miniMapInteraction) {
+      return;
+    }
+
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;

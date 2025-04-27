@@ -102,6 +102,10 @@ const MiniMap = {
     this.canvas.addEventListener('mousedown', (e) => {
       if (this.isCollapsed) return;
 
+      // Set a flag to indicate that we're interacting with the minimap
+      // This will prevent the event from being handled by the main canvas
+      window.miniMapInteraction = true;
+
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -118,10 +122,14 @@ const MiniMap = {
 
       this.isDragging = true;
       e.preventDefault();
+      e.stopPropagation();
     });
 
     this.canvas.addEventListener('mousemove', (e) => {
       if (!this.isDragging || this.isCollapsed) return;
+
+      // Keep the minimap interaction flag set
+      window.miniMapInteraction = true;
 
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -136,10 +144,19 @@ const MiniMap = {
 
       // Update the mini-map
       this.draw();
+
+      e.preventDefault();
+      e.stopPropagation();
     });
 
     document.addEventListener('mouseup', () => {
       this.isDragging = false;
+
+      // Reset the minimap interaction flag after a short delay
+      // This allows the main canvas to recognize that the interaction has ended
+      setTimeout(() => {
+        window.miniMapInteraction = false;
+      }, 50);
     });
 
     // Resize the mini-map when the window is resized
