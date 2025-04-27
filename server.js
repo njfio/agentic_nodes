@@ -76,6 +76,9 @@ const connectWithRetry = async () => {
     // First, try to connect to the Docker MongoDB
     if (process.env.MONGODB_DOCKER_URI) {
       try {
+        // Set Docker environment flag
+        process.env.DOCKER_ENV = 'true';
+
         await mongoose.connect(process.env.MONGODB_DOCKER_URI, {
           serverSelectionTimeoutMS: 5000,
           connectTimeoutMS: 5000

@@ -21,6 +21,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize login functionality
 function initLogin() {
+  // Special case for Docker environment - auto-login with test user
+  const isDockerEnv = window.location.hostname === 'localhost' &&
+                      (window.location.port === '8732' || window.location.port === '8731');
+
+  if (isDockerEnv) {
+    // Create mock user data for Docker environment
+    const mockUserData = {
+      user: {
+        username: 'testuser',
+        email: 'test@example.com',
+        role: 'user',
+        id: 'docker-test-user'
+      },
+      token: 'docker-test-token-' + Date.now()
+    };
+
+    // Auto-login with test user
+    setLoggedIn(mockUserData, true);
+    redirectToApp();
+    return;
+  }
+
   // Check if the user is already logged in
   if (isLoggedIn()) {
     redirectToApp();

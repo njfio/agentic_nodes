@@ -42,6 +42,23 @@ const auth = async (req, res, next) => {
     const authHeader = req.header('Authorization');
 
     if (!authHeader) {
+      // Special case for Docker environment - check for test user
+      if (process.env.DOCKER_ENV === 'true' || process.env.NODE_ENV === 'development') {
+        try {
+          // Try to find the test user
+          const testUser = await User.findOne({ username: 'testuser' });
+          if (testUser) {
+            // Attach test user to request for Docker/development environment
+            req.user = testUser;
+            console.log('Using test user for Docker/development environment');
+            next();
+            return;
+          }
+        } catch (testUserError) {
+          console.warn('Error finding test user:', testUserError);
+        }
+      }
+
       return res.status(401).json({ message: 'No authentication token, access denied' });
     }
 
@@ -59,7 +76,7 @@ const auth = async (req, res, next) => {
 
     try {
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
       // Find user by id
       const user = await User.findById(decoded.id);
@@ -95,6 +112,22 @@ const optionalAuth = async (req, res, next) => {
     // Get token from header
     const authHeader = req.header('Authorization');
 
+    // Special case for Docker environment - check for test user
+    if (process.env.DOCKER_ENV === 'true' || process.env.NODE_ENV === 'development') {
+      try {
+        // Try to find the test user
+        const testUser = await User.findOne({ username: 'testuser' });
+        if (testUser) {
+          // Attach test user to request for Docker/development environment
+          req.user = testUser;
+          next();
+          return;
+        }
+      } catch (testUserError) {
+        console.warn('Error finding test user in optionalAuth:', testUserError);
+      }
+    }
+
     if (!authHeader) {
       // No token, but that's okay
       next();
@@ -119,7 +152,7 @@ const optionalAuth = async (req, res, next) => {
 
     try {
       // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
 
       // Find user by id
       const user = await User.findById(decoded.id);

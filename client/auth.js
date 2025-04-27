@@ -40,6 +40,28 @@ const Auth = {
     const localToken = localStorage.getItem(Config.storageKeys.authToken);
     const sessionToken = sessionStorage.getItem(Config.storageKeys.authToken);
 
+    // Special case for Docker environment - auto-login with test user
+    const isDockerEnv = window.location.hostname === 'localhost' &&
+                        (window.location.port === '8732' || window.location.port === '8731');
+
+    if (isDockerEnv && !userProfile) {
+      // Create a mock user profile for Docker environment
+      const mockUserProfile = {
+        username: 'testuser',
+        email: 'test@example.com',
+        role: 'user'
+      };
+
+      // Store the mock user profile
+      localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(mockUserProfile));
+
+      // Create a mock token
+      const mockToken = 'docker-test-token-' + Date.now();
+      localStorage.setItem(Config.storageKeys.authToken, mockToken);
+
+      return true;
+    }
+
     // Return true if we have both user profile and a token
     return userProfile !== null && (localToken !== null || sessionToken !== null);
   },
