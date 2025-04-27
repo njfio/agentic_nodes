@@ -5,6 +5,7 @@
 
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 let mongoServer;
 
@@ -28,7 +29,54 @@ async function startMemoryServer() {
 
     console.log(`MongoDB Memory Server running at ${mongoUri}`);
 
-    // We'll create the default user after connecting to the database in server.js
+    // Connect to the in-memory MongoDB
+    const conn = await mongoose.createConnection(mongoUri);
+
+    // Get the database
+    const db = conn.db;
+
+    // Create collections
+    try {
+      await db.createCollection('users');
+      await db.createCollection('workflows');
+      await db.createCollection('nodes');
+      await db.createCollection('images');
+      await db.createCollection('logs');
+      console.log('Collections created in memory MongoDB');
+    } catch (collErr) {
+      console.log('Error creating collections (may already exist):', collErr.message);
+    }
+
+    // Create a default user directly in the database
+    try {
+      // Hash the password manually
+      const hashedPassword = await bcrypt.hash('password123', 10);
+
+      // Check if user already exists
+      const existingUser = await db.collection('users').findOne({ username: 'testuser' });
+
+      if (!existingUser) {
+        // Create the user
+        await db.collection('users').insertOne({
+          username: 'testuser',
+          password: hashedPassword,
+          email: 'test@example.com',
+          isVerified: true,
+          role: 'user',
+          tokens: [],
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        console.log('Created test user in memory MongoDB');
+      } else {
+        console.log('Test user already exists in memory MongoDB');
+      }
+    } catch (userError) {
+      console.log('User creation error:', userError.message);
+    }
+
+    // Close the connection
+    await conn.close();
 
     // Set the MongoDB URI in the environment
     process.env.MONGODB_URI = mongoUri;
