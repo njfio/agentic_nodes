@@ -46,11 +46,19 @@ router.post('/openai/chat', async (req, res) => {
       });
     }
 
+    // Configure axios with improved SSL settings
+    const httpsAgent = new (require('https').Agent)({
+      rejectUnauthorized: true,
+      secureProtocol: 'TLSv1_2_method'
+    });
+
     const response = await axios.post('https://api.openai.com/v1/chat/completions', req.body, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
-      }
+      },
+      httpsAgent,
+      timeout: 60000 // 60 seconds timeout
     });
     res.json(response.data);
   } catch (error) {
@@ -61,6 +69,19 @@ router.post('/openai/chat', async (req, res) => {
       return res.status(401).json({
         error: {
           message: 'Invalid OpenAI API key. Please update your API key in the OpenAI Configuration modal.'
+        }
+      });
+    }
+
+    // Handle SSL errors
+    if (error.message && (
+        error.message.includes('SSL') ||
+        error.message.includes('ssl') ||
+        error.message.includes('alert bad record mac') ||
+        error.message.includes('ECONNRESET'))) {
+      return res.status(500).json({
+        error: {
+          message: 'SSL connection error with OpenAI API. Please try again or check your network connection.'
         }
       });
     }
@@ -87,11 +108,20 @@ router.post('/openai/images', async (req, res) => {
       });
     }
 
+    // Configure axios with improved SSL settings
+    const httpsAgent = new (require('https').Agent)({
+      rejectUnauthorized: true,
+      secureProtocol: 'TLSv1_2_method'
+    });
+
+    // Use a longer timeout for image generation
     const response = await axios.post('https://api.openai.com/v1/images/generations', req.body, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
-      }
+      },
+      httpsAgent,
+      timeout: 120_000 // 120 seconds timeout for image generation
     });
     res.json(response.data);
   } catch (error) {
@@ -102,6 +132,19 @@ router.post('/openai/images', async (req, res) => {
       return res.status(401).json({
         error: {
           message: 'Invalid OpenAI API key. Please update your API key in the OpenAI Configuration modal.'
+        }
+      });
+    }
+
+    // Handle SSL errors
+    if (error.message && (
+        error.message.includes('SSL') ||
+        error.message.includes('ssl') ||
+        error.message.includes('alert bad record mac') ||
+        error.message.includes('ECONNRESET'))) {
+      return res.status(500).json({
+        error: {
+          message: 'SSL connection error with OpenAI API. Please try again or check your network connection.'
         }
       });
     }

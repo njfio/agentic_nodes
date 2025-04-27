@@ -3791,8 +3791,15 @@ const App = {
     const requestTimestamp = document.getElementById('requestTimestamp');
 
     if (node.lastRequestPayload) {
-      requestPayload.textContent = JSON.stringify(node.lastRequestPayload, null, 2);
-      requestTimestamp.textContent = node.lastRequestTime || '-';
+      try {
+        // Process the request payload to handle large image data
+        const processedRequestPayload = this.processPayloadForDisplay(node.lastRequestPayload);
+        requestPayload.textContent = JSON.stringify(processedRequestPayload, null, 2);
+        requestTimestamp.textContent = node.lastRequestTime || '-';
+      } catch (error) {
+        requestPayload.textContent = 'Error formatting request payload: ' + error.message;
+        DebugManager.addLog(`Error formatting request payload: ${error.message}`, 'error');
+      }
     } else {
       requestPayload.textContent = 'No request payload available';
       requestTimestamp.textContent = '-';
@@ -3803,8 +3810,15 @@ const App = {
     const responseTimestamp = document.getElementById('responseTimestamp');
 
     if (node.lastResponsePayload) {
-      responsePayload.textContent = JSON.stringify(node.lastResponsePayload, null, 2);
-      responseTimestamp.textContent = node.lastResponseTime || '-';
+      try {
+        // Process the response payload to handle large image data
+        const processedResponsePayload = this.processPayloadForDisplay(node.lastResponsePayload);
+        responsePayload.textContent = JSON.stringify(processedResponsePayload, null, 2);
+        responseTimestamp.textContent = node.lastResponseTime || '-';
+      } catch (error) {
+        responsePayload.textContent = 'Error formatting response payload: ' + error.message;
+        DebugManager.addLog(`Error formatting response payload: ${error.message}`, 'error');
+      }
     } else {
       responsePayload.textContent = 'No response payload available';
       responseTimestamp.textContent = '-';
@@ -3853,6 +3867,63 @@ const App = {
     // Open the modal
     ModalManager.openModal('payloadViewerModal');
     DebugManager.addLog(`Viewing API payloads for node ${node.id}`, 'info');
+  },
+
+  // Process payload for display, truncating large data like images
+  processPayloadForDisplay(payload) {
+    if (!payload) return null;
+
+    // Create a deep copy to avoid modifying the original
+    const processedPayload = JSON.parse(JSON.stringify(payload));
+
+    // Helper function to process nested objects
+    const processObject = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+
+      // Process each property
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const value = obj[key];
+
+          // Handle arrays
+          if (Array.isArray(value)) {
+            for (let i = 0; i < value.length; i++) {
+              if (typeof value[i] === 'object') {
+                processObject(value[i]);
+              } else if (typeof value[i] === 'string') {
+                // Truncate long strings that might be base64 images
+                if (value[i].length > 1000 &&
+                    (value[i].startsWith('data:image') ||
+                     value[i].startsWith('http') ||
+                     key === 'url' ||
+                     key === 'image_url')) {
+                  value[i] = `[${value[i].substring(0, 30)}... (${value[i].length} chars)]`;
+                }
+              }
+            }
+          }
+          // Handle nested objects
+          else if (typeof value === 'object' && value !== null) {
+            processObject(value);
+          }
+          // Handle strings
+          else if (typeof value === 'string') {
+            // Truncate long strings that might be base64 images
+            if (value.length > 1000 &&
+                (value.startsWith('data:image') ||
+                 value.startsWith('http') ||
+                 key === 'url' ||
+                 key === 'image_url')) {
+              obj[key] = `[${value.substring(0, 30)}... (${value.length} chars)]`;
+            }
+          }
+        }
+      }
+    };
+
+    // Process the payload
+    processObject(processedPayload);
+    return processedPayload;
   },
 
   // Open the node editor modal

@@ -111,6 +111,13 @@ body, html {
   overflow-y: auto;
 }
 
+/* Special styling for the payload viewer modal */
+#payloadViewerModal .modal-content {
+  max-width: 90%;
+  width: 90%;
+  max-height: 90vh;
+}
+
 /* Form styles */
 .form-group {
   margin-bottom: 15px;
@@ -392,8 +399,10 @@ body, html {
   font-size: 12px;
   white-space: pre-wrap;
   overflow-x: auto;
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .payload-info {
