@@ -1597,12 +1597,15 @@ class Node {
     for (const input of inputs) {
       if (typeof input === 'string' && input.startsWith('img_')) {
         // This is an image ID from our storage
-        const imageData = ImageStorage.getImage(input);
+        // Use the synchronous version to avoid Promise objects
+        const imageData = ImageStorage.getImageSync(input);
         if (imageData) {
           imageInputs.push(input);
 
           // Add a placeholder for the image in the combined input content
           combinedInputContent.push(`[Image ${imageInputs.length}]`);
+        } else {
+          DebugManager.addLog(`Warning: Image ${input} not found in cache for input display, skipping`, 'warning');
         }
       } else if (Utils.isImageData(input)) {
         // This is raw image data, store it and get an ID
@@ -1679,12 +1682,15 @@ class Node {
     for (const input of inputs) {
       if (typeof input === 'string' && input.startsWith('img_')) {
         // This is an image ID from our storage
-        const imageData = ImageStorage.getImage(input);
+        // Use the synchronous version to avoid Promise objects
+        const imageData = ImageStorage.getImageSync(input);
         if (imageData) {
           imageInputs.push(input);
 
           // Add a placeholder for the image in the combined input content
           combinedInputContent.push(`[Image ${imageInputs.length}]`);
+        } else {
+          DebugManager.addLog(`Warning: Image ${input} not found in cache for combining inputs, skipping`, 'warning');
         }
       } else if (Utils.isImageData(input)) {
         // This is raw image data, store it and get an ID
@@ -1994,6 +2000,12 @@ class Node {
 
   // Get text lines for a given string and max width
   getTextLines(ctx, text, maxWidth) {
+    // Check if text is a string before trying to split it
+    if (typeof text !== 'string') {
+      // Return a single line with a placeholder for non-string content
+      return ['[Non-text content]'];
+    }
+
     const words = text.split(' ');
     const lines = [];
     let currentLine = '';
