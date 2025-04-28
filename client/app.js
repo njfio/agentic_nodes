@@ -4724,6 +4724,18 @@ const App = {
 
   // Handle keyboard events
   handleKeyDown(e) {
+    // Don't handle shortcuts if an input element is focused
+    if (
+      e.target.tagName === 'INPUT' ||
+      e.target.tagName === 'TEXTAREA' ||
+      e.target.isContentEditable ||
+      // Also check if we're in a modal
+      this.editingNode !== null ||
+      ModalManager.currentModal !== null
+    ) {
+      return;
+    }
+
     // Delete key
     if (e.key === 'Delete' || e.key === 'Backspace') {
       // Find selected node
@@ -5500,11 +5512,17 @@ const App = {
 
   // Send a chat message from the node editor and process it
   async sendChatMessageFromEditor() {
-    if (!this.editingNode) return null;
+    if (!this.editingNode) {
+      DebugManager.addLog('No node being edited', 'error');
+      return null;
+    }
 
     // Get the chat input
     const chatInput = document.getElementById('chatInput');
-    if (!chatInput || !chatInput.value.trim()) return null;
+    if (!chatInput || !chatInput.value.trim()) {
+      DebugManager.addLog('No chat message to send', 'error');
+      return null;
+    }
 
     // Get the message
     const message = chatInput.value.trim();
@@ -5533,7 +5551,18 @@ const App = {
 
     // Process the message
     try {
+      // Set processing state
+      this.editingNode.processing = true;
+      this.editingNode.error = null;
+
+      // Process the message
       const result = await this.editingNode.processChatMessage(message);
+
+      // Update the node with the result
+      this.editingNode.processing = false;
+
+      // Add the assistant message to the chat history
+      this.editingNode.addChatMessage(result, 'assistant');
 
       // Show the chat message in the processing log
       if (processingLog) {
@@ -5547,8 +5576,15 @@ const App = {
       // Log success for debugging
       DebugManager.addLog(`Chat message processed for node ${this.editingNode.id}`, 'success');
 
+      // Redraw the canvas to update the node display
+      this.draw();
+
       return result;
     } catch (error) {
+      // Update the node state
+      this.editingNode.processing = false;
+      this.editingNode.error = error.message;
+
       // Show the error in the processing log
       if (processingLog) {
         processingLog.innerHTML += `
@@ -5560,6 +5596,9 @@ const App = {
 
       // Log error for debugging
       DebugManager.addLog(`Error processing chat message: ${error.message}`, 'error');
+
+      // Redraw the canvas to update the node display
+      this.draw();
 
       throw error;
     }
@@ -5573,11 +5612,20 @@ const App = {
       e.stopPropagation();
     }
 
-    // Store the current nodes and connections
-    const currentNodes = [...this.nodes];
-    const currentConnections = [...this.connections];
+    // Check if we have a valid editing node
+    if (!this.editingNode) {
+      DebugManager.addLog('No node being edited', 'error');
+      return;
+    }
 
-    if (!this.editingNode) return;
+    // Make sure the editing node still exists in the nodes array
+    const nodeIndex = this.nodes.findIndex(node => node.id === this.editingNode.id);
+    if (nodeIndex === -1) {
+      DebugManager.addLog(`Node ${this.editingNode.id} no longer exists in the canvas`, 'error');
+      this.editingNode = null;
+      ModalManager.closeModal('nodeEditor');
+      return;
+    }
 
     // Get values from the form
     this.editingNode.title = document.getElementById('nodeTitle').value;
