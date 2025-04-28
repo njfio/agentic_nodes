@@ -3668,13 +3668,55 @@ const App = {
 
     window.addEventListener('keydown', (e) => this.handleKeyDown(e));
 
-    document.getElementById('addNodeBtn').addEventListener('click', () => this.addNode());
-    document.getElementById('addChatNodeBtn').addEventListener('click', () => this.addChatNode());
-    document.getElementById('configBtn').addEventListener('click', () => ModalManager.openModal('configModal'));
-    document.getElementById('saveWorkflowBtn').addEventListener('click', () => this.handleSaveWorkflow());
-    document.getElementById('saveBtn').addEventListener('click', () => this.handleSave());
-    document.getElementById('loadBtn').addEventListener('click', () => this.handleLoad());
-    document.getElementById('helpBtn').addEventListener('click', () => ModalManager.openModal('helpModal'));
+    // Remove any existing event listeners by cloning and replacing the buttons
+    const addNodeBtn = document.getElementById('addNodeBtn');
+    if (addNodeBtn) {
+      const newAddNodeBtn = addNodeBtn.cloneNode(true);
+      addNodeBtn.parentNode.replaceChild(newAddNodeBtn, addNodeBtn);
+      newAddNodeBtn.addEventListener('click', () => this.addNode());
+    }
+
+    const addChatNodeBtn = document.getElementById('addChatNodeBtn');
+    if (addChatNodeBtn) {
+      const newAddChatNodeBtn = addChatNodeBtn.cloneNode(true);
+      addChatNodeBtn.parentNode.replaceChild(newAddChatNodeBtn, addChatNodeBtn);
+      newAddChatNodeBtn.addEventListener('click', () => this.addChatNode());
+    }
+
+    const configBtn = document.getElementById('configBtn');
+    if (configBtn) {
+      const newConfigBtn = configBtn.cloneNode(true);
+      configBtn.parentNode.replaceChild(newConfigBtn, configBtn);
+      newConfigBtn.addEventListener('click', () => ModalManager.openModal('configModal'));
+    }
+
+    const saveWorkflowBtn = document.getElementById('saveWorkflowBtn');
+    if (saveWorkflowBtn) {
+      const newSaveWorkflowBtn = saveWorkflowBtn.cloneNode(true);
+      saveWorkflowBtn.parentNode.replaceChild(newSaveWorkflowBtn, saveWorkflowBtn);
+      newSaveWorkflowBtn.addEventListener('click', () => this.handleSaveWorkflow());
+    }
+
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+      const newSaveBtn = saveBtn.cloneNode(true);
+      saveBtn.parentNode.replaceChild(newSaveBtn, saveBtn);
+      newSaveBtn.addEventListener('click', () => this.handleSave());
+    }
+
+    const loadBtn = document.getElementById('loadBtn');
+    if (loadBtn) {
+      const newLoadBtn = loadBtn.cloneNode(true);
+      loadBtn.parentNode.replaceChild(newLoadBtn, loadBtn);
+      newLoadBtn.addEventListener('click', () => this.handleLoad());
+    }
+
+    const helpBtn = document.getElementById('helpBtn');
+    if (helpBtn) {
+      const newHelpBtn = helpBtn.cloneNode(true);
+      helpBtn.parentNode.replaceChild(newHelpBtn, helpBtn);
+      newHelpBtn.addEventListener('click', () => ModalManager.openModal('helpModal'));
+    }
   },
 
   initModalHandlers() {
