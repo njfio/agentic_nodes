@@ -6883,35 +6883,51 @@ const App = {
 
   // Add a chat node to the canvas
   addChatNode() {
-    const id = this.nodes.length + 1;
-    const x = window.innerWidth/2 - 80;
-    const y = window.innerHeight/2 - 40;
-    const node = new Node(x, y, id);
+    // Check if we're already in the process of adding a chat node
+    if (this._addingChatNode) {
+      DebugManager.addLog('Already adding a chat node, please wait...', 'warning');
+      return;
+    }
 
-    // Configure as a chat node
-    node.title = "Chat Node " + id;
-    node.contentType = 'chat';
-    node.aiProcessor = 'chat';
-    node.inputType = 'text';
-    node.outputType = 'text';
-    node.systemPrompt = "You are a helpful assistant. Respond to the user's messages in a friendly and informative way.";
-    node.width = 300; // Make chat nodes wider by default
-    node.height = 200; // Make chat nodes taller by default
+    // Set flag to prevent multiple calls
+    this._addingChatNode = true;
 
-    // Initialize chat history array
-    node.chatHistory = [];
+    try {
+      const id = this.nodes.length + 1;
+      const x = window.innerWidth/2 - 80;
+      const y = window.innerHeight/2 - 40;
+      const node = new Node(x, y, id);
 
-    // Select the new node
-    this.nodes.forEach(n => n.selected = false);
-    node.selected = true;
+      // Configure as a chat node
+      node.title = "Chat Node " + id;
+      node.contentType = 'chat';
+      node.aiProcessor = 'chat';
+      node.inputType = 'text';
+      node.outputType = 'text';
+      node.systemPrompt = "You are a helpful assistant. Respond to the user's messages in a friendly and informative way.";
+      node.width = 300; // Make chat nodes wider by default
+      node.height = 200; // Make chat nodes taller by default
 
-    this.nodes.push(node);
-    DebugManager.addLog(`Added new chat node "Chat Node ${id}" (ID: ${id})`, 'info');
-    DebugManager.updateCanvasStats();
-    this.draw();
+      // Initialize chat history array
+      node.chatHistory = [];
 
-    // Open the node editor for the new chat node
-    this.openNodeEditor(node);
+      // Select the new node
+      this.nodes.forEach(n => n.selected = false);
+      node.selected = true;
+
+      this.nodes.push(node);
+      DebugManager.addLog(`Added new chat node "Chat Node ${id}" (ID: ${id})`, 'info');
+      DebugManager.updateCanvasStats();
+      this.draw();
+
+      // Open the node editor for the new chat node
+      this.openNodeEditor(node);
+    } finally {
+      // Clear the flag after a short delay to prevent accidental double-clicks
+      setTimeout(() => {
+        this._addingChatNode = false;
+      }, 500);
+    }
   },
 
   // Send a chat message directly from a node in the canvas

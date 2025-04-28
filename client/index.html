@@ -21,6 +21,7 @@
 <body>
   <div id="toolbar">
     <button id="addNodeBtn" type="button">Add Node</button>
+    <button id="addChatNodeBtn" type="button">Add Chat Node</button>
     <button id="testWorkflowBtn" type="button">Test Workflow</button>
     <button id="configBtn" type="button">OpenAI Config</button>
 
@@ -64,6 +65,7 @@
           <option value="image">Image</option>
           <option value="audio">Audio</option>
           <option value="video">Video</option>
+          <option value="chat">Chat</option>
         </select>
       </div>
       <div class="form-group">
@@ -153,6 +155,25 @@
           <div class="video-info">
             <span>Duration: <span id="videoDuration">0s</span></span>
             <span>Format: <span id="videoFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="chatContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Chat History:</label>
+          <div id="chatHistory" class="chat-history"></div>
+        </div>
+        <div class="form-group">
+          <label for="chatInput">Message:</label>
+          <div class="chat-input-container">
+            <textarea id="chatInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); App.sendChatMessageFromEditor(); return false;}"></textarea>
+            <button id="sendChatBtn" class="primary-btn" type="button" onclick="App.sendChatMessageFromEditor()">Send</button>
+          </div>
+        </div>
+        <div class="debug-info">
+          <div class="chat-info">
+            <span>Messages: <span id="messageCount">0</span></span>
           </div>
         </div>
       </div>
@@ -314,11 +335,18 @@
         <h3>Keyboard Shortcuts</h3>
         <ul>
           <li><kbd>N</kbd> - Add new node</li>
+          <li><kbd>C</kbd> - Add chat node</li>
+          <li><kbd>X</kbd> - Copy selected node</li>
+          <li><kbd>V</kbd> - Paste node</li>
+          <li><kbd>E</kbd> - Edit selected node</li>
           <li><kbd>Delete</kbd> - Delete selected node</li>
           <li><kbd>Esc</kbd> - Cancel connection/Close modal</li>
           <li><kbd>Ctrl/Cmd + S</kbd> - Save canvas</li>
           <li><kbd>Ctrl/Cmd + O</kbd> - Load canvas</li>
+          <li><kbd>+/-</kbd> - Zoom in/out</li>
+          <li><kbd>0</kbd> - Reset zoom</li>
           <li><kbd>H</kbd> - Show/hide this help</li>
+          <li><kbd>Arrow keys</kbd> - Move selected node</li>
         </ul>
       </div>
       <div class="help-section">
