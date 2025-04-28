@@ -94,6 +94,28 @@ const MiniMap = {
       });
     }
 
+    // Add Fit All Nodes button if it doesn't exist
+    let fitAllNodesBtn = document.getElementById('fitAllNodesBtn');
+    if (!fitAllNodesBtn) {
+      const miniMapControls = document.querySelector('.mini-map-controls');
+      if (miniMapControls) {
+        fitAllNodesBtn = document.createElement('button');
+        fitAllNodesBtn.id = 'fitAllNodesBtn';
+        fitAllNodesBtn.className = 'mini-map-btn';
+        fitAllNodesBtn.title = 'Fit All Nodes';
+        fitAllNodesBtn.textContent = '⊡';
+        miniMapControls.appendChild(fitAllNodesBtn);
+      }
+    }
+
+    // Set up Fit All Nodes button
+    if (fitAllNodesBtn) {
+      fitAllNodesBtn.addEventListener('click', () => {
+        this.fitAllNodes();
+        DebugManager.addLog('Adjusted view to fit all nodes on screen', 'info');
+      });
+    }
+
     // Auto arrange button
     const autoArrangeBtn = document.getElementById('autoArrangeBtn');
     if (autoArrangeBtn) {
@@ -421,17 +443,32 @@ const MiniMap = {
     if (!App.nodes || App.nodes.length === 0) return;
 
     // Constants for the force-directed layout
-    const REPULSION = 10000; // Repulsion force between nodes
-    const ATTRACTION = 0.05; // Attraction force for connections
-    const DAMPING = 0.9;     // Damping factor to prevent oscillation
-    const ITERATIONS = 50;   // Number of iterations for the simulation
-    const MIN_DISTANCE = 200; // Minimum distance between nodes
+    const REPULSION = 25000;  // Significantly increased repulsion force between nodes
+    const ATTRACTION = 0.02;  // Reduced attraction force for connections
+    const DAMPING = 0.8;      // Adjusted damping factor to prevent oscillation
+    const ITERATIONS = 150;   // Increased iterations for better convergence
+    const MIN_NODE_DISTANCE = 350; // Minimum distance between node centers
+    const PADDING = 100;      // Additional padding around nodes
 
     // Initialize velocities
     const velocities = {};
     App.nodes.forEach(node => {
       velocities[node.id] = { x: 0, y: 0 };
     });
+
+    // If nodes are all at the same position, distribute them randomly first
+    const allSamePosition = App.nodes.every(node =>
+      node.x === App.nodes[0].x && node.y === App.nodes[0].y
+    );
+
+    if (allSamePosition) {
+      const radius = Math.sqrt(App.nodes.length) * 200;
+      App.nodes.forEach((node, i) => {
+        const angle = (i / App.nodes.length) * 2 * Math.PI;
+        node.x = Math.cos(angle) * radius;
+        node.y = Math.sin(angle) * radius;
+      });
+    }
 
     // Run the simulation for a fixed number of iterations
     for (let iter = 0; iter < ITERATIONS; iter++) {
@@ -447,12 +484,56 @@ const MiniMap = {
             const dy = node1.y - node2.y;
             const distance = Math.sqrt(dx * dx + dy * dy) || 1; // Avoid division by zero
 
-            // Apply repulsion force (inverse square law)
-            if (distance < MIN_DISTANCE) {
-              const force = REPULSION / (distance * distance);
-              forceX += (dx / distance) * force;
-              forceY += (dy / distance) * force;
+            // Calculate node bounding boxes with padding
+            const node1Right = node1.x + node1.width + PADDING;
+            const node1Bottom = node1.y + node1.height + PADDING;
+            const node2Right = node2.x + node2.width + PADDING;
+            const node2Bottom = node2.y + node2.height + PADDING;
+
+            // Check for overlap
+            const overlap = !(
+              node1Right < node2.x ||
+              node1.x > node2Right ||
+              node1Bottom < node2.y ||
+              node1.y > node2Bottom
+            );
+
+            // Apply stronger repulsion force if nodes overlap
+            if (overlap) {
+              // Calculate overlap amount
+              const overlapX = Math.min(node1Right - node2.x, node2Right - node1.x);
+              const overlapY = Math.min(node1Bottom - node2.y, node2Bottom - node1.y);
+
+              // Apply strong directional force to resolve overlap
+              if (overlapX < overlapY) {
+                // Resolve horizontal overlap
+                if (node1.x < node2.x) {
+                  forceX -= overlapX * 3;
+                } else {
+                  forceX += overlapX * 3;
+                }
+              } else {
+                // Resolve vertical overlap
+                if (node1.y < node2.y) {
+                  forceY -= overlapY * 3;
+                } else {
+                  forceY += overlapY * 3;
+                }
+              }
             }
+
+            // Apply standard repulsion force (inverse square law)
+            // Use a stronger repulsion for nodes that are too close
+            const desiredDistance = MIN_NODE_DISTANCE + (node1.width + node2.width + node1.height + node2.height) / 4;
+            let force = REPULSION / (distance * distance);
+
+            // Increase force if nodes are closer than desired distance
+            if (distance < desiredDistance) {
+              force *= (desiredDistance / distance);
+            }
+
+            forceX += (dx / distance) * force;
+            forceY += (dy / distance) * force;
           }
         });
 
@@ -489,13 +570,149 @@ const MiniMap = {
         node.x += velocities[node.id].x;
         node.y += velocities[node.id].y;
       });
+
+      // Check for node overlaps after each iteration
+      if (iter % 10 === 0) { // Only resolve overlaps every 10 iterations for performance
+        this.resolveNodeOverlaps();
+      }
     }
+
+    // Final overlap resolution pass
+    this.resolveNodeOverlaps();
 
     // Center the layout in the viewport
     this.centerLayout();
 
+    // Fit all nodes in the viewport
+    this.fitAllNodes();
+
     // Redraw the canvas
     App.draw();
+
+    DebugManager.addLog('Auto-arranged nodes with improved spacing and layout', 'info');
+  },
+
+  // Resolve any remaining node overlaps
+  resolveNodeOverlaps() {
+    const PADDING = 80; // Increased minimum space between nodes
+    const MAX_PASSES = 10; // Maximum number of passes to prevent infinite loops
+    let overlapsResolved = false;
+    let passCount = 0;
+
+    // Repeat until no more overlaps are found or max passes reached
+    while (!overlapsResolved && passCount < MAX_PASSES) {
+      overlapsResolved = true;
+      passCount++;
+
+      // Check each pair of nodes for overlap
+      for (let i = 0; i < App.nodes.length; i++) {
+        const node1 = App.nodes[i];
+
+        for (let j = i + 1; j < App.nodes.length; j++) {
+          const node2 = App.nodes[j];
+
+          // Calculate node bounding boxes with padding
+          const node1Right = node1.x + node1.width + PADDING;
+          const node1Bottom = node1.y + node1.height + PADDING;
+          const node2Right = node2.x + node2.width + PADDING;
+          const node2Bottom = node2.y + node2.height + PADDING;
+
+          // Check for overlap
+          const overlap = !(
+            node1Right < node2.x ||
+            node1.x > node2Right ||
+            node1Bottom < node2.y ||
+            node1.y > node2Bottom
+          );
+
+          if (overlap) {
+            overlapsResolved = false;
+
+            // Calculate overlap amount
+            const overlapX = Math.min(node1Right - node2.x, node2Right - node1.x);
+            const overlapY = Math.min(node1Bottom - node2.y, node2Bottom - node1.y);
+
+            // Calculate the center points of each node
+            const node1CenterX = node1.x + node1.width / 2;
+            const node1CenterY = node1.y + node1.height / 2;
+            const node2CenterX = node2.x + node2.width / 2;
+            const node2CenterY = node2.y + node2.height / 2;
+
+            // Calculate the direction vector between centers
+            const dirX = node2CenterX - node1CenterX;
+            const dirY = node2CenterY - node1CenterY;
+
+            // Calculate the distance between centers
+            const distance = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+
+            // Normalize the direction vector
+            const normDirX = dirX / distance;
+            const normDirY = dirY / distance;
+
+            // Calculate the desired distance between centers
+            const desiredDistance = (node1.width + node2.width) / 2 +
+                                   (node1.height + node2.height) / 2 +
+                                   PADDING;
+
+            // Calculate the amount to move each node
+            const moveDistance = (desiredDistance - distance) / 2 + 10; // Add extra to ensure separation
+
+            // Move nodes apart along the direction vector
+            node1.x -= normDirX * moveDistance;
+            node1.y -= normDirY * moveDistance;
+            node2.x += normDirX * moveDistance;
+            node2.y += normDirY * moveDistance;
+          }
+        }
+      }
+    }
+
+    // If we still have overlaps after max passes, try a different approach
+    if (!overlapsResolved) {
+      // Apply a grid-based layout as a fallback
+      this.applyGridLayout();
+    }
+  },
+
+  // Apply a grid layout as a fallback for overlap resolution
+  applyGridLayout() {
+    if (!App.nodes || App.nodes.length === 0) return;
+
+    // Calculate the number of rows and columns for the grid
+    const count = App.nodes.length;
+    const cols = Math.ceil(Math.sqrt(count));
+    const rows = Math.ceil(count / cols);
+
+    // Calculate the maximum node dimensions
+    let maxWidth = 0;
+    let maxHeight = 0;
+
+    App.nodes.forEach(node => {
+      maxWidth = Math.max(maxWidth, node.width);
+      maxHeight = Math.max(maxHeight, node.height);
+    });
+
+    // Add padding
+    const GRID_PADDING = 100;
+    const cellWidth = maxWidth + GRID_PADDING;
+    const cellHeight = maxHeight + GRID_PADDING;
+
+    // Calculate the grid origin (top-left corner)
+    const gridWidth = cols * cellWidth;
+    const gridHeight = rows * cellHeight;
+    const startX = -gridWidth / 2 + cellWidth / 2;
+    const startY = -gridHeight / 2 + cellHeight / 2;
+
+    // Position each node in the grid
+    App.nodes.forEach((node, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+
+      node.x = startX + col * cellWidth;
+      node.y = startY + row * cellHeight;
+    });
+
+    DebugManager.addLog('Applied grid layout to resolve node overlaps', 'info');
   },
 
   // Arrange nodes horizontally based on connections
@@ -557,25 +774,45 @@ const MiniMap = {
       levels.push(unvisitedNodes);
     }
 
-    // Position nodes based on levels
-    const LEVEL_SPACING = 300;
-    const NODE_SPACING = 200;
+    // Position nodes based on levels with improved spacing
+    const LEVEL_SPACING = 400; // Increased spacing between levels
+    const MIN_NODE_SPACING = 250; // Minimum spacing between nodes in the same level
 
+    // Calculate node positions with dynamic spacing
     levels.forEach((level, levelIndex) => {
-      const levelWidth = level.length * NODE_SPACING;
-      const startX = -levelWidth / 2 + NODE_SPACING / 2;
+      // Calculate total width needed for this level
+      let totalWidth = 0;
+      level.forEach(node => {
+        totalWidth += node.width + MIN_NODE_SPACING;
+      });
 
+      // Starting X position for this level
+      let currentX = -totalWidth / 2;
+
+      // Position each node in the level
       level.forEach((node, nodeIndex) => {
-        node.x = startX + nodeIndex * NODE_SPACING;
+        // Position the node
+        node.x = currentX;
         node.y = levelIndex * LEVEL_SPACING;
+
+        // Move to the next position
+        currentX += node.width + MIN_NODE_SPACING;
       });
     });
+
+    // Resolve any remaining overlaps
+    this.resolveNodeOverlaps();
 
     // Center the layout in the viewport
     this.centerLayout();
 
+    // Fit all nodes in the viewport
+    this.fitAllNodes();
+
     // Redraw the canvas
     App.draw();
+
+    DebugManager.addLog('Arranged nodes in horizontal flow layout with improved spacing', 'info');
   },
 
   // Arrange nodes vertically based on connections
@@ -637,25 +874,45 @@ const MiniMap = {
       levels.push(unvisitedNodes);
     }
 
-    // Position nodes based on levels
-    const LEVEL_SPACING = 300;
-    const NODE_SPACING = 200;
+    // Position nodes based on levels with improved spacing
+    const LEVEL_SPACING = 400; // Increased spacing between levels
+    const MIN_NODE_SPACING = 250; // Minimum spacing between nodes in the same level
 
+    // Calculate node positions with dynamic spacing
     levels.forEach((level, levelIndex) => {
-      const levelHeight = level.length * NODE_SPACING;
-      const startY = -levelHeight / 2 + NODE_SPACING / 2;
+      // Calculate total height needed for this level
+      let totalHeight = 0;
+      level.forEach(node => {
+        totalHeight += node.height + MIN_NODE_SPACING;
+      });
 
+      // Starting Y position for this level
+      let currentY = -totalHeight / 2;
+
+      // Position each node in the level
       level.forEach((node, nodeIndex) => {
+        // Position the node
         node.x = levelIndex * LEVEL_SPACING;
-        node.y = startY + nodeIndex * NODE_SPACING;
+        node.y = currentY;
+
+        // Move to the next position
+        currentY += node.height + MIN_NODE_SPACING;
       });
     });
+
+    // Resolve any remaining overlaps
+    this.resolveNodeOverlaps();
 
     // Center the layout in the viewport
     this.centerLayout();
 
+    // Fit all nodes in the viewport
+    this.fitAllNodes();
+
     // Redraw the canvas
     App.draw();
+
+    DebugManager.addLog('Arranged nodes in vertical flow layout with improved spacing', 'info');
   },
 
   // Center the layout in the viewport
@@ -678,6 +935,55 @@ const MiniMap = {
 
     // Center the view on this point
     App.centerViewOn(centerX, centerY);
+  },
+
+  // Fit all nodes in the viewport
+  fitAllNodes() {
+    if (!App.nodes || App.nodes.length === 0) return;
+
+    // Find the bounds of all nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    App.nodes.forEach(node => {
+      minX = Math.min(minX, node.x);
+      minY = Math.min(minY, node.y);
+      maxX = Math.max(maxX, node.x + node.width);
+      maxY = Math.max(maxY, node.y + node.height);
+    });
+
+    // Add padding
+    const padding = 100;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    // Calculate the content width and height
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+
+    // Calculate the scale needed to fit all nodes
+    const scaleX = window.innerWidth / contentWidth;
+    const scaleY = window.innerHeight / contentHeight;
+
+    // Use the smaller scale to ensure everything fits
+    const newScale = Math.min(scaleX, scaleY, App.MAX_SCALE);
+
+    // Set the new scale
+    App.zoom = newScale;
+
+    // Center the layout
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Calculate the new offsets to center the view
+    App.offsetX = window.innerWidth / 2 - centerX * newScale;
+    App.offsetY = window.innerHeight / 2 - centerY * newScale;
+
+    // Redraw the canvas
+    App.draw();
+
+    DebugManager.addLog(`Fit all nodes to view at ${Math.round(newScale * 100)}% zoom`, 'info');
   }
 };
 

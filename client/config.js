@@ -13,7 +13,7 @@ const Config = {
     model: 'gpt-4o',
     temperature: 0.7,
     maxTokens: 2000,
-    timeout: 120 // Default timeout in seconds
+    timeout: 300 // Default timeout in seconds (increased to 5 minutes)
   },
 
   // Available models

@@ -228,8 +228,8 @@
       </div>
       <div class="form-group">
         <label for="timeout">API Timeout (seconds):</label>
-        <input type="number" id="timeout" value="120" min="30" max="600" step="30">
-        <div class="tooltip">Longer timeouts are useful for complex requests and image generation.</div>
+        <input type="number" id="timeout" value="300" min="30" max="1800" step="30">
+        <div class="tooltip">Longer timeouts are useful for complex requests and image generation. For image generation, the actual timeout will be doubled.</div>
       </div>
 
       <!-- API Test Section -->
@@ -360,6 +360,7 @@
         <button id="zoomInBtn" class="mini-map-btn" title="Zoom In">+</button>
         <button id="zoomOutBtn" class="mini-map-btn" title="Zoom Out">-</button>
         <button id="resetZoomBtn" class="mini-map-btn" title="Reset Zoom">1:1</button>
+        <button id="fitAllNodesBtn" class="mini-map-btn" title="Fit All Nodes">⊡</button>
         <button id="autoArrangeBtn" class="mini-map-btn" title="Auto Arrange">⊞</button>
         <button id="horizontalLayoutBtn" class="mini-map-btn" title="Horizontal Layout">⇄</button>
         <button id="verticalLayoutBtn" class="mini-map-btn" title="Vertical Layout">⇅</button>
@@ -454,8 +455,8 @@
         </style>
       `;
 
-      // Attempt auto-login
-      fetch('/api/docker/auto-login')
+      // Attempt auto-login with the correct API URL
+      fetch('http://localhost:8732/api/docker/auto-login')
         .then(response => {
           if (!response.ok) {
             throw new Error('Auto-login failed');
@@ -495,7 +496,7 @@
   <script src="config.js"></script>
   <script src="api-service.js"></script>
   <script src="data-migration.js"></script>
-  <script src="imageStorage.js"></script>
+  <script src="image-storage.js"></script>
 
   <!-- Application Scripts -->
   <script src="auth.js"></script>

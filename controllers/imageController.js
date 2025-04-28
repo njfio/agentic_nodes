@@ -1,14 +1,42 @@
 const Image = require('../models/Image');
 
+/**
+ * Get image data by ID (for internal use)
+ * @param {string} imageId - The image ID
+ * @returns {object|null} - The image data or null if not found
+ */
+exports.getImageDataById = async (imageId) => {
+  try {
+    const image = await Image.findOne({ imageId });
+
+    if (!image) {
+      console.error(`Image with ID ${imageId} not found`);
+      return null;
+    }
+
+    return {
+      imageId: image.imageId,
+      data: image.data,
+      contentType: image.contentType,
+      size: image.size,
+      width: image.width,
+      height: image.height
+    };
+  } catch (error) {
+    console.error(`Error fetching image data for ID ${imageId}:`, error);
+    return null;
+  }
+};
+
 // Get an image by its ID
 exports.getImageById = async (req, res) => {
   try {
     const image = await Image.findOne({ imageId: req.params.id });
-    
+
     if (!image) {
       return res.status(404).json({ message: 'Image not found' });
     }
-    
+
     res.json({
       imageId: image.imageId,
       data: image.data,
@@ -28,10 +56,10 @@ exports.getImageById = async (req, res) => {
 exports.saveImage = async (req, res) => {
   try {
     const { imageId, data, contentType, size, width, height, workflow, node } = req.body;
-    
+
     // Check if image with this ID already exists
     const existingImage = await Image.findOne({ imageId });
-    
+
     if (existingImage) {
       // Update existing image
       existingImage.data = data;
@@ -40,12 +68,12 @@ exports.saveImage = async (req, res) => {
       existingImage.width = width;
       existingImage.height = height;
       existingImage.updatedAt = Date.now();
-      
+
       if (workflow) existingImage.workflow = workflow;
       if (node) existingImage.node = node;
-      
+
       await existingImage.save();
-      
+
       return res.json({
         imageId: existingImage.imageId,
         contentType: existingImage.contentType,
@@ -54,7 +82,7 @@ exports.saveImage = async (req, res) => {
         height: existingImage.height
       });
     }
-    
+
     // Create new image
     const image = new Image({
       imageId,
@@ -67,9 +95,9 @@ exports.saveImage = async (req, res) => {
       node,
       user: req.user?.id || null
     });
-    
+
     await image.save();
-    
+
     res.status(201).json({
       imageId: image.imageId,
       contentType: image.contentType,
@@ -87,7 +115,7 @@ exports.saveImage = async (req, res) => {
 exports.getWorkflowImages = async (req, res) => {
   try {
     const images = await Image.find({ workflow: req.params.workflowId });
-    
+
     // Return only metadata, not the actual image data
     const imageMetadata = images.map(image => ({
       imageId: image.imageId,
@@ -98,7 +126,7 @@ exports.getWorkflowImages = async (req, res) => {
       node: image.node,
       createdAt: image.createdAt
     }));
-    
+
     res.json(imageMetadata);
   } catch (error) {
     console.error('Error fetching workflow images:', error);
@@ -110,11 +138,11 @@ exports.getWorkflowImages = async (req, res) => {
 exports.deleteImage = async (req, res) => {
   try {
     const image = await Image.findOne({ imageId: req.params.id });
-    
+
     if (!image) {
       return res.status(404).json({ message: 'Image not found' });
     }
-    
+
     await image.remove();
     res.json({ message: 'Image deleted' });
   } catch (error) {

@@ -29,6 +29,118 @@ const ApiService = {
   },
 
   /**
+   * Check if a payload is large and might exceed size limits
+   * @param {object} data - The data to check
+   * @returns {boolean} - Whether the payload is large
+   */
+  isLargePayload(data) {
+    try {
+      // Stringify the data to check its size
+      const jsonString = JSON.stringify(data);
+
+      // Check if the payload is larger than 10MB (a conservative threshold)
+      const sizeInMB = jsonString.length / (1024 * 1024);
+
+      // Log the payload size for debugging
+      if (sizeInMB > 1) {
+        DebugManager.addLog(`Payload size: ${sizeInMB.toFixed(2)}MB`, 'info');
+      }
+
+      return sizeInMB > 10; // Return true if payload is larger than 10MB
+    } catch (error) {
+      console.error('Error checking payload size:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Optimize a payload by compressing image data
+   * @param {object} data - The data to optimize
+   * @returns {object} - The optimized data
+   */
+  optimizePayload(data) {
+    try {
+      // Create a deep copy of the data
+      const optimizedData = JSON.parse(JSON.stringify(data));
+
+      // Process the payload to optimize image data
+      this.processObjectForOptimization(optimizedData);
+
+      return optimizedData;
+    } catch (error) {
+      console.error('Error optimizing payload:', error);
+      return data; // Return original data if optimization fails
+    }
+  },
+
+  /**
+   * Recursively process an object to optimize image data
+   * @param {object} obj - The object to process
+   */
+  processObjectForOptimization(obj) {
+    if (!obj || typeof obj !== 'object') return;
+
+    // Process arrays
+    if (Array.isArray(obj)) {
+      for (let i = 0; i < obj.length; i++) {
+        if (typeof obj[i] === 'object') {
+          this.processObjectForOptimization(obj[i]);
+        } else if (typeof obj[i] === 'string' && this.isBase64Image(obj[i])) {
+          // Optimize base64 image data
+          obj[i] = this.optimizeBase64Image(obj[i]);
+        }
+      }
+      return;
+    }
+
+    // Process objects
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (typeof obj[key] === 'object') {
+          this.processObjectForOptimization(obj[key]);
+        } else if (typeof obj[key] === 'string' && this.isBase64Image(obj[key])) {
+          // Optimize base64 image data
+          obj[key] = this.optimizeBase64Image(obj[key]);
+        }
+      }
+    }
+  },
+
+  /**
+   * Check if a string is a base64 encoded image
+   * @param {string} str - The string to check
+   * @returns {boolean} - Whether the string is a base64 encoded image
+   */
+  isBase64Image(str) {
+    return typeof str === 'string' &&
+           (str.startsWith('data:image/') ||
+            str.startsWith('data:application/octet-stream;base64,'));
+  },
+
+  /**
+   * Optimize a base64 encoded image
+   * @param {string} base64String - The base64 encoded image
+   * @returns {string} - The optimized image or a reference to it
+   */
+  optimizeBase64Image(base64String) {
+    try {
+      // If the image is already small, return it as is
+      if (base64String.length < 100_000) { // Less than 100KB
+        return base64String;
+      }
+
+      // For large images, we'll use a placeholder and store the actual data in ImageStorage
+      const imageId = ImageStorage.saveImage(base64String);
+
+      // Return a placeholder that references the stored image
+      return `[image:${imageId}]`;
+    } catch (error) {
+      console.error('Error optimizing base64 image:', error);
+      return base64String; // Return original string if optimization fails
+    }
+  },
+
+  /**
    * Make a request to the API with retry capability
    * @param {string} endpoint - API endpoint
    * @param {string} method - HTTP method
@@ -38,11 +150,11 @@ const ApiService = {
    * @param {number} maxRetries - Maximum number of retries (default: 3)
    * @param {number} retryDelay - Delay between retries in ms (default: 1000)
    * @param {number} retryCount - Current retry count (used internally)
-   * @param {number} timeout - Request timeout in ms (default: 30000)
+   * @param {number} timeout - Request timeout in ms (default: 300000 - 5 minutes)
    * @returns {Promise} - Promise with response data
    */
   async request(endpoint, method = 'GET', data = null, retry = true, customHeaders = {},
-                maxRetries = 3, retryDelay = 1000, retryCount = 0, timeout = 30000) {
+                maxRetries = 3, retryDelay = 1000, retryCount = 0, timeout = 300000) { // Default 5 minute timeout
     const url = `${Config.apiBaseUrl}${endpoint}`;
 
     const options = {
@@ -73,7 +185,23 @@ const ApiService = {
 
     // Add request body for non-GET requests
     if (method !== 'GET' && data) {
-      options.body = JSON.stringify(data);
+      // Check if this is a large payload that might exceed size limits
+      const isLargePayload = this.isLargePayload(data);
+
+      if (isLargePayload && (endpoint === '/openai/chat' || endpoint === '/openai/images')) {
+        // For large payloads to OpenAI endpoints, use chunking strategy
+        DebugManager.addLog('Large payload detected, optimizing request size...', 'info');
+
+        // Optimize the payload by compressing image data
+        const optimizedData = this.optimizePayload(data);
+        options.body = JSON.stringify(optimizedData);
+
+        // Add header to indicate payload was optimized
+        options.headers['x-payload-optimized'] = 'true';
+      } else {
+        // Normal payload
+        options.body = JSON.stringify(data);
+      }
     }
 
     try {
@@ -255,10 +383,19 @@ const ApiService = {
      */
     async chat(data) {
       const config = this.getConfig();
-      const headers = config.apiKey ? { 'x-openai-api-key': config.apiKey } : {};
 
-      // Convert timeout from seconds to milliseconds
-      const timeout = (config.timeout || 120) * 1000;
+      // Add API key and timeout to headers
+      const headers = {};
+      if (config.apiKey) {
+        headers['x-openai-api-key'] = config.apiKey;
+      }
+
+      // Convert timeout from seconds to milliseconds and add to headers
+      const timeoutMs = (config.timeout || 300) * 1000;
+      headers['x-openai-timeout'] = timeoutMs.toString();
+
+      // Add debug log
+      DebugManager.addLog(`Using timeout of ${timeoutMs}ms for OpenAI chat request`, 'info');
 
       return ApiService.request(
         '/openai/chat',
@@ -269,7 +406,7 @@ const ApiService = {
         3,    // maxRetries
         1000, // retryDelay
         0,    // retryCount
-        timeout
+        timeoutMs
       );
     },
 
@@ -280,13 +417,24 @@ const ApiService = {
      */
     async generateImage(data) {
       const config = this.getConfig();
-      const headers = config.apiKey ? { 'x-openai-api-key': config.apiKey } : {};
+
+      // Add API key and timeout to headers
+      const headers = {};
+      if (config.apiKey) {
+        headers['x-openai-api-key'] = config.apiKey;
+      }
 
       // Use a longer timeout for image generation
       // Image generation can take significantly longer than text generation
-      // Use the configured timeout but multiply it by 2 for image generation, with a minimum of 4 minutes
-      const configuredTimeoutMs = (config.timeout || 120) * 1000;
-      const IMAGE_GENERATION_TIMEOUT = Math.max(configuredTimeoutMs * 2, 240_000); // At least 4 minutes
+      // Use the configured timeout but multiply it by 2 for image generation, with a minimum of 10 minutes
+      const configuredTimeoutMs = (config.timeout || 300) * 1000;
+      const IMAGE_GENERATION_TIMEOUT = Math.max(configuredTimeoutMs * 2, 600_000); // At least 10 minutes
+
+      // Add timeout to headers
+      headers['x-openai-timeout'] = IMAGE_GENERATION_TIMEOUT.toString();
+
+      // Add debug log
+      DebugManager.addLog(`Using timeout of ${IMAGE_GENERATION_TIMEOUT}ms for OpenAI image generation request`, 'info');
 
       return ApiService.request(
         '/openai/images',

@@ -591,23 +591,56 @@ class Node {
           });
         }
 
-        // Add any additional images from imageInputIds
+        // Add images from imageInputIds, but prevent duplicates and limit the total number
         if (this.imageInputIds && this.imageInputIds.length > 0) {
+          // Create a Set to track unique image data to prevent duplicates
+          const addedImageData = new Set();
+          // Limit to a maximum of 5 images to prevent payload size issues
+          const MAX_IMAGES = 5;
+          let imageCount = 0;
+
+          // Log the total number of images before filtering
+          DebugManager.addLog(`Node ${this.id} has ${this.imageInputIds.length} images in imageInputIds before filtering`, 'info');
+
           for (const imgId of this.imageInputIds) {
+            // Stop if we've reached the maximum number of images
+            if (imageCount >= MAX_IMAGES) {
+              DebugManager.addLog(`Reached maximum limit of ${MAX_IMAGES} images for node ${this.id}, skipping remaining images`, 'warning');
+              break;
+            }
+
             // Use the synchronous version to avoid Promise objects
             const imgData = ImageStorage.getImageSync(imgId);
+
             if (imgData) {
-              contentArray.push({
-                type: "image_url",
-                image_url: {
-                  url: imgData
-                }
-              });
-              DebugManager.addLog(`Added image ${imgId} to text-to-text request`, 'info');
+              // Check if this exact image data has already been added
+              // Use a hash or truncated version of the data to check for duplicates
+              const imageHash = imgData.substring(0, 100); // Use first 100 chars as a simple hash
+
+              if (!addedImageData.has(imageHash)) {
+                // Add the image to the content array
+                contentArray.push({
+                  type: "image_url",
+                  image_url: {
+                    url: imgData
+                  }
+                });
+
+                // Add to our set of added images
+                addedImageData.add(imageHash);
+                imageCount++;
+
+                DebugManager.addLog(`Added image ${imgId} to text-to-text request (${imageCount}/${MAX_IMAGES})`, 'info');
+              } else {
+                DebugManager.addLog(`Skipping duplicate image ${imgId} for node ${this.id}`, 'info');
+              }
             } else {
               DebugManager.addLog(`Warning: Image ${imgId} not found in cache, skipping`, 'warning');
             }
           }
+
+          // Log the final number of images added
+          DebugManager.addLog(`Node ${this.id} added ${imageCount} unique images to the request`, 'info');
         }
 
         // Create the request with the content array
@@ -640,6 +673,11 @@ class Node {
       this.lastRequestTime = new Date().toISOString();
 
       try {
+        // Log the timeout value for debugging
+        const config = ApiService.openai.getConfig();
+        const timeoutSeconds = config.timeout || 300; // Default to 5 minutes if not set
+        DebugManager.addLog(`Using timeout of ${timeoutSeconds} seconds for node ${this.id}`, 'info');
+
         // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.chat(requestData);
 
@@ -724,6 +762,11 @@ class Node {
       this.lastRequestTime = new Date().toISOString();
 
       try {
+        // Log the timeout value for debugging
+        const config = ApiService.openai.getConfig();
+        const timeoutSeconds = config.timeout || 300; // Default to 5 minutes if not set
+        DebugManager.addLog(`Using timeout of ${timeoutSeconds} seconds for image generation (node ${this.id})`, 'info');
+
         // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.generateImage(requestData);
 
@@ -959,23 +1002,56 @@ class Node {
         }
       });
 
-      // Add any additional images if available
+      // Add any additional images if available, but limit the number
       if (this.additionalImageIds && this.additionalImageIds.length > 0) {
+        // Create a Set to track unique image data to prevent duplicates
+        const addedImageData = new Set();
+        // Limit to a maximum of 5 images to prevent payload size issues
+        const MAX_IMAGES = 5;
+        let imageCount = 0;
+
+        // Log the total number of images before filtering
+        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional images before filtering`, 'info');
+
         for (const imgId of this.additionalImageIds) {
+          // Stop if we've reached the maximum number of images
+          if (imageCount >= MAX_IMAGES) {
+            DebugManager.addLog(`Reached maximum limit of ${MAX_IMAGES} additional images for node ${this.id}, skipping remaining images`, 'warning');
+            break;
+          }
+
           // Use the synchronous version to avoid Promise objects
           const imgData = ImageStorage.getImageSync(imgId);
+
           if (imgData) {
-            contentArray.push({
-              type: "image_url",
-              image_url: {
-                url: imgData
-              }
-            });
-            DebugManager.addLog(`Added additional image ${imgId} to request`, 'info');
+            // Check if this exact image data has already been added
+            // Use a hash or truncated version of the data to check for duplicates
+            const imageHash = imgData.substring(0, 100); // Use first 100 chars as a simple hash
+
+            if (!addedImageData.has(imageHash)) {
+              // Add the image to the content array
+              contentArray.push({
+                type: "image_url",
+                image_url: {
+                  url: imgData
+                }
+              });
+
+              // Add to our set of added images
+              addedImageData.add(imageHash);
+              imageCount++;
+
+              DebugManager.addLog(`Added additional image ${imgId} to request (${imageCount}/${MAX_IMAGES})`, 'info');
+            } else {
+              DebugManager.addLog(`Skipping duplicate additional image ${imgId} for node ${this.id}`, 'info');
+            }
           } else {
             DebugManager.addLog(`Warning: Image ${imgId} not found in cache, skipping`, 'warning');
           }
         }
+
+        // Log the final number of images added
+        DebugManager.addLog(`Node ${this.id} added ${imageCount} unique additional images to the request`, 'info');
       }
 
       // Prepare the request data
@@ -995,6 +1071,11 @@ class Node {
       this.lastRequestTime = new Date().toISOString();
 
       try {
+        // Log the timeout value for debugging
+        const config = ApiService.openai.getConfig();
+        const timeoutSeconds = config.timeout || 300; // Default to 5 minutes if not set
+        DebugManager.addLog(`Using timeout of ${timeoutSeconds} seconds for image analysis (node ${this.id})`, 'info');
+
         // Call the API through our service with retry logic built into ApiService
         const data = await ApiService.openai.chat(requestData);
 
@@ -1724,14 +1805,25 @@ class Node {
         this.imageInputIds = [];
       }
 
-      // Add any image IDs that aren't already in the array
+      // Use a Set to ensure uniqueness and limit the number of images
+      const uniqueImageIds = new Set(this.imageInputIds);
+
+      // Add new image IDs to the set
       for (const imgId of imageInputs) {
-        if (!this.imageInputIds.includes(imgId)) {
-          this.imageInputIds.push(imgId);
-        }
+        uniqueImageIds.add(imgId);
       }
 
-      DebugManager.addLog(`Node ${this.id} has ${this.imageInputIds.length} total image inputs`, 'info');
+      // Limit to a maximum of 5 images to prevent payload size issues
+      const MAX_IMAGES = 5;
+
+      // Convert back to array, keeping only the first MAX_IMAGES elements
+      this.imageInputIds = [...uniqueImageIds].slice(0, MAX_IMAGES);
+
+      if (uniqueImageIds.size > MAX_IMAGES) {
+        DebugManager.addLog(`Limited node ${this.id} to ${MAX_IMAGES} images (had ${uniqueImageIds.size})`, 'warning');
+      }
+
+      DebugManager.addLog(`Node ${this.id} has ${this.imageInputIds.length} total image inputs after deduplication`, 'info');
     }
 
     // For image-to-image nodes, handle multiple images
@@ -1758,10 +1850,28 @@ class Node {
         this.additionalImageIds = [];
       }
 
-      // Update additionalImageIds with all images except the primary one
+      // Update additionalImageIds with all images except the primary one, with limits
       if (imageInputs.length > 1) {
-        this.additionalImageIds = [...new Set([...this.additionalImageIds, ...imageInputs.slice(1)])];
-        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images for image-to-text`, 'info');
+        // Use a Set to ensure uniqueness
+        const uniqueAdditionalImageIds = new Set(this.additionalImageIds || []);
+
+        // Add new image IDs to the set (skip the first one which is the primary image)
+        for (const imgId of imageInputs.slice(1)) {
+          uniqueAdditionalImageIds.add(imgId);
+        }
+
+        // Limit to a maximum of 4 additional images to prevent payload size issues
+        // (5 total including the primary image)
+        const MAX_ADDITIONAL_IMAGES = 4;
+
+        // Convert back to array, keeping only the first MAX_ADDITIONAL_IMAGES elements
+        this.additionalImageIds = [...uniqueAdditionalImageIds].slice(0, MAX_ADDITIONAL_IMAGES);
+
+        if (uniqueAdditionalImageIds.size > MAX_ADDITIONAL_IMAGES) {
+          DebugManager.addLog(`Limited node ${this.id} to ${MAX_ADDITIONAL_IMAGES} additional images (had ${uniqueAdditionalImageIds.size})`, 'warning');
+        }
+
+        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images for image-to-text after deduplication`, 'info');
       }
 
       // For image-to-text nodes, return the primary image ID
@@ -1780,10 +1890,28 @@ class Node {
         this.additionalImageIds = [];
       }
 
-      // Update additionalImageIds with all images except the primary one
+      // Update additionalImageIds with all images except the primary one, with limits
       if (imageInputs.length > 1) {
-        this.additionalImageIds = [...new Set([...this.additionalImageIds, ...imageInputs.slice(1)])];
-        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images for text-to-text`, 'info');
+        // Use a Set to ensure uniqueness
+        const uniqueAdditionalImageIds = new Set(this.additionalImageIds || []);
+
+        // Add new image IDs to the set (skip the first one which is the primary image)
+        for (const imgId of imageInputs.slice(1)) {
+          uniqueAdditionalImageIds.add(imgId);
+        }
+
+        // Limit to a maximum of 4 additional images to prevent payload size issues
+        // (5 total including the primary image)
+        const MAX_ADDITIONAL_IMAGES = 4;
+
+        // Convert back to array, keeping only the first MAX_ADDITIONAL_IMAGES elements
+        this.additionalImageIds = [...uniqueAdditionalImageIds].slice(0, MAX_ADDITIONAL_IMAGES);
+
+        if (uniqueAdditionalImageIds.size > MAX_ADDITIONAL_IMAGES) {
+          DebugManager.addLog(`Limited node ${this.id} to ${MAX_ADDITIONAL_IMAGES} additional images (had ${uniqueAdditionalImageIds.size})`, 'warning');
+        }
+
+        DebugManager.addLog(`Node ${this.id} has ${this.additionalImageIds.length} additional reference images for text-to-text after deduplication`, 'info');
       }
 
       // For text-to-text nodes with image capability, return the primary image ID
@@ -1828,67 +1956,9 @@ class Node {
       }
     }
 
-    // Detect if input is an image URL
-    const isImageInput = Utils.isImageData(this.inputContent);
-
-    // Preload input image if needed
-    if (isImageInput && !this.inputImage) {
-      try {
-        this.inputImage = new Image();
-
-        // Add error handler
-        this.inputImage.onerror = () => {
-          DebugManager.addLog(`Error loading input image for node ${this.id}`, 'error');
-          this.inputImage = null; // Clear the broken image
-          App.draw();
-        };
-
-        // When input image loads, update node size if auto-sizing is enabled
-        this.inputImage.onload = () => {
-          if (this.autoSize) {
-            this.calculateOptimalSize();
-            App.draw();
-          }
-        };
-
-        // Set the source after adding event handlers
-        this.inputImage.src = this.inputContent;
-      } catch (err) {
-        DebugManager.addLog(`Error creating input image for node ${this.id}: ${err.message}`, 'error');
-      }
-    }
-
-    // If output content exists and is not already preloaded
-    if (this.content && !this.contentImage && (this.contentType === 'image' || this.aiProcessor === 'text-to-image')) {
-      try {
-        this.contentImage = new Image();
-
-        // Add error handler
-        this.contentImage.onerror = () => {
-          DebugManager.addLog(`Error loading output image for node ${this.id}`, 'error');
-          this.contentImage = null; // Clear the broken image
-          App.draw();
-        };
-
-        // When output image loads, update node size if auto-sizing is enabled
-        this.contentImage.onload = () => {
-          if (this.autoSize) {
-            this.calculateOptimalSize();
-            App.draw();
-          }
-        };
-
-        // Set the source after adding event handlers
-        this.contentImage.src = this.content;
-
-        // For text-to-image nodes, ensure we set the content type to image
-        if (this.aiProcessor === 'text-to-image') {
-          this.contentType = 'image';
-        }
-      } catch (err) {
-        DebugManager.addLog(`Error creating output image for node ${this.id}: ${err.message}`, 'error');
-      }
-    }
+    // Check if we need to load images
+    this.preloadInputImage();
+    this.preloadOutputImage();
 
     if (this.content && !this.contentVideo && this.contentType === 'video') {
       // For video, we'd need to create a video element and capture a frame
@@ -1899,6 +1969,253 @@ class Node {
     if (this.content && !this.contentAudio && this.contentType === 'audio') {
       // For audio, we'd need to visualize the waveform
       // For now, we'll just use a placeholder
+    }
+  }
+
+  // Preload input image with error handling and performance optimizations
+  preloadInputImage() {
+    // Detect if input is an image URL
+    const isImageInput = Utils.isImageData(this.inputContent);
+
+    // Skip if no image input or already loaded
+    if (!isImageInput || this.inputImage) {
+      return;
+    }
+
+    // Check if the image is already in the cache
+    if (typeof ImageStorage !== 'undefined' && ImageStorage.imageCache && ImageStorage.imageCache[this.inputContent]) {
+      this.inputImage = ImageStorage.imageCache[this.inputContent];
+      return;
+    }
+
+    try {
+      // Create a new image object
+      this.inputImage = new Image();
+
+      // Set a timeout to abort loading if it takes too long
+      const loadTimeout = setTimeout(() => {
+        if (!this.inputImage.complete) {
+          DebugManager.addLog(`Timeout loading input image for node ${this.id}`, 'warning');
+          this.inputImage.src = ''; // Cancel the loading
+          this.inputImage = null;
+        }
+      }, 10000); // 10 second timeout
+
+      // Add error handler
+      this.inputImage.onerror = () => {
+        clearTimeout(loadTimeout);
+        DebugManager.addLog(`Error loading input image for node ${this.id}`, 'error');
+        this.inputImage = null; // Clear the broken image
+        App.draw();
+      };
+
+      // When input image loads, update node size if auto-sizing is enabled
+      this.inputImage.onload = () => {
+        clearTimeout(loadTimeout);
+        // Cache the loaded image
+        ImageStorage.imageCache[this.inputContent] = this.inputImage;
+
+        if (this.autoSize) {
+          this.calculateOptimalSize();
+          App.draw();
+        }
+      };
+
+      // Set the source after adding event handlers
+      this.inputImage.src = this.inputContent;
+
+      // If the image is already in the browser cache, the onload event might not fire
+      if (this.inputImage.complete) {
+        this.inputImage.onload();
+      }
+    } catch (err) {
+      DebugManager.addLog(`Error creating input image for node ${this.id}: ${err.message}`, 'error');
+    }
+  }
+
+  // Preload output image with error handling and performance optimizations
+  preloadOutputImage() {
+    // Skip if no content, already loaded, or not an image type
+    if (!this.content ||
+        this.contentImage ||
+        (this.contentType !== 'image' && this.aiProcessor !== 'text-to-image')) {
+      return;
+    }
+
+    // For text-to-image nodes, ensure we set the content type to image
+    if (this.aiProcessor === 'text-to-image') {
+      this.contentType = 'image';
+    }
+
+    // Check if the image is already in the cache
+    if (typeof ImageStorage !== 'undefined' && ImageStorage.imageCache && ImageStorage.imageCache[this.content]) {
+      this.contentImage = ImageStorage.imageCache[this.content];
+      return;
+    }
+
+    // Check if this is a reference to a stored image
+    if (this.content && typeof this.content === 'string' && this.content.startsWith('img_')) {
+      // This is a reference to a stored image, try to get it from ImageStorage
+      const imageData = ImageStorage.getImageSync(this.content);
+      if (imageData) {
+        this.loadImageFromData(imageData);
+        return;
+      }
+    }
+
+    try {
+      // Create a new image object with a placeholder
+      this.contentImage = new Image();
+
+      // Use a lightweight placeholder while the real image loads
+      this.contentImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5OTkiPkxvYWRpbmcuLi48L3RleHQ+PC9zdmc+';
+
+      // Set up a timeout to handle hanging loads
+      const loadTimeout = setTimeout(() => {
+        DebugManager.addLog(`Image load timeout for node ${this.id}`, 'warning');
+        // Keep the placeholder instead of setting to null
+      }, 10_000); // 10 second timeout
+
+      // Load the actual image in the background
+      this.loadImageInBackground(loadTimeout);
+    } catch (err) {
+      DebugManager.addLog(`Error creating output image for node ${this.id}: ${err.message}`, 'error');
+    }
+  }
+
+  // Load the actual image in the background to prevent UI freezing
+  async loadImageInBackground(loadTimeout) {
+    try {
+      // Create a new image object for background loading
+      const backgroundImage = new Image();
+
+      // Set up promise to handle load/error events
+      await new Promise((resolve, reject) => {
+        backgroundImage.onload = () => {
+          clearTimeout(loadTimeout);
+
+          // Check if the image is too large and resize if needed
+          if (backgroundImage.width > 1000 || backgroundImage.height > 1000) {
+            try {
+              // Create a canvas to resize the image
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+
+              // Calculate new dimensions (maintaining aspect ratio)
+              const maxDimension = 1000;
+              const ratio = Math.min(maxDimension / backgroundImage.width, maxDimension / backgroundImage.height);
+              canvas.width = backgroundImage.width * ratio;
+              canvas.height = backgroundImage.height * ratio;
+
+              // Draw the resized image
+              ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+
+              // Get the resized image data
+              const resizedData = canvas.toDataURL('image/jpeg', 0.85);
+
+              // Create a new image with the resized data
+              const resizedImg = new Image();
+              resizedImg.src = resizedData;
+
+              // Replace the content with the resized version
+              this.content = resizedData;
+              this.contentImage = resizedImg;
+
+              // Cache the resized image
+              if (typeof ImageStorage !== 'undefined') {
+                ImageStorage.imageCache[resizedData] = resizedImg;
+              }
+
+              DebugManager.addLog(`Resized large image for node ${this.id}`, 'info');
+            } catch (resizeErr) {
+              // If resizing fails, use the original image
+              this.contentImage = backgroundImage;
+
+              // Cache the loaded image
+              if (typeof ImageStorage !== 'undefined') {
+                ImageStorage.imageCache[this.content] = backgroundImage;
+              }
+
+              DebugManager.addLog(`Failed to resize image for node ${this.id}: ${resizeErr.message}`, 'warning');
+            }
+          } else {
+            // Use the original image
+            this.contentImage = backgroundImage;
+
+            // Cache the loaded image
+            if (typeof ImageStorage !== 'undefined') {
+              ImageStorage.imageCache[this.content] = backgroundImage;
+            }
+          }
+
+          // Update node size if auto-sizing is enabled
+          if (this.autoSize) {
+            this.calculateOptimalSize();
+          }
+
+          // Redraw the canvas
+          if (typeof App !== 'undefined') {
+            App.draw();
+          }
+
+          resolve();
+        };
+
+        backgroundImage.onerror = () => {
+          clearTimeout(loadTimeout);
+          DebugManager.addLog(`Error loading output image for node ${this.id}`, 'error');
+
+          // Keep the placeholder instead of setting to null
+          reject(new Error(`Failed to load image for node ${this.id}`));
+        };
+
+        // Set the source to trigger loading
+        backgroundImage.src = this.content;
+      }).catch(err => {
+        console.warn(`Error in background image loading for node ${this.id}:`, err);
+      });
+    } catch (err) {
+      console.warn(`Error in background image loading for node ${this.id}:`, err);
+    }
+  }
+
+  // Load an image from data
+  loadImageFromData(imageData) {
+    try {
+      // Create a new image object
+      this.contentImage = new Image();
+
+      // Set up load and error handlers
+      this.contentImage.onload = () => {
+        // Cache the loaded image
+        if (typeof ImageStorage !== 'undefined') {
+          ImageStorage.imageCache[imageData] = this.contentImage;
+        }
+
+        // Update node size if auto-sizing is enabled
+        if (this.autoSize) {
+          this.calculateOptimalSize();
+          if (typeof App !== 'undefined') {
+            App.draw();
+          }
+        }
+      };
+
+      this.contentImage.onerror = () => {
+        DebugManager.addLog(`Error loading image from data for node ${this.id}`, 'error');
+        // Use a placeholder instead of null
+        this.contentImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5OTkiPkVycm9yPC90ZXh0Pjwvc3ZnPg==';
+      };
+
+      // Set the source after adding event handlers
+      this.contentImage.src = imageData;
+
+      // If the image is already in the browser cache, the onload event might not fire
+      if (this.contentImage.complete) {
+        this.contentImage.onload();
+      }
+    } catch (err) {
+      DebugManager.addLog(`Error creating image from data for node ${this.id}: ${err.message}`, 'error');
     }
   }
 
@@ -2906,6 +3223,12 @@ const App = {
       document.getElementById('model').value = config.model || Config.defaultOpenAIConfig.model;
       document.getElementById('temperature').value = config.temperature || Config.defaultOpenAIConfig.temperature;
       document.getElementById('maxTokens').value = config.maxTokens || Config.defaultOpenAIConfig.maxTokens;
+
+      // Load timeout value if it exists
+      const timeoutInput = document.getElementById('timeout');
+      if (timeoutInput && config.timeout) {
+        timeoutInput.value = config.timeout;
+      }
     }
   },
 
@@ -3095,11 +3418,24 @@ const App = {
       return false;
     }
 
+    // Get timeout value with validation
+    const timeoutInput = document.getElementById('timeout');
+    let timeout = Config.defaultOpenAIConfig.timeout; // Default value
+
+    if (timeoutInput) {
+      // Parse the timeout value, ensuring it's at least 30 seconds and at most 1800 seconds (30 minutes)
+      const parsedTimeout = parseInt(timeoutInput.value);
+      if (!isNaN(parsedTimeout)) {
+        timeout = Math.max(30, Math.min(1800, parsedTimeout));
+      }
+    }
+
     const config = {
       apiKey: apiKey,
       model: document.getElementById('model').value,
       temperature: parseFloat(document.getElementById('temperature').value) || Config.defaultOpenAIConfig.temperature,
-      maxTokens: parseInt(document.getElementById('maxTokens').value) || Config.defaultOpenAIConfig.maxTokens
+      maxTokens: parseInt(document.getElementById('maxTokens').value) || Config.defaultOpenAIConfig.maxTokens,
+      timeout: timeout // Add timeout to the config
     };
 
     // Save to localStorage using the correct key
@@ -3730,7 +4066,101 @@ const App = {
       this.offsetY = mouseY - worldY * this.scale;
 
       this.draw();
+
+      // Log the zoom action
+      DebugManager.addLog(`Zoomed to ${Math.round(this.scale * 100)}%`, 'info');
     }
+  },
+
+  // Zoom in method for external access
+  zoomIn() {
+    // Calculate center of viewport
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+
+    // Calculate world position before zoom
+    const worldX = (centerX - this.offsetX) / this.scale;
+    const worldY = (centerY - this.offsetY) / this.scale;
+
+    // Apply zoom
+    const newScale = Math.min(this.scale * 1.2, this.MAX_SCALE);
+
+    // Only update if scale changed
+    if (newScale !== this.scale) {
+      this.scale = newScale;
+
+      // Recalculate offset to keep the center point fixed
+      this.offsetX = centerX - worldX * this.scale;
+      this.offsetY = centerY - worldY * this.scale;
+
+      // Update the canvas
+      this.draw();
+
+      // Log the zoom action
+      DebugManager.addLog(`Zoomed in to ${Math.round(this.scale * 100)}%`, 'info');
+    }
+  },
+
+  // Zoom out method for external access
+  zoomOut() {
+    // Calculate center of viewport
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+
+    // Calculate world position before zoom
+    const worldX = (centerX - this.offsetX) / this.scale;
+    const worldY = (centerY - this.offsetY) / this.scale;
+
+    // Apply zoom
+    const newScale = Math.max(this.scale / 1.2, this.MIN_SCALE);
+
+    // Only update if scale changed
+    if (newScale !== this.scale) {
+      this.scale = newScale;
+
+      // Recalculate offset to keep the center point fixed
+      this.offsetX = centerX - worldX * this.scale;
+      this.offsetY = centerY - worldY * this.scale;
+
+      // Update the canvas
+      this.draw();
+
+      // Log the zoom action
+      DebugManager.addLog(`Zoomed out to ${Math.round(this.scale * 100)}%`, 'info');
+    }
+  },
+
+  // Reset zoom method for external access
+  resetZoom() {
+    this.scale = 1;
+
+    // Center the view on the canvas content
+    if (this.nodes.length > 0) {
+      // Find the bounds of all nodes
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      this.nodes.forEach(node => {
+        minX = Math.min(minX, node.x);
+        minY = Math.min(minY, node.y);
+        maxX = Math.max(maxX, node.x + node.width);
+        maxY = Math.max(maxY, node.y + node.height);
+      });
+
+      // Calculate the center of all nodes
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+
+      // Center the view
+      this.offsetX = window.innerWidth / 2 - centerX * this.scale;
+      this.offsetY = window.innerHeight / 2 - centerY * this.scale;
+    } else {
+      // If no nodes, just center at origin
+      this.offsetX = window.innerWidth / 2;
+      this.offsetY = window.innerHeight / 2;
+    }
+
+    this.draw();
+    DebugManager.addLog('Zoom reset to 100%', 'info');
   },
 
   // Handle keyboard events
@@ -4431,8 +4861,7 @@ const App = {
     const currentNodes = [...this.nodes];
     const currentConnections = [...this.connections];
 
-    try {
-      if (!this.editingNode) return;
+    if (!this.editingNode) return;
 
     // Get values from the form
     this.editingNode.title = document.getElementById('nodeTitle').value;
@@ -4619,12 +5048,9 @@ const App = {
         }
       })();
     }
-    } catch (error) {
-      // If anything goes wrong, restore the previous state
-      this.nodes = currentNodes;
-      this.connections = currentConnections;
-      DebugManager.addLog(`Error saving node: ${error.message}`, 'error');
-    }
+
+    // Error handling for the entire saveNode method is done in the async function
+    // We don't need a separate try-catch block here
   },
 
   // Execute the current node
@@ -5297,14 +5723,73 @@ const App = {
     this.nodes = [];
     this.connections = [];
 
-    // Load workflow images if this is a server workflow
+    // Show loading indicator
+    DebugManager.addLog('Loading workflow...', 'info');
+
+    // Create a loading indicator in the DOM
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'workflow-loading-indicator';
+    loadingIndicator.innerHTML = `
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Loading workflow...</div>
+    `;
+    loadingIndicator.style.position = 'fixed';
+    loadingIndicator.style.top = '50%';
+    loadingIndicator.style.left = '50%';
+    loadingIndicator.style.transform = 'translate(-50%, -50%)';
+    loadingIndicator.style.background = 'rgba(0, 0, 0, 0.7)';
+    loadingIndicator.style.color = 'white';
+    loadingIndicator.style.padding = '20px';
+    loadingIndicator.style.borderRadius = '5px';
+    loadingIndicator.style.zIndex = '9999';
+    loadingIndicator.style.display = 'flex';
+    loadingIndicator.style.flexDirection = 'column';
+    loadingIndicator.style.alignItems = 'center';
+    loadingIndicator.style.justifyContent = 'center';
+
+    // Add spinner styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .loading-spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid white;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 10px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(loadingIndicator);
+
+    // Start loading workflow images if this is a server workflow
     if (state._id) {
       try {
         DebugManager.addLog('Loading workflow images...', 'info');
+
+        // Update loading indicator text
+        const loadingText = loadingIndicator.querySelector('.loading-text');
+        if (loadingText) {
+          loadingText.textContent = 'Loading workflow images...';
+        }
+
+        // Start loading images progressively
         await ImageStorage.loadWorkflowImages(state._id);
-        DebugManager.addLog('Workflow images loaded', 'success');
+
+        // Update loading indicator
+        if (loadingText) {
+          loadingText.textContent = 'Processing workflow...';
+        }
+
+        DebugManager.addLog('Initial workflow images loaded, continuing with workflow setup', 'success');
       } catch (error) {
         console.warn('Error loading workflow images:', error);
+        DebugManager.addLog(`Error loading workflow images: ${error.message}`, 'warning');
         // Continue even if image loading fails
       }
     }
@@ -5447,6 +5932,21 @@ const App = {
     // Redraw the canvas
     this.draw();
 
+    // Remove the loading indicator
+    const loadingElement = document.getElementById('workflow-loading-indicator');
+    if (loadingElement) {
+      // Fade out the loading indicator
+      loadingElement.style.transition = 'opacity 0.5s';
+      loadingElement.style.opacity = '0';
+
+      // Remove after animation completes
+      setTimeout(() => {
+        if (loadingElement.parentNode) {
+          loadingElement.parentNode.removeChild(loadingElement);
+        }
+      }, 500);
+    }
+
     // Force another redraw after a longer delay to ensure images are properly loaded
     setTimeout(() => {
       // Preload content for all nodes again
@@ -5458,6 +5958,8 @@ const App = {
         WorkflowIO.updateStatus();
         DebugManager.addLog('Updated workflow I/O status', 'info');
       }
+
+      DebugManager.addLog('Workflow loaded successfully', 'success');
     }, 1000); // Increased timeout to allow for image loading
 
     DebugManager.updateCanvasStats();

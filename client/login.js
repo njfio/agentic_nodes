@@ -65,8 +65,8 @@ function initLogin() {
       </style>
     `;
 
-    // Use the Docker auto-login endpoint
-    fetch('/api/docker/auto-login')
+    // Use the Docker auto-login endpoint with the correct API URL
+    fetch('http://localhost:8732/api/docker/auto-login')
       .then(response => {
         if (!response.ok) {
           throw new Error('Auto-login failed');

@@ -698,15 +698,29 @@ kbd {
   font-size: 12px;
   padding: 2px 5px;
   margin: 0 2px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .mini-map-btn:hover {
   background-color: #444;
+  transform: scale(1.05);
 }
 
 .mini-map-btn:active {
   background-color: #4a90e2;
+  transform: scale(0.95);
+}
+
+#fitAllNodesBtn {
+  background-color: #2980b9;
+}
+
+#autoArrangeBtn {
+  background-color: #27ae60;
+}
+
+#horizontalLayoutBtn, #verticalLayoutBtn {
+  background-color: #8e44ad;
 }
 
 /* Status indicators */

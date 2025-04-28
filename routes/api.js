@@ -15,6 +15,95 @@ const dataMigration = require('../utils/data-migration');
 // Import middleware
 const { auth, optionalAuth } = require('../middleware/auth');
 
+/**
+ * Process an optimized payload to restore any image references
+ * @param {object} payload - The optimized payload
+ * @returns {object} - The processed payload with restored images
+ */
+async function processOptimizedPayload(payload) {
+  if (!payload) return payload;
+
+  try {
+    // Create a deep copy of the payload
+    const processedPayload = JSON.parse(JSON.stringify(payload));
+
+    // Process the payload recursively
+    await processObjectForImageReferences(processedPayload);
+
+    return processedPayload;
+  } catch (error) {
+    console.error('Error processing optimized payload:', error);
+    return payload; // Return original payload if processing fails
+  }
+}
+
+/**
+ * Recursively process an object to restore image references
+ * @param {object} obj - The object to process
+ */
+async function processObjectForImageReferences(obj) {
+  if (!obj || typeof obj !== 'object') return;
+
+  // Process arrays
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      if (typeof obj[i] === 'object') {
+        await processObjectForImageReferences(obj[i]);
+      } else if (typeof obj[i] === 'string' && isImageReference(obj[i])) {
+        // Restore image reference
+        obj[i] = await restoreImageReference(obj[i]);
+      }
+    }
+    return;
+  }
+
+  // Process objects
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (typeof obj[key] === 'object') {
+        await processObjectForImageReferences(obj[key]);
+      } else if (typeof obj[key] === 'string' && isImageReference(obj[key])) {
+        // Restore image reference
+        obj[key] = await restoreImageReference(obj[key]);
+      }
+    }
+  }
+}
+
+/**
+ * Check if a string is an image reference
+ * @param {string} str - The string to check
+ * @returns {boolean} - Whether the string is an image reference
+ */
+function isImageReference(str) {
+  return typeof str === 'string' && str.startsWith('[image:') && str.endsWith(']');
+}
+
+/**
+ * Restore an image reference to its original content
+ * @param {string} reference - The image reference
+ * @returns {string} - The restored image content
+ */
+async function restoreImageReference(reference) {
+  try {
+    // Extract the image ID from the reference
+    const imageId = reference.substring(7, reference.length - 1);
+
+    // Get the image from the database
+    const imageData = await imageController.getImageDataById(imageId);
+
+    if (!imageData) {
+      console.error(`Image with ID ${imageId} not found`);
+      return reference; // Return the reference if the image is not found
+    }
+
+    return imageData.data; // Return the actual image data
+  } catch (error) {
+    console.error('Error restoring image reference:', error);
+    return reference; // Return the reference if restoration fails
+  }
+}
+
 // Test route
 router.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });
@@ -37,6 +126,21 @@ router.post('/openai/chat', async (req, res) => {
     // Get API key from request headers or fall back to env variable
     const apiKey = req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY;
 
+    // Get timeout from request headers or use default
+    const timeout = parseInt(req.headers['x-openai-timeout']) || 300000; // Default to 5 minutes (300 seconds) if not specified
+
+    // Log the timeout value for debugging
+    console.log(`[API] Using timeout of ${timeout}ms for OpenAI chat request`);
+
+    // Check if the payload was optimized by the client
+    const isOptimizedPayload = req.headers['x-payload-optimized'] === 'true';
+    if (isOptimizedPayload) {
+      console.log('[API] Received optimized payload, processing...');
+
+      // Process the optimized payload to restore any image references
+      req.body = await processOptimizedPayload(req.body);
+    }
+
     // Check if OpenAI API key is set
     if (!apiKey || apiKey === 'sk-your-actual-openai-api-key' || apiKey === 'REPLACE_WITH_YOUR_OPENAI_API_KEY') {
       return res.status(401).json({
@@ -58,7 +162,7 @@ router.post('/openai/chat', async (req, res) => {
         'Authorization': `Bearer ${apiKey}`
       },
       httpsAgent,
-      timeout: 60000 // 60 seconds timeout
+      timeout: timeout // Use the timeout from the request headers
     });
     res.json(response.data);
   } catch (error) {
@@ -99,6 +203,22 @@ router.post('/openai/images', async (req, res) => {
     // Get API key from request headers or fall back to env variable
     const apiKey = req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY;
 
+    // Get timeout from request headers or use default
+    // For image generation, we use a longer default timeout (10 minutes)
+    const timeout = parseInt(req.headers['x-openai-timeout']) || 600_000; // 10 minutes
+
+    // Log the timeout value for debugging
+    console.log(`[API] Using timeout of ${timeout}ms for OpenAI image generation request`);
+
+    // Check if the payload was optimized by the client
+    const isOptimizedPayload = req.headers['x-payload-optimized'] === 'true';
+    if (isOptimizedPayload) {
+      console.log('[API] Received optimized payload for image generation, processing...');
+
+      // Process the optimized payload to restore any image references
+      req.body = await processOptimizedPayload(req.body);
+    }
+
     // Check if OpenAI API key is set
     if (!apiKey || apiKey === 'sk-your-actual-openai-api-key' || apiKey === 'REPLACE_WITH_YOUR_OPENAI_API_KEY') {
       return res.status(401).json({
@@ -114,14 +234,14 @@ router.post('/openai/images', async (req, res) => {
       secureProtocol: 'TLSv1_2_method'
     });
 
-    // Use a longer timeout for image generation
+    // Use the timeout from the request headers
     const response = await axios.post('https://api.openai.com/v1/images/generations', req.body, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
       httpsAgent,
-      timeout: 120_000 // 120 seconds timeout for image generation
+      timeout: timeout // Use the timeout from the request headers
     });
     res.json(response.data);
   } catch (error) {
