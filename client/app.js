@@ -2495,16 +2495,33 @@ class Node {
         // Calculate height based on chat history
         const baseHeight = 40; // Title area
         const inputHeight = this.inputContent ? Math.min(80, this.getTextLines(ctx, this.inputContent, newWidth - 40).length * 14 + 20) : 30;
+        const chatInputAreaHeight = 40; // Height for the chat input area at the bottom
 
-        // Calculate output height based on chat history
+        // Calculate output height based on chat history with better text measurement
         let outputHeight = 100; // Default height for chat area
 
         if (this.chatHistory && this.chatHistory.length > 0) {
-          // Add height for each message (2 lines per message on average)
-          outputHeight = Math.min(300, 20 + (this.chatHistory.length * 40));
+          // Calculate height based on actual message content
+          outputHeight = 20; // Start with padding
+
+          // Process each message to calculate its height
+          this.chatHistory.forEach(msg => {
+            // Add height for the role label
+            outputHeight += 20; // Role label height
+
+            // Calculate height needed for the message content
+            const contentLines = this.getTextLines(ctx, msg.content, newWidth - 40);
+            const contentHeight = Math.min(200, contentLines.length * 16); // Limit height per message
+
+            outputHeight += contentHeight + 10; // Add content height plus padding
+          });
+
+          // Ensure we don't exceed a reasonable maximum while still accommodating content
+          outputHeight = Math.min(400, outputHeight);
         }
 
-        newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, baseHeight + inputHeight + outputHeight));
+        // Calculate total height with all components
+        newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, baseHeight + inputHeight + outputHeight + chatInputAreaHeight));
       }
     }
 
@@ -3113,23 +3130,54 @@ class Node {
       ctx.font = '12px Arial';
       ctx.fillText('No chat messages. Type below to start...', x + 10, y + 20);
     } else {
-      ctx.fillStyle = '#ccc';
-      ctx.font = '12px Arial';
-
       // Calculate available space
       const maxLineWidth = width - 20;
       const lineHeight = 16;
-      const messageSpacing = 8;
-      const maxLines = Math.floor((chatHistoryHeight - 20) / (lineHeight + messageSpacing));
+      const messageSpacing = 10;
 
-      // Limit the number of messages to display
-      const maxMessages = Math.min(this.chatHistory.length, Math.floor(maxLines / 2));
-      const messages = this.chatHistory.slice(-maxMessages);
+      // Calculate how many messages we can show
+      // We'll prioritize showing the most recent messages
+      const messages = [...this.chatHistory]; // Make a copy to avoid modifying original
 
-      let currentY = y + 20;
+      // Start drawing from the top
+      let currentY = y + 15;
 
-      // Draw each message
-      messages.forEach(message => {
+      // Track if we need to show a "more messages" indicator
+      let showMoreIndicator = false;
+
+      // Process messages from newest to oldest to determine which ones fit
+      const visibleMessages = [];
+      let availableHeight = chatHistoryHeight - 20; // Reserve space for "more messages" indicator
+
+      // Process messages from newest to oldest
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i];
+
+        // Calculate height needed for this message
+        // Use getTextLines to properly wrap text
+        const lines = this.getTextLines(ctx, message.content, maxLineWidth);
+        const messageHeight = lineHeight + (lines.length * lineHeight) + messageSpacing;
+
+        // Check if this message fits
+        if (availableHeight >= messageHeight) {
+          visibleMessages.unshift(message); // Add to beginning of visible messages
+          availableHeight -= messageHeight;
+        } else {
+          showMoreIndicator = true;
+          break;
+        }
+      }
+
+      // Show "more messages" indicator if needed
+      if (showMoreIndicator && messages.length > visibleMessages.length) {
+        ctx.fillStyle = '#888';
+        ctx.font = '11px Arial';
+        ctx.fillText(`+ ${messages.length - visibleMessages.length} more messages...`, x + 10, currentY);
+        currentY += lineHeight + 5;
+      }
+
+      // Draw each visible message
+      visibleMessages.forEach(message => {
         // Set color based on role
         if (message.role === 'user') {
           ctx.fillStyle = '#4a90e2';
@@ -3146,33 +3194,8 @@ class Node {
         // Draw message content
         ctx.font = '12px Arial';
 
-        // Split message into lines
-        const words = message.content.split(' ');
-        let lines = [];
-        let currentLine = '';
-
-        for (const word of words) {
-          const testLine = currentLine ? `${currentLine} ${word}` : word;
-          const metrics = ctx.measureText(testLine);
-
-          if (metrics.width > maxLineWidth) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            currentLine = testLine;
-          }
-        }
-
-        if (currentLine) {
-          lines.push(currentLine);
-        }
-
-        // Limit to max lines and add ellipsis if needed
-        const maxContentLines = 2;
-        if (lines.length > maxContentLines) {
-          lines = lines.slice(0, maxContentLines);
-          lines[maxContentLines - 1] += '...';
-        }
+        // Get wrapped lines using the existing getTextLines method
+        const lines = this.getTextLines(ctx, message.content, maxLineWidth);
 
         // Draw each line
         lines.forEach((line, index) => {
