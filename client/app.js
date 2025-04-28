@@ -2522,6 +2522,25 @@ class Node {
 
         // Calculate total height with all components
         newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, baseHeight + inputHeight + outputHeight + chatInputAreaHeight));
+
+        // Ensure the node stays within the visible canvas area
+        // Get the current canvas dimensions
+        const canvasWidth = window.innerWidth;
+        const canvasHeight = window.innerHeight;
+
+        // Check if the node would be positioned outside the visible area
+        if (this.x < -newWidth + 50) {
+          this.x = 50; // Keep at least 50px visible on the left
+        }
+        if (this.y < -newHeight + 50) {
+          this.y = 50; // Keep at least 50px visible on the top
+        }
+        if (this.x > canvasWidth - 50) {
+          this.x = canvasWidth - 50; // Keep at least 50px visible on the right
+        }
+        if (this.y > canvasHeight - 50) {
+          this.y = canvasHeight - 50; // Keep at least 50px visible on the bottom
+        }
       }
     }
 
@@ -6875,6 +6894,9 @@ const App = {
       // Process the message to get AI response
       await node.processChatMessage(message);
 
+      // Ensure the node is visible on the canvas
+      this.ensureNodeVisible(node);
+
       // Redraw the canvas
       this.draw();
     } catch (error) {
@@ -6884,6 +6906,33 @@ const App = {
       // Clear processing state
       node.processing = false;
       this.draw();
+    }
+  },
+
+  // Ensure a node is visible on the canvas
+  ensureNodeVisible(node) {
+    if (!node) return;
+
+    // Get the current canvas dimensions
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
+
+    // Calculate node boundaries in canvas coordinates
+    const nodeLeft = node.x * this.scale + this.offsetX;
+    const nodeTop = node.y * this.scale + this.offsetY;
+    const nodeRight = (node.x + node.width) * this.scale + this.offsetX;
+    const nodeBottom = (node.y + node.height) * this.scale + this.offsetY;
+
+    // Check if the node is completely outside the visible area
+    const isOutsideX = nodeRight < 0 || nodeLeft > canvasWidth;
+    const isOutsideY = nodeBottom < 0 || nodeTop > canvasHeight;
+
+    if (isOutsideX || isOutsideY) {
+      // Node is outside the visible area, center it on the canvas
+      this.offsetX = canvasWidth / 2 - (node.x + node.width / 2) * this.scale;
+      this.offsetY = canvasHeight / 2 - (node.y + node.height / 2) * this.scale;
+
+      DebugManager.addLog(`Repositioned node "${node.title}" (ID: ${node.id}) to be visible on the canvas`, 'info');
     }
   },
 
@@ -6967,6 +7016,9 @@ const App = {
       if (node.autoSize) {
         node.calculateOptimalSize();
       }
+
+      // Ensure the node is visible on the canvas
+      this.ensureNodeVisible(node);
 
       // Redraw the canvas
       this.draw();
