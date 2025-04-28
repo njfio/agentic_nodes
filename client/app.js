@@ -3103,85 +3103,156 @@ class Node {
 
   // Draw chat content
   drawChatContent(ctx, x, y, width, height) {
+    // Reserve space for chat input at the bottom
+    const inputHeight = 30;
+    const chatHistoryHeight = height - inputHeight;
+
+    // Draw chat history area
     if (!this.chatHistory || this.chatHistory.length === 0) {
       ctx.fillStyle = '#666';
       ctx.font = '12px Arial';
-      ctx.fillText('No chat messages. Double-click to edit...', x + 10, y + 20);
-      return;
-    }
-
-    ctx.fillStyle = '#ccc';
-    ctx.font = '12px Arial';
-
-    // Calculate available space
-    const maxLineWidth = width - 20;
-    const lineHeight = 16;
-    const messageSpacing = 8;
-    const maxLines = Math.floor((height - 20) / (lineHeight + messageSpacing));
-
-    // Limit the number of messages to display
-    const maxMessages = Math.min(this.chatHistory.length, Math.floor(maxLines / 2));
-    const messages = this.chatHistory.slice(-maxMessages);
-
-    let currentY = y + 20;
-
-    // Draw each message
-    messages.forEach(message => {
-      // Set color based on role
-      if (message.role === 'user') {
-        ctx.fillStyle = '#4a90e2';
-      } else {
-        ctx.fillStyle = '#ccc';
-      }
-
-      // Draw role label
-      const roleLabel = message.role === 'user' ? 'User:' : 'Assistant:';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText(roleLabel, x + 10, currentY);
-      currentY += lineHeight;
-
-      // Draw message content
+      ctx.fillText('No chat messages. Type below to start...', x + 10, y + 20);
+    } else {
+      ctx.fillStyle = '#ccc';
       ctx.font = '12px Arial';
 
-      // Split message into lines
-      const words = message.content.split(' ');
-      let lines = [];
-      let currentLine = '';
+      // Calculate available space
+      const maxLineWidth = width - 20;
+      const lineHeight = 16;
+      const messageSpacing = 8;
+      const maxLines = Math.floor((chatHistoryHeight - 20) / (lineHeight + messageSpacing));
 
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const metrics = ctx.measureText(testLine);
+      // Limit the number of messages to display
+      const maxMessages = Math.min(this.chatHistory.length, Math.floor(maxLines / 2));
+      const messages = this.chatHistory.slice(-maxMessages);
 
-        if (metrics.width > maxLineWidth) {
-          lines.push(currentLine);
-          currentLine = word;
+      let currentY = y + 20;
+
+      // Draw each message
+      messages.forEach(message => {
+        // Set color based on role
+        if (message.role === 'user') {
+          ctx.fillStyle = '#4a90e2';
         } else {
-          currentLine = testLine;
+          ctx.fillStyle = '#ccc';
         }
-      }
 
-      if (currentLine) {
-        lines.push(currentLine);
-      }
+        // Draw role label
+        const roleLabel = message.role === 'user' ? 'User:' : 'Assistant:';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(roleLabel, x + 10, currentY);
+        currentY += lineHeight;
 
-      // Limit to max lines and add ellipsis if needed
-      const maxContentLines = 2;
-      if (lines.length > maxContentLines) {
-        lines = lines.slice(0, maxContentLines);
-        lines[maxContentLines - 1] += '...';
-      }
+        // Draw message content
+        ctx.font = '12px Arial';
 
-      // Draw each line
-      lines.forEach((line, index) => {
-        ctx.fillText(line, x + 15, currentY + (index * lineHeight));
+        // Split message into lines
+        const words = message.content.split(' ');
+        let lines = [];
+        let currentLine = '';
+
+        for (const word of words) {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const metrics = ctx.measureText(testLine);
+
+          if (metrics.width > maxLineWidth) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+
+        // Limit to max lines and add ellipsis if needed
+        const maxContentLines = 2;
+        if (lines.length > maxContentLines) {
+          lines = lines.slice(0, maxContentLines);
+          lines[maxContentLines - 1] += '...';
+        }
+
+        // Draw each line
+        lines.forEach((line, index) => {
+          ctx.fillText(line, x + 15, currentY + (index * lineHeight));
+        });
+
+        // Update Y position for next message
+        currentY += (lines.length * lineHeight) + messageSpacing;
       });
+    }
 
-      // Update Y position for next message
-      currentY += (lines.length * lineHeight) + messageSpacing;
-    });
+    // Draw chat input area
+    const inputY = y + chatHistoryHeight;
+
+    // Store the chat input area coordinates for interaction
+    this.chatInputArea = {
+      x: x + 5,
+      y: inputY + 5,
+      width: width - 70,
+      height: inputHeight - 10
+    };
+
+    // Store the send button coordinates for interaction
+    this.chatSendButton = {
+      x: x + width - 60,
+      y: inputY + 5,
+      width: 50,
+      height: inputHeight - 10,
+      tooltip: 'Send message'
+    };
+
+    // Draw input box
+    ctx.fillStyle = '#1e1e1e';
+    ctx.fillRect(this.chatInputArea.x, this.chatInputArea.y, this.chatInputArea.width, this.chatInputArea.height);
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.chatInputArea.x, this.chatInputArea.y, this.chatInputArea.width, this.chatInputArea.height);
+
+    // Draw placeholder text if no input
+    if (!this.chatInputText) {
+      ctx.fillStyle = '#666';
+      ctx.font = '12px Arial';
+      ctx.fillText('Type your message...', this.chatInputArea.x + 5, this.chatInputArea.y + 15);
+    } else {
+      // Draw the actual input text
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px Arial';
+
+      // Truncate if too long
+      let displayText = this.chatInputText;
+      if (ctx.measureText(displayText).width > this.chatInputArea.width - 10) {
+        // Find the maximum number of characters that fit
+        let i = 0;
+        while (i < displayText.length &&
+               ctx.measureText(displayText.substring(0, i) + '...').width < this.chatInputArea.width - 10) {
+          i++;
+        }
+        displayText = displayText.substring(0, i - 1) + '...';
+      }
+
+      ctx.fillText(displayText, this.chatInputArea.x + 5, this.chatInputArea.y + 15);
+    }
+
+    // Draw send button
+    ctx.fillStyle = this.processing ? '#666' : '#4a90e2';
+    ctx.fillRect(this.chatSendButton.x, this.chatSendButton.y, this.chatSendButton.width, this.chatSendButton.height);
+
+    // Draw send button text
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.processing ? '...' : 'Send',
+                 this.chatSendButton.x + this.chatSendButton.width / 2,
+                 this.chatSendButton.y + this.chatSendButton.height / 2);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
 
     // Draw message count badge with different colors based on count
-    const messageCount = this.chatHistory.length;
+    const messageCount = this.chatHistory ? this.chatHistory.length : 0;
 
     // Use different colors based on message count
     if (messageCount > 0) {
@@ -3197,12 +3268,12 @@ class Node {
       ctx.fillStyle = '#555'; // Default gray
     }
 
-    ctx.fillRect(x + width - 40, y + height - 40, 30, 30);
+    ctx.fillRect(x + width - 40, y + 5, 30, 30);
     ctx.fillStyle = '#fff';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${messageCount}`, x + width - 25, y + height - 25);
+    ctx.fillText(`${messageCount}`, x + width - 25, y + 20);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
   }
@@ -4047,6 +4118,37 @@ const App = {
 
     // Check if a toolbar button was clicked
     for (const node of this.nodes) {
+      // Check for chat input area click
+      if (node.contentType === 'chat' && node.chatInputArea &&
+          this.isPointInRect(canvasX, canvasY, node.chatInputArea)) {
+
+        // Set the active chat node
+        this.activeChatNode = node;
+
+        // Show a prompt for chat input
+        const message = prompt('Enter your message:', node.chatInputText || '');
+        if (message !== null) {
+          // Store the input text
+          node.chatInputText = message;
+
+          // Redraw to show the input
+          this.draw();
+        }
+        return;
+      }
+
+      // Check for chat send button click
+      if (node.contentType === 'chat' && node.chatSendButton &&
+          this.isPointInRect(canvasX, canvasY, node.chatSendButton)) {
+
+        // Only process if there's input text and the node isn't already processing
+        if (node.chatInputText && !node.processing) {
+          // Send the chat message
+          this.sendChatMessageFromNode(node);
+        }
+        return;
+      }
+
       // Check input collapse button
       if (node.inputCollapseButton &&
           this.isPointInButton(canvasX, canvasY, node.inputCollapseButton)) {
@@ -4106,6 +4208,15 @@ const App = {
            x <= button.x + button.width &&
            y >= button.y &&
            y <= button.y + button.height;
+  },
+
+  // Helper method to check if a point is inside a rectangle
+  isPointInRect(x, y, rect) {
+    return rect &&
+           x >= rect.x &&
+           x <= rect.x + rect.width &&
+           y >= rect.y &&
+           y <= rect.y + rect.height;
   },
 
   // Delete a node
@@ -6614,6 +6725,40 @@ const App = {
 
     // Open the node editor for the new chat node
     this.openNodeEditor(node);
+  },
+
+  // Send a chat message directly from a node in the canvas
+  async sendChatMessageFromNode(node) {
+    if (!node || !node.chatInputText || node.processing) {
+      return;
+    }
+
+    // Get the message from the node's chat input
+    const message = node.chatInputText;
+
+    // Clear the input text
+    node.chatInputText = '';
+
+    // Set processing state
+    node.processing = true;
+
+    try {
+      // Add the message to the chat history
+      node.addChatMessage(message, 'user');
+
+      // Process the message to get AI response
+      await node.processChatMessage(message);
+
+      // Redraw the canvas
+      this.draw();
+    } catch (error) {
+      DebugManager.addLog(`Error processing chat message: ${error.message}`, 'error');
+      node.error = error.message;
+    } finally {
+      // Clear processing state
+      node.processing = false;
+      this.draw();
+    }
   },
 
   // Send a chat message from a chat node
