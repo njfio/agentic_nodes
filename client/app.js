@@ -4125,15 +4125,8 @@ const App = {
         // Set the active chat node
         this.activeChatNode = node;
 
-        // Show a prompt for chat input
-        const message = prompt('Enter your message:', node.chatInputText || '');
-        if (message !== null) {
-          // Store the input text
-          node.chatInputText = message;
-
-          // Redraw to show the input
-          this.draw();
-        }
+        // Create a custom modal for chat input instead of using prompt()
+        this.openCustomChatInputModal(node);
         return;
       }
 
@@ -5009,11 +5002,8 @@ const App = {
         }
       }
 
-      // Clear the chat input
-      const chatInput = document.getElementById('chatInput');
-      if (chatInput) {
-        chatInput.value = '';
-      }
+      // Don't clear the chat input - this was causing the issue
+      // Instead, we'll leave it as is so the user can continue typing
     }
 
     // Set input and output types if those fields exist
@@ -6692,6 +6682,119 @@ const App = {
     DebugManager.addLog(`Added new node "Node ${id}" (ID: ${id})`, 'info');
     DebugManager.updateCanvasStats();
     this.draw();
+  },
+
+  // Open a custom chat input modal
+  openCustomChatInputModal(node) {
+    // Create modal container if it doesn't exist
+    let chatModal = document.getElementById('chatInputModal');
+    if (!chatModal) {
+      chatModal = document.createElement('div');
+      chatModal.id = 'chatInputModal';
+      chatModal.className = 'modal';
+
+      // Create modal content
+      const modalContent = document.createElement('div');
+      modalContent.className = 'modal-content chat-input-modal';
+
+      // Create header
+      const header = document.createElement('div');
+      header.className = 'modal-header';
+
+      const title = document.createElement('h2');
+      title.textContent = 'Chat Message';
+
+      const closeBtn = document.createElement('span');
+      closeBtn.className = 'close';
+      closeBtn.innerHTML = '&times;';
+      closeBtn.onclick = () => {
+        chatModal.style.display = 'none';
+      };
+
+      header.appendChild(title);
+      header.appendChild(closeBtn);
+
+      // Create body
+      const body = document.createElement('div');
+      body.className = 'modal-body';
+
+      const inputContainer = document.createElement('div');
+      inputContainer.className = 'chat-input-container';
+
+      const textarea = document.createElement('textarea');
+      textarea.id = 'customChatInput';
+      textarea.placeholder = 'Type your message here...';
+      textarea.rows = 4;
+
+      // Add event listener for Enter key
+      textarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById('sendCustomChatBtn').click();
+        }
+      });
+
+      inputContainer.appendChild(textarea);
+
+      // Create footer
+      const footer = document.createElement('div');
+      footer.className = 'modal-footer';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.className = 'btn btn-secondary';
+      cancelBtn.onclick = () => {
+        chatModal.style.display = 'none';
+      };
+
+      const sendBtn = document.createElement('button');
+      sendBtn.id = 'sendCustomChatBtn';
+      sendBtn.textContent = 'Send';
+      sendBtn.className = 'btn btn-primary';
+      sendBtn.onclick = () => {
+        const message = document.getElementById('customChatInput').value.trim();
+        if (message) {
+          // Store the input text in the node
+          this.activeChatNode.chatInputText = message;
+
+          // Send the message
+          this.sendChatMessageFromNode(this.activeChatNode);
+
+          // Close the modal
+          chatModal.style.display = 'none';
+        }
+      };
+
+      footer.appendChild(cancelBtn);
+      footer.appendChild(sendBtn);
+
+      // Assemble modal
+      modalContent.appendChild(header);
+      body.appendChild(inputContainer);
+      modalContent.appendChild(body);
+      modalContent.appendChild(footer);
+      chatModal.appendChild(modalContent);
+
+      // Add to document
+      document.body.appendChild(chatModal);
+    }
+
+    // Set the current value if any
+    const textarea = document.getElementById('customChatInput');
+    if (textarea) {
+      textarea.value = node.chatInputText || '';
+    }
+
+    // Show the modal
+    chatModal.style.display = 'block';
+
+    // Focus the textarea
+    setTimeout(() => {
+      const textarea = document.getElementById('customChatInput');
+      if (textarea) {
+        textarea.focus();
+      }
+    }, 100);
   },
 
   // Add a chat node to the canvas
