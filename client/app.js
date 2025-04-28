@@ -246,6 +246,7 @@ class Node {
     this.processing = false;
     this.error = null;
     this.contentImage = null; // For caching output image content
+    this.chatHistory = [];    // For storing chat messages
     this.inputImage = null;   // For caching input image content
     this.contentVideo = null; // For caching video content
     this.contentAudio = null; // For caching audio content
@@ -271,6 +272,9 @@ class Node {
     this.lastResponsePayload = null; // Last API response payload
     this.lastRequestTime = null; // Timestamp of last request
     this.lastResponseTime = null; // Timestamp of last response
+
+    // For chat nodes
+    this.chatHistory = []; // Array of chat messages with {role: 'user'|'assistant', content: string}
   }
 
   getContentTypeIcon() {
@@ -278,6 +282,7 @@ class Node {
       case 'image': return '🖼️';
       case 'audio': return '🔊';
       case 'video': return '🎥';
+      case 'chat': return '💬';
       default: return '📝';
     }
   }
@@ -301,6 +306,140 @@ class Node {
 
     // Log the reset
     DebugManager.addLog(`Reset input state for node "${this.title}" (ID: ${this.id})`, 'info');
+  }
+
+  // Add a message to the chat history
+  addChatMessage(message, role = 'user') {
+    // Create a new message object
+    const chatMessage = {
+      role,
+      content: message,
+      timestamp: new Date().toISOString()
+    };
+
+    // Initialize chat history if it doesn't exist
+    if (!this.chatHistory) {
+      this.chatHistory = [];
+    }
+
+    // Add to chat history
+    this.chatHistory.push(chatMessage);
+
+    // Update the content with the full chat history for passing to other nodes
+    this.updateChatContent();
+
+    // If this is a user message, process it to get AI response
+    if (role === 'user' && this.contentType === 'chat' && this.aiProcessor === 'chat') {
+      // Process the message to get AI response
+      this.processChatMessage(message);
+    }
+
+    return chatMessage;
+  }
+
+  // Update the node content with formatted chat history
+  updateChatContent() {
+    // Format the chat history as a string
+    let formattedChat = '';
+
+    this.chatHistory.forEach(msg => {
+      const roleLabel = msg.role === 'user' ? 'User' : 'Assistant';
+      formattedChat += `${roleLabel}: ${msg.content}\n\n`;
+    });
+
+    // Update the node content
+    this.content = formattedChat.trim();
+
+    // Mark as processed if we have any messages
+    if (this.chatHistory.length > 0) {
+      this.hasBeenProcessed = true;
+    }
+
+    // Auto-resize the node if needed
+    if (this.autoSize) {
+      this.calculateOptimalSize();
+    }
+  }
+
+  // Process a chat message to get AI response
+  async processChatMessage(message) {
+    // Set processing state
+    this.processing = true;
+    DebugManager.state.processingNodes++;
+
+    try {
+      // Create messages array for the API
+      const messages = [];
+
+      // Add system prompt if available
+      if (this.systemPrompt) {
+        messages.push({
+          role: 'system',
+          content: this.systemPrompt
+        });
+      }
+
+      // Add all chat history
+      this.chatHistory.forEach(msg => {
+        messages.push({
+          role: msg.role,
+          content: msg.content
+        });
+      });
+
+      // Get OpenAI config
+      const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
+
+      // Prepare the request data
+      const requestData = {
+        model: config.model || Config.defaultOpenAIConfig.model,
+        messages: messages,
+        temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
+        max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
+      };
+
+      // Store the request payload and timestamp
+      this.lastRequestPayload = JSON.parse(JSON.stringify(requestData));
+      this.lastRequestTime = new Date().toISOString();
+
+      // Log the timeout value for debugging
+      const timeoutSeconds = config.timeout || 300; // Default to 5 minutes if not set
+      DebugManager.addLog(`Using timeout of ${timeoutSeconds} seconds for chat node ${this.id}`, 'info');
+
+      // Call the API
+      const data = await ApiService.openai.chat(requestData);
+
+      // Check if we have a valid response
+      if (!data || !data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Invalid response from OpenAI API. Please try again.');
+      }
+
+      // Store the response payload and timestamp
+      this.lastResponsePayload = JSON.parse(JSON.stringify(data));
+      this.lastResponseTime = new Date().toISOString();
+
+      // Get the response content
+      const responseContent = data.choices[0].message.content;
+
+      // Add the AI response to chat history
+      this.addChatMessage(responseContent, 'assistant');
+
+      // Update stats
+      DebugManager.state.totalRequests++;
+
+      // Redraw the canvas
+      App.draw();
+
+      return responseContent;
+    } catch (err) {
+      this.error = err.message;
+      DebugManager.addLog(`Chat node "${this.title}" (ID: ${this.id}) error: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      this.processing = false;
+      DebugManager.state.processingNodes--;
+      DebugManager.updateUsageStats();
+    }
   }
 
   async process(input) {
@@ -355,6 +494,26 @@ class Node {
 
         case 'audio-to-text':
           output = await this.processAudioToText(input);
+          break;
+
+        case 'chat':
+          // For chat nodes, add the input as a user message and process it
+          if (input && input.trim()) {
+            // Initialize chat history if it doesn't exist
+            if (!this.chatHistory) {
+              this.chatHistory = [];
+            }
+
+            // Add the input as a user message
+            this.addChatMessage(input, 'user');
+
+            // Process the message to get AI response
+            output = await this.processChatMessage(input);
+          } else {
+            // If no input, just return the last message or empty string
+            output = this.chatHistory && this.chatHistory.length > 0 ?
+              this.chatHistory[this.chatHistory.length - 1].content : '';
+          }
           break;
 
         default:
@@ -1924,6 +2083,23 @@ class Node {
       return combinedText;
     }
 
+    // For chat nodes
+    if (this.aiProcessor === 'chat' || this.contentType === 'chat') {
+      // For chat nodes, we'll add the combined text as a user message
+      if (textInputs.length > 0) {
+        // If we have chat history, add the combined text as a user message
+        if (!this.chatHistory) {
+          this.chatHistory = [];
+        }
+
+        // Add the combined text as a user message
+        this.addChatMessage(combinedText, 'user');
+
+        // Return the combined text
+        return combinedText;
+      }
+    }
+
     // For text-to-image nodes
     if (this.aiProcessor === 'text-to-image') {
       // If we have text inputs, use those
@@ -2312,6 +2488,24 @@ class Node {
 
         newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, baseHeight + inputHeight + outputHeight));
       }
+      else if (this.contentType === 'chat') {
+        // For chat nodes, adjust size based on chat history
+        newWidth = Math.max(newWidth, 300); // Minimum width for chat nodes
+
+        // Calculate height based on chat history
+        const baseHeight = 40; // Title area
+        const inputHeight = this.inputContent ? Math.min(80, this.getTextLines(ctx, this.inputContent, newWidth - 40).length * 14 + 20) : 30;
+
+        // Calculate output height based on chat history
+        let outputHeight = 100; // Default height for chat area
+
+        if (this.chatHistory && this.chatHistory.length > 0) {
+          // Add height for each message (2 lines per message on average)
+          outputHeight = Math.min(300, 20 + (this.chatHistory.length * 40));
+        }
+
+        newHeight = Math.min(this.maxHeight, Math.max(this.minHeight, baseHeight + inputHeight + outputHeight));
+      }
     }
 
     // Update node dimensions
@@ -2425,6 +2619,9 @@ class Node {
           break;
         case 'audio':
           this.drawAudioContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
+          break;
+        case 'chat':
+          this.drawChatContent(ctx, contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
           break;
       }
     } else {
@@ -2904,6 +3101,112 @@ class Node {
     ctx.stroke();
   }
 
+  // Draw chat content
+  drawChatContent(ctx, x, y, width, height) {
+    if (!this.chatHistory || this.chatHistory.length === 0) {
+      ctx.fillStyle = '#666';
+      ctx.font = '12px Arial';
+      ctx.fillText('No chat messages. Double-click to edit...', x + 10, y + 20);
+      return;
+    }
+
+    ctx.fillStyle = '#ccc';
+    ctx.font = '12px Arial';
+
+    // Calculate available space
+    const maxLineWidth = width - 20;
+    const lineHeight = 16;
+    const messageSpacing = 8;
+    const maxLines = Math.floor((height - 20) / (lineHeight + messageSpacing));
+
+    // Limit the number of messages to display
+    const maxMessages = Math.min(this.chatHistory.length, Math.floor(maxLines / 2));
+    const messages = this.chatHistory.slice(-maxMessages);
+
+    let currentY = y + 20;
+
+    // Draw each message
+    messages.forEach(message => {
+      // Set color based on role
+      if (message.role === 'user') {
+        ctx.fillStyle = '#4a90e2';
+      } else {
+        ctx.fillStyle = '#ccc';
+      }
+
+      // Draw role label
+      const roleLabel = message.role === 'user' ? 'User:' : 'Assistant:';
+      ctx.font = 'bold 12px Arial';
+      ctx.fillText(roleLabel, x + 10, currentY);
+      currentY += lineHeight;
+
+      // Draw message content
+      ctx.font = '12px Arial';
+
+      // Split message into lines
+      const words = message.content.split(' ');
+      let lines = [];
+      let currentLine = '';
+
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const metrics = ctx.measureText(testLine);
+
+        if (metrics.width > maxLineWidth) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      // Limit to max lines and add ellipsis if needed
+      const maxContentLines = 2;
+      if (lines.length > maxContentLines) {
+        lines = lines.slice(0, maxContentLines);
+        lines[maxContentLines - 1] += '...';
+      }
+
+      // Draw each line
+      lines.forEach((line, index) => {
+        ctx.fillText(line, x + 15, currentY + (index * lineHeight));
+      });
+
+      // Update Y position for next message
+      currentY += (lines.length * lineHeight) + messageSpacing;
+    });
+
+    // Draw message count badge with different colors based on count
+    const messageCount = this.chatHistory.length;
+
+    // Use different colors based on message count
+    if (messageCount > 0) {
+      // More messages = more prominent badge
+      if (messageCount > 5) {
+        ctx.fillStyle = '#4a90e2'; // Blue for many messages
+      } else if (messageCount > 2) {
+        ctx.fillStyle = '#27ae60'; // Green for some messages
+      } else {
+        ctx.fillStyle = '#555'; // Gray for few messages
+      }
+    } else {
+      ctx.fillStyle = '#555'; // Default gray
+    }
+
+    ctx.fillRect(x + width - 40, y + height - 40, 30, 30);
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${messageCount}`, x + width - 25, y + height - 25);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+  }
+
   draw(ctx) {
     // Preload content if needed
     this.preloadContent();
@@ -3253,6 +3556,7 @@ const App = {
     window.addEventListener('keydown', (e) => this.handleKeyDown(e));
 
     document.getElementById('addNodeBtn').addEventListener('click', () => this.addNode());
+    document.getElementById('addChatNodeBtn').addEventListener('click', () => this.addChatNode());
     document.getElementById('configBtn').addEventListener('click', () => ModalManager.openModal('configModal'));
     document.getElementById('saveWorkflowBtn').addEventListener('click', () => this.handleSaveWorkflow());
     document.getElementById('saveBtn').addEventListener('click', () => this.handleSave());
@@ -3471,6 +3775,65 @@ const App = {
     if (section) {
       section.style.display = 'block';
 
+      // If this is a chat section, make sure we have the chat UI elements
+      if (contentType === 'chat') {
+        // Check if we need to create the chat UI
+        if (!document.getElementById('chatHistory')) {
+          // Create chat UI elements
+          const chatSection = document.getElementById('chatContentSection');
+          if (chatSection) {
+            // Create chat history container
+            const chatHistoryContainer = document.createElement('div');
+            chatHistoryContainer.id = 'chatHistory';
+            chatHistoryContainer.className = 'chat-history';
+
+            // Create chat input container
+            const chatInputContainer = document.createElement('div');
+            chatInputContainer.className = 'chat-input-container';
+
+            // Create chat input
+            const chatInput = document.createElement('textarea');
+            chatInput.id = 'chatInput';
+            chatInput.className = 'chat-input';
+            chatInput.placeholder = 'Type your message here...';
+            chatInput.rows = 3;
+
+            // Create send button
+            const sendButton = document.createElement('button');
+            sendButton.id = 'sendChatMessage';
+            sendButton.className = 'chat-send-button';
+            sendButton.textContent = 'Send';
+
+            // Create message counter
+            const messageCounter = document.createElement('div');
+            messageCounter.className = 'chat-message-counter';
+            messageCounter.innerHTML = 'Messages: <span id="messageCount">0</span>';
+
+            // Add elements to containers
+            chatInputContainer.appendChild(chatInput);
+            chatInputContainer.appendChild(sendButton);
+
+            // Add containers to chat section
+            chatSection.appendChild(messageCounter);
+            chatSection.appendChild(chatHistoryContainer);
+            chatSection.appendChild(chatInputContainer);
+
+            // Add event listener to send button
+            sendButton.addEventListener('click', () => {
+              App.sendChatMessageFromEditor();
+            });
+
+            // Add event listener to chat input for Enter key
+            chatInput.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                App.sendChatMessageFromEditor();
+              }
+            });
+          }
+        }
+      }
+
       // Special handling for image-to-text nodes
       if (this.editingNode && this.editingNode.aiProcessor === 'image-to-text') {
         // For image-to-text nodes, we need to handle both the input image and output text
@@ -3566,6 +3929,10 @@ const App = {
         inputType.value = 'video';
         outputType.value = 'text';
         break;
+      case 'chat':
+        inputType.value = 'text';
+        outputType.value = 'text';
+        break;
     }
 
     inputType.disabled = true;
@@ -3592,6 +3959,10 @@ const App = {
       case 'video':
         return `
           <option value="video-to-text">Video to Text</option>
+        `;
+      case 'chat':
+        return `
+          <option value="chat">Chat</option>
         `;
       default:
         return `
@@ -4193,6 +4564,18 @@ const App = {
       }
     }
 
+    // Add node with 'N' key
+    if (e.key === 'n' || e.key === 'N') {
+      this.addNode();
+      DebugManager.addLog('Added new node with keyboard shortcut', 'info');
+    }
+
+    // Add chat node with 'C' key
+    if (e.key === 'c' || e.key === 'C') {
+      this.addChatNode();
+      DebugManager.addLog('Added new chat node with keyboard shortcut', 'info');
+    }
+
     // Reset view with 'R' key
     if (e.key === 'r' || e.key === 'R') {
       this.scale = 1;
@@ -4463,6 +4846,62 @@ const App = {
       // For text nodes, show the input content in the text area
       if (nodeContent) {
         nodeContent.value = node.inputContent || node.content || '';
+      }
+    } else if (node.contentType === 'chat') {
+      // For chat nodes, we need to handle the chat history
+
+      // Update content section to show chat interface
+      this.updateContentSection('chat');
+
+      // Update the chat history display
+      const chatHistoryContainer = document.getElementById('chatHistory');
+      if (chatHistoryContainer) {
+        // Clear existing chat history
+        chatHistoryContainer.innerHTML = '';
+
+        // Add each message to the chat history display
+        if (node.chatHistory && node.chatHistory.length > 0) {
+          node.chatHistory.forEach(msg => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${msg.role}`;
+
+            const roleLabel = document.createElement('div');
+            roleLabel.className = 'chat-role';
+            roleLabel.textContent = msg.role === 'user' ? 'User' : 'Assistant';
+
+            const messageContent = document.createElement('div');
+            messageContent.className = 'chat-content';
+            messageContent.textContent = msg.content;
+
+            messageDiv.appendChild(roleLabel);
+            messageDiv.appendChild(messageContent);
+            chatHistoryContainer.appendChild(messageDiv);
+          });
+
+          // Update message count
+          const messageCount = document.getElementById('messageCount');
+          if (messageCount) {
+            messageCount.textContent = node.chatHistory.length;
+          }
+        } else {
+          // No messages yet
+          const emptyMessage = document.createElement('div');
+          emptyMessage.className = 'chat-empty';
+          emptyMessage.textContent = 'No chat messages yet. Type a message below to start chatting.';
+          chatHistoryContainer.appendChild(emptyMessage);
+
+          // Set message count to 0
+          const messageCount = document.getElementById('messageCount');
+          if (messageCount) {
+            messageCount.textContent = '0';
+          }
+        }
+      }
+
+      // Clear the chat input
+      const chatInput = document.getElementById('chatInput');
+      if (chatInput) {
+        chatInput.value = '';
       }
     }
 
@@ -4849,6 +5288,98 @@ const App = {
     }
   },
 
+  // Send a chat message from the chat input
+  sendChatMessage() {
+    if (!this.editingNode) return;
+
+    // Get the chat input
+    const chatInput = document.getElementById('chatInput');
+    if (!chatInput || !chatInput.value.trim()) return;
+
+    // Add the message to the chat history
+    const message = chatInput.value.trim();
+    this.editingNode.addChatMessage(message, 'user');
+
+    // Clear the input
+    chatInput.value = '';
+
+    // Update the message count
+    const messageCount = document.getElementById('messageCount');
+    if (messageCount) {
+      messageCount.textContent = this.editingNode.chatHistory.length;
+    }
+
+    // Redraw the canvas
+    this.draw();
+  },
+
+  // Send a chat message from the node editor and process it
+  async sendChatMessageFromEditor() {
+    if (!this.editingNode) return null;
+
+    // Get the chat input
+    const chatInput = document.getElementById('chatInput');
+    if (!chatInput || !chatInput.value.trim()) return null;
+
+    // Get the message
+    const message = chatInput.value.trim();
+
+    // Add the message to the chat history
+    this.editingNode.addChatMessage(message, 'user');
+
+    // Clear the input
+    chatInput.value = '';
+
+    // Update the message count
+    const messageCount = document.getElementById('messageCount');
+    if (messageCount) {
+      messageCount.textContent = this.editingNode.chatHistory.length;
+    }
+
+    // Get the processing log element
+    const processingLog = document.getElementById('processingLog');
+    if (processingLog) {
+      processingLog.innerHTML += `
+        <div class="log-entry">
+          <div>User: ${message}</div>
+        </div>
+      `;
+    }
+
+    // Process the message
+    try {
+      const result = await this.editingNode.processChatMessage(message);
+
+      // Show the chat message in the processing log
+      if (processingLog) {
+        processingLog.innerHTML += `
+          <div class="log-entry success">
+            <div>Assistant: ${result}</div>
+          </div>
+        `;
+      }
+
+      // Log success for debugging
+      DebugManager.addLog(`Chat message processed for node ${this.editingNode.id}`, 'success');
+
+      return result;
+    } catch (error) {
+      // Show the error in the processing log
+      if (processingLog) {
+        processingLog.innerHTML += `
+          <div class="log-entry error">
+            <div>Error: ${error.message}</div>
+          </div>
+        `;
+      }
+
+      // Log error for debugging
+      DebugManager.addLog(`Error processing chat message: ${error.message}`, 'error');
+
+      throw error;
+    }
+  },
+
   // Save changes from the node editor
   saveNodeEditor(e) {
     // If called from an event, prevent default form submission
@@ -4943,6 +5474,36 @@ const App = {
               this.editingNode.needsImageGeneration = true;
             }
           }
+        }
+        break;
+
+      case 'chat':
+        // For chat nodes, we need to handle the chat history
+        // The chat history is already stored in the node
+        // We just need to make sure the content type is set to chat
+        this.editingNode.contentType = 'chat';
+
+        // If there's a system prompt, update it
+        const systemPrompt = document.getElementById('systemPrompt').value;
+        if (systemPrompt) {
+          this.editingNode.systemPrompt = systemPrompt;
+        }
+
+        // If there's a chat input, get it
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput && chatInput.value.trim()) {
+          // Add the message to the chat history
+          const message = chatInput.value.trim();
+          this.editingNode.addChatMessage(message, 'user');
+
+          // Clear the input
+          chatInput.value = '';
+        }
+
+        // Update the message count
+        const messageCount = document.getElementById('messageCount');
+        if (messageCount) {
+          messageCount.textContent = this.editingNode.chatHistory.length;
         }
         break;
 
@@ -5080,6 +5641,32 @@ const App = {
           inputContent = document.getElementById('nodeContent').value;
           break;
 
+        case 'chat':
+          // For chat, get input from the chat input
+          const chatInput = document.getElementById('chatInput');
+          if (chatInput && chatInput.value.trim()) {
+            inputContent = chatInput.value.trim();
+
+            // Show the chat input in the processing log
+            if (processingLog) {
+              processingLog.innerHTML += `
+                <div class="log-entry">
+                  <div>User message:</div>
+                  <div class="chat-message user">${inputContent}</div>
+                </div>
+              `;
+            }
+          } else {
+            // If no input, use the last message from chat history
+            if (this.editingNode.chatHistory && this.editingNode.chatHistory.length > 0) {
+              const lastMessage = this.editingNode.chatHistory[this.editingNode.chatHistory.length - 1];
+              if (lastMessage.role === 'user') {
+                inputContent = lastMessage.content;
+              }
+            }
+          }
+          break;
+
         case 'image':
           // For image-to-text, use the node's content as input
           if (this.editingNode.aiProcessor === 'image-to-text') {
@@ -5188,6 +5775,18 @@ const App = {
 
           // Log success for debugging
           DebugManager.addLog(`Image generated successfully for node ${this.editingNode.id}: ${result.substring(0, 30)}...`, 'success');
+          break;
+
+        case 'chat':
+          // For chat nodes, use our sendChatMessageFromEditor method
+          try {
+            result = await this.sendChatMessageFromEditor();
+            if (!result) {
+              throw new Error('No chat message to process');
+            }
+          } catch (error) {
+            throw error;
+          }
           break;
 
         case 'image-to-text':
@@ -5544,7 +6143,8 @@ const App = {
         inputCollapsed: node.inputCollapsed,
         outputCollapsed: node.outputCollapsed,
         error: node.error,
-        workflowRole: node.workflowRole || 'none'
+        workflowRole: node.workflowRole || 'none',
+        chatHistory: node.chatHistory || []
       })),
       connections: this.connections.map(conn => ({
         fromNodeId: conn.fromNode.id,
@@ -5650,7 +6250,8 @@ const App = {
         inputCollapsed: node.inputCollapsed,
         outputCollapsed: node.outputCollapsed,
         error: node.error,
-        workflowRole: node.workflowRole || 'none'
+        workflowRole: node.workflowRole || 'none',
+        chatHistory: node.chatHistory || []
       })),
       connections: this.connections.map(conn => ({
         fromNodeId: conn.fromNode.id,
@@ -5817,6 +6418,11 @@ const App = {
       node.outputCollapsed = nodeData.outputCollapsed || false;
       node.autoSize = nodeData.autoSize !== undefined ? nodeData.autoSize : true;
 
+      // Restore chat history if it exists
+      if (nodeData.chatHistory && Array.isArray(nodeData.chatHistory)) {
+        node.chatHistory = [...nodeData.chatHistory];
+      }
+
       // Restore workflow role if it exists
       if (nodeData.workflowRole) {
         node.workflowRole = nodeData.workflowRole;
@@ -5975,6 +6581,277 @@ const App = {
     DebugManager.addLog(`Added new node "Node ${id}" (ID: ${id})`, 'info');
     DebugManager.updateCanvasStats();
     this.draw();
+  },
+
+  // Add a chat node to the canvas
+  addChatNode() {
+    const id = this.nodes.length + 1;
+    const x = window.innerWidth/2 - 80;
+    const y = window.innerHeight/2 - 40;
+    const node = new Node(x, y, id);
+
+    // Configure as a chat node
+    node.title = "Chat Node " + id;
+    node.contentType = 'chat';
+    node.aiProcessor = 'chat';
+    node.inputType = 'text';
+    node.outputType = 'text';
+    node.systemPrompt = "You are a helpful assistant. Respond to the user's messages in a friendly and informative way.";
+    node.width = 300; // Make chat nodes wider by default
+    node.height = 200; // Make chat nodes taller by default
+
+    // Initialize chat history array
+    node.chatHistory = [];
+
+    // Select the new node
+    this.nodes.forEach(n => n.selected = false);
+    node.selected = true;
+
+    this.nodes.push(node);
+    DebugManager.addLog(`Added new chat node "Chat Node ${id}" (ID: ${id})`, 'info');
+    DebugManager.updateCanvasStats();
+    this.draw();
+
+    // Open the node editor for the new chat node
+    this.openNodeEditor(node);
+  },
+
+  // Send a chat message from a chat node
+  async sendChatMessage(node, message) {
+    if (!node || !message || message.trim() === '') {
+      DebugManager.addLog('Cannot send empty message', 'error');
+      return;
+    }
+
+    try {
+      // Set node to processing state
+      node.processing = true;
+      this.draw();
+
+      // Add user message to chat history
+      if (!node.chatHistory) {
+        node.chatHistory = [];
+      }
+
+      // Add user message
+      node.chatHistory.push({
+        role: 'user',
+        content: message
+      });
+
+      // Get the system prompt
+      const systemPrompt = node.systemPrompt || "You are a helpful assistant.";
+
+      // Prepare the messages array for the API
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...node.chatHistory
+      ];
+
+      // Get OpenAI config
+      const config = OpenAIConfig.getConfig();
+
+      // Log the request
+      DebugManager.addLog(`Sending chat request to OpenAI API (model: ${config.model})`, 'info');
+
+      // Make API request
+      const response = await fetch('/api/openai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messages: messages,
+          model: config.model,
+          max_tokens: config.max_tokens,
+          temperature: config.temperature
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response from OpenAI API');
+      }
+
+      const data = await response.json();
+
+      // Extract the assistant's response
+      const assistantResponse = data.choices[0].message.content;
+
+      // Add assistant response to chat history
+      node.chatHistory.push({
+        role: 'assistant',
+        content: assistantResponse
+      });
+
+      // Update node state
+      node.processing = false;
+      node.hasBeenProcessed = true;
+      node.error = null;
+
+      // Set the node content to the latest message for connections
+      node.content = assistantResponse;
+
+      // Auto-resize the node if needed
+      if (node.autoSize) {
+        node.calculateOptimalSize();
+      }
+
+      // Redraw the canvas
+      this.draw();
+
+      // Log success
+      DebugManager.addLog(`Chat response received for node ${node.id}`, 'success');
+
+      // Process any connected nodes
+      const connections = this.connections.filter(conn => conn.fromNode === node);
+      if (connections.length > 0) {
+        DebugManager.addLog(`Processing ${connections.length} connected node(s)...`, 'info');
+
+        // Process each connected node
+        for (const connection of connections) {
+          try {
+            await this.processNodeAndConnections(connection.toNode, assistantResponse);
+          } catch (err) {
+            DebugManager.addLog(`Error processing connected node ${connection.toNode.id}: ${err.message}`, 'error');
+          }
+        }
+      }
+
+      return assistantResponse;
+    } catch (error) {
+      // Handle errors
+      node.processing = false;
+      node.error = error.message;
+      DebugManager.addLog(`Chat error: ${error.message}`, 'error');
+      this.draw();
+      throw error;
+    }
+  },
+
+  // Send a chat message from the node editor
+  async sendChatMessageFromEditor() {
+    if (!this.editingNode) {
+      DebugManager.addLog('No node being edited', 'error');
+      return;
+    }
+
+    // Get the chat input
+    const chatInput = document.getElementById('chatInput');
+    if (!chatInput || !chatInput.value.trim()) {
+      DebugManager.addLog('Cannot send empty message', 'error');
+      return;
+    }
+
+    // Get the message
+    const message = chatInput.value.trim();
+
+    try {
+      // Disable the input and send button while processing
+      chatInput.disabled = true;
+      const sendButton = document.getElementById('sendChatMessage');
+      if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending...';
+      }
+
+      // Update the processing log
+      const processingLog = document.getElementById('processingLog');
+      if (processingLog) {
+        processingLog.innerHTML += `
+          <div class="log-entry">
+            <div>Sending message: ${message}</div>
+          </div>
+        `;
+      }
+
+      // Update the chat history UI
+      this.updateChatHistoryUI(this.editingNode, message, 'user');
+
+      // Send the message
+      const response = await this.sendChatMessage(this.editingNode, message);
+
+      // Update the chat history UI with the response
+      this.updateChatHistoryUI(this.editingNode, response, 'assistant');
+
+      // Update the processing log
+      if (processingLog) {
+        processingLog.innerHTML += `
+          <div class="log-entry success">
+            <div>Response received: ${response}</div>
+          </div>
+        `;
+      }
+
+      // Clear the input
+      chatInput.value = '';
+
+      // Update the message count
+      const messageCount = document.getElementById('messageCount');
+      if (messageCount) {
+        messageCount.textContent = this.editingNode.chatHistory.length;
+      }
+
+      // Log success
+      DebugManager.addLog('Chat message sent and response received', 'success');
+
+      return response;
+    } catch (error) {
+      // Update the processing log with the error
+      const processingLog = document.getElementById('processingLog');
+      if (processingLog) {
+        processingLog.innerHTML += `
+          <div class="log-entry error">
+            <div>Error: ${error.message}</div>
+          </div>
+        `;
+      }
+
+      // Log the error
+      DebugManager.addLog(`Chat error: ${error.message}`, 'error');
+    } finally {
+      // Re-enable the input and send button
+      chatInput.disabled = false;
+      chatInput.focus();
+      const sendButton = document.getElementById('sendChatMessage');
+      if (sendButton) {
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send';
+      }
+    }
+  },
+
+  // Update the chat history UI
+  updateChatHistoryUI(node, message, role) {
+    if (!node || !message) return;
+
+    // Get the chat history container
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return;
+
+    // Create a new message element
+    const messageElement = document.createElement('div');
+    messageElement.className = `chat-message ${role}`;
+
+    // Add role label
+    const roleLabel = document.createElement('div');
+    roleLabel.className = 'chat-role';
+    roleLabel.textContent = role === 'user' ? 'User' : 'Assistant';
+
+    // Add message content
+    const contentElement = document.createElement('div');
+    contentElement.className = 'chat-content';
+    contentElement.textContent = message;
+
+    // Add elements to the message
+    messageElement.appendChild(roleLabel);
+    messageElement.appendChild(contentElement);
+
+    // Add the message to the chat history
+    chatHistory.appendChild(messageElement);
+
+    // Scroll to the bottom
+    chatHistory.scrollTop = chatHistory.scrollHeight;
   },
 
   draw() {
