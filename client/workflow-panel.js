@@ -174,33 +174,30 @@ const WorkflowPanel = {
       return;
     }
 
-    // Log the content for debugging
-    console.log("Rendering content:", typeof content, content.substring ? content.substring(0, 100) : content);
-
-    // Debug the forceImage flag
-    if (forceImage) {
-      console.log("Force image flag is set to true");
-    }
-
-    // Add more detailed debugging
-    if (typeof content === 'string' && content.startsWith('data:image')) {
-      console.log("Content is a data:image URL");
-    } else if (typeof content === 'string' && content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)) {
-      console.log("Content is an image URL");
-    } else if (typeof content === 'string' && content.includes('data:image')) {
-      console.log("Content contains embedded image data");
-    }
+    // Add a special debug message for workflow chat
+    console.log("WorkflowPanel.renderContent called with:", {
+      contentType: typeof content,
+      isString: typeof content === 'string',
+      isDataImage: typeof content === 'string' && content.startsWith('data:image'),
+      forceImage: forceImage,
+      contentLength: typeof content === 'string' ? content.length : 'N/A',
+      contentPreview: typeof content === 'string' ? content.substring(0, 100) : 'N/A'
+    });
 
     try {
       // Check if content is an image (data URL or image URL) or if forceImage is true
-      if (forceImage || (typeof content === 'string' && (
+      const isImageContent = forceImage || (typeof content === 'string' && (
           content.startsWith('data:image') ||
           content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
-      ))) {
-        console.log("Detected image content");
+      ));
+
+      if (isImageContent) {
+        console.log("Detected image content in workflow chat");
 
         // Create image element
         const img = document.createElement('img');
+
+        // Set the image source
         img.src = content;
         img.alt = 'Image';
         img.className = 'chat-message-image';
@@ -213,7 +210,7 @@ const WorkflowPanel = {
 
         // Handle image load
         img.onload = () => {
-          console.log("Image loaded successfully");
+          console.log("Image loaded successfully in workflow chat");
           // Remove loading indicator
           if (loadingIndicator.parentNode) {
             loadingIndicator.parentNode.removeChild(loadingIndicator);
@@ -236,11 +233,17 @@ const WorkflowPanel = {
 
         // Handle image error
         img.onerror = (e) => {
-          console.error("Error loading image:", e);
+          console.error("Error loading image in workflow chat:", e);
           if (loadingIndicator.parentNode) {
             loadingIndicator.textContent = 'Error loading image';
             loadingIndicator.className = 'image-error-indicator';
           }
+
+          // Try to display error details
+          const errorEl = document.createElement('div');
+          errorEl.className = 'image-error-details';
+          errorEl.textContent = `Failed to load image. Length: ${content.length}`;
+          contentEl.appendChild(errorEl);
         };
 
         // Add image to content
