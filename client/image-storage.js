@@ -111,11 +111,29 @@ class ImageStorage {
     // Only try if we're in a context with fetch API
     if (typeof fetch === 'undefined') return;
 
+    // Skip server saving if we're in development mode without a server
+    // This prevents the 404 errors in the console
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      // Store the image in memory only
+      return;
+    }
+
     // Don't block the main thread
     setTimeout(async () => {
       try {
+        // Use the Config.apiBaseUrl if available to ensure correct port
+        const apiBaseUrl = window.Config?.apiBaseUrl || '/api';
+        const statusUrl = apiBaseUrl.endsWith('/api')
+          ? apiBaseUrl + '/status'
+          : apiBaseUrl + '/api/status';
+
         // Check if we have a server API available
-        const response = await fetch('/api/status', { method: 'HEAD' });
+        const response = await fetch(statusUrl, {
+          method: 'HEAD',
+          // Add a timeout to prevent hanging requests
+          signal: AbortSignal.timeout(3000)
+        });
+
         if (response.ok) {
           // Server is available, try to save the image
           await this.saveImageToServer(imageData, null, null);
@@ -125,7 +143,10 @@ class ImageStorage {
         }
       } catch (error) {
         // Silently fail - this is just a background optimization
-        console.warn('Could not save image to server:', error);
+        // Don't log to console to avoid cluttering it
+        if (typeof DebugManager !== 'undefined') {
+          DebugManager.addLog(`Image server storage skipped: ${error.message}`, 'info');
+        }
       }
     }, 100);
   }
@@ -169,10 +190,32 @@ class ImageStorage {
         DebugManager.addLog(`Loading images for workflow ${workflowId}...`, 'info');
       }
 
-      // Fetch the list of images for this workflow
-      const response = await fetch(`/api/images/workflow/${workflowId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to load workflow images: ${response.statusText}`);
+      // Use the Config.apiBaseUrl if available to ensure correct port
+      const apiBaseUrl = window.Config?.apiBaseUrl || '/api';
+      const workflowImagesUrl = apiBaseUrl.endsWith('/api')
+        ? `${apiBaseUrl}/images/workflow/${workflowId}`
+        : `${apiBaseUrl}/api/images/workflow/${workflowId}`;
+
+      // Fetch the list of images for this workflow with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      try {
+        const response = await fetch(workflowImagesUrl, {
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`Failed to load workflow images: ${response.statusText}`);
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Timeout loading workflow images');
+        }
+        throw fetchError;
       }
 
       const images = await response.json();
@@ -382,7 +425,13 @@ class ImageStorage {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
       try {
-        const imageResponse = await fetch(`/api/images/${imageId}`, {
+        // Use the Config.apiBaseUrl if available to ensure correct port
+        const apiBaseUrl = window.Config?.apiBaseUrl || '/api';
+        const imageUrl = apiBaseUrl.endsWith('/api')
+          ? `${apiBaseUrl}/images/${imageId}`
+          : `${apiBaseUrl}/api/images/${imageId}`;
+
+        const imageResponse = await fetch(imageUrl, {
           signal: controller.signal
         });
 
@@ -506,23 +555,43 @@ class ImageStorage {
         workflow: workflowId
       };
 
-      // Send the request
-      const response = await fetch('/api/images', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
+      // Use the Config.apiBaseUrl if available to ensure correct port
+      const apiBaseUrl = window.Config?.apiBaseUrl || '/api';
+      const imagesUrl = apiBaseUrl.endsWith('/api')
+        ? `${apiBaseUrl}/images`
+        : `${apiBaseUrl}/api/images`;
 
-      if (!response.ok) {
-        throw new Error(`Failed to save image: ${response.statusText}`);
+      // Send the request with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      try {
+        const response = await fetch(imagesUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`Failed to save image: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        return result.imageId;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
       }
-
-      const result = await response.json();
-      return result.imageId;
     } catch (error) {
-      console.error('Error saving image to server:', error);
+      // Log to debug manager instead of console to avoid cluttering
+      if (typeof DebugManager !== 'undefined') {
+        DebugManager.addLog(`Error saving image to server: ${error.message}`, 'warning');
+      }
       throw error;
     }
   }
