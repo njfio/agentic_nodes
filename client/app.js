@@ -2258,9 +2258,9 @@ class Node {
           this.contentImage.onload = () => {
             DebugManager.addLog(`Image loaded for node ${nodeId}`, 'success');
 
-            // Force a redraw to show the updated image
-            if (typeof App !== 'undefined') {
-              App.draw();
+            // Only update size, don't trigger a full redraw
+            if (this.autoSize) {
+              this.calculateOptimalSize();
             }
 
             // Clean up the event handler after it's fired
@@ -2362,7 +2362,7 @@ class Node {
         clearTimeout(loadTimeout);
         DebugManager.addLog(`Error loading input image for node ${this.id}`, 'error');
         this.inputImage = null; // Clear the broken image
-        App.draw();
+        // Don't call App.draw() here to prevent reloading loops
       };
 
       // When input image loads, update node size if auto-sizing is enabled
@@ -2373,7 +2373,7 @@ class Node {
 
         if (this.autoSize) {
           this.calculateOptimalSize();
-          App.draw();
+          // Don't call App.draw() here to prevent reloading loops
         }
       };
 
@@ -2509,10 +2509,8 @@ class Node {
             this.calculateOptimalSize();
           }
 
-          // Redraw the canvas
-          if (typeof App !== 'undefined') {
-            App.draw();
-          }
+          // Don't redraw the canvas here to prevent reloading loops
+          // The main App.draw() cycle will handle this
 
           resolve();
         };
@@ -2551,9 +2549,7 @@ class Node {
         // Update node size if auto-sizing is enabled
         if (this.autoSize) {
           this.calculateOptimalSize();
-          if (typeof App !== 'undefined') {
-            App.draw();
-          }
+          // Don't call App.draw() here to prevent reloading loops
         }
       };
 
