@@ -493,8 +493,12 @@ const WorkflowIO = {
         DebugManager.addLog("Some nodes are still processing, but maximum wait time reached", "warning");
       }
 
-      // Remove the waiting message
-      WorkflowPanel.removeMessage(waitingMessageId);
+      // Always remove the waiting message before showing results
+      try {
+        WorkflowPanel.removeMessage(waitingMessageId);
+      } catch (error) {
+        console.warn("Error removing waiting message:", error);
+      }
 
       // Get all nodes connected to the input node
       const connectedNodes = App.getConnectedNodes(this.inputNode);

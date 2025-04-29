@@ -169,11 +169,16 @@ const WorkflowPanel = {
       return;
     }
 
+    // Log the content for debugging
+    console.log("Rendering content:", typeof content, content.substring ? content.substring(0, 100) : content);
+
     // Check if content is an image (data URL or image URL)
     if (typeof content === 'string' && (
         content.startsWith('data:image') ||
         content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
     )) {
+      console.log("Detected image content");
+
       // Create image element
       const img = document.createElement('img');
       img.src = content;
@@ -188,6 +193,7 @@ const WorkflowPanel = {
 
       // Handle image load
       img.onload = () => {
+        console.log("Image loaded successfully");
         // Remove loading indicator
         if (loadingIndicator.parentNode) {
           loadingIndicator.parentNode.removeChild(loadingIndicator);
@@ -209,7 +215,8 @@ const WorkflowPanel = {
       };
 
       // Handle image error
-      img.onerror = () => {
+      img.onerror = (e) => {
+        console.error("Error loading image:", e);
         if (loadingIndicator.parentNode) {
           loadingIndicator.textContent = 'Error loading image';
           loadingIndicator.className = 'image-error-indicator';
@@ -218,15 +225,24 @@ const WorkflowPanel = {
 
       // Add image to content
       contentEl.appendChild(img);
+
+      // Force image load
+      if (img.complete) {
+        img.onload();
+      }
     }
     // Check for mixed content with embedded images
     else if (typeof content === 'string' && content.includes('data:image')) {
+      console.log("Detected mixed content with embedded images");
+
       // Extract image data URLs
       const imageMatches = content.match(/data:image\/[^;]+;base64,[^\s"')]+/g);
 
       if (imageMatches && imageMatches.length > 0) {
+        console.log(`Found ${imageMatches.length} embedded images`);
+
         // Split content by image URLs
-        let parts = content.split(/(data:image\/[^;]+;base64,[^\s"')]+)/g);
+        const parts = content.split(/(data:image\/[^;]+;base64,[^\s"')]+)/g);
 
         // Process each part
         parts.forEach(part => {
@@ -236,7 +252,28 @@ const WorkflowPanel = {
             img.src = part;
             img.alt = 'Image';
             img.className = 'chat-message-image';
+
+            // Handle image load
+            img.onload = () => {
+              console.log("Embedded image loaded successfully");
+              // Scroll to bottom after image loads
+              const chatMessages = document.getElementById('chatMessages');
+              if (chatMessages) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+              }
+            };
+
+            // Handle image error
+            img.onerror = (e) => {
+              console.error("Error loading embedded image:", e);
+            };
+
             contentEl.appendChild(img);
+
+            // Force image load
+            if (img.complete) {
+              img.onload();
+            }
           } else if (part.trim()) {
             // This part is text
             const textNode = document.createElement('div');
@@ -252,6 +289,7 @@ const WorkflowPanel = {
           }
         });
       } else {
+        console.log("No embedded images found in content that includes 'data:image'");
         // Handle as regular text with markdown
         if (content.includes('**') && sender === 'assistant') {
           contentEl.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
