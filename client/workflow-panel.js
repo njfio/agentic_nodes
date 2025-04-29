@@ -202,6 +202,18 @@ const WorkflowPanel = {
       if (isImageContent) {
         console.log("Detected image content in workflow chat");
 
+        // Additional validation to ensure the image content is valid
+        if (!content || typeof content !== 'string' ||
+            !(content.startsWith('data:image') ||
+              content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
+          console.warn("Invalid image content detected, displaying error message instead");
+          const errorEl = document.createElement('div');
+          errorEl.className = 'image-error-details';
+          errorEl.textContent = 'Invalid image content';
+          contentEl.appendChild(errorEl);
+          return;
+        }
+
         // Create image element
         const img = document.createElement('img');
 

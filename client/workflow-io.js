@@ -599,10 +599,20 @@ const WorkflowIO = {
                 imageContent = node.contentImage.src;
               }
 
-              // First add the title
-              WorkflowPanel.addMessage(`**${node.title}**:`, 'assistant');
-              // Then add the image as a separate message
-              WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+              // Verify that the image content is valid before adding it to the chat
+              if (imageContent && typeof imageContent === 'string' &&
+                  (imageContent.startsWith('data:image') ||
+                   imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
+
+                // First add the title
+                WorkflowPanel.addMessage(`**${node.title}**:`, 'assistant');
+                // Then add the image as a separate message
+                WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+              } else {
+                // If image content is invalid, just add the title and a placeholder message
+                console.warn(`Invalid image content for node ${node.id}, skipping image display`);
+                WorkflowPanel.addMessage(`**${node.title}**: [Image could not be displayed]`, 'assistant');
+              }
             } else {
               // For text nodes, add the title and content
               console.log(`Adding text from node ${node.id} (${node.title}) to chat`);
@@ -638,8 +648,18 @@ const WorkflowIO = {
                 imageContent = this.outputNode.contentImage.src;
               }
 
-              // Force the content to be treated as an image by adding a special marker
-              WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+              // Verify that the image content is valid before adding it to the chat
+              if (imageContent && typeof imageContent === 'string' &&
+                  (imageContent.startsWith('data:image') ||
+                   imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
+
+                // Force the content to be treated as an image by adding a special marker
+                WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+              } else {
+                // If image content is invalid, just add a placeholder message
+                console.warn(`Invalid image content for output node ${this.outputNode.id}, skipping image display`);
+                WorkflowPanel.addMessage(`[Image could not be displayed]`, 'assistant');
+              }
             } else {
               // For text nodes, add the content
               console.log("Sending text content to chat");
@@ -672,7 +692,17 @@ const WorkflowIO = {
                 imageContent = lastNode.contentImage.src;
               }
 
-              WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+              // Verify that the image content is valid before adding it to the chat
+              if (imageContent && typeof imageContent === 'string' &&
+                  (imageContent.startsWith('data:image') ||
+                   imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
+
+                WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+              } else {
+                // If image content is invalid, just add a placeholder message
+                console.warn(`Invalid image content for last node ${lastNode.id}, skipping image display`);
+                WorkflowPanel.addMessage(`[Image could not be displayed]`, 'assistant');
+              }
             } else {
               // For text nodes, add the content
               console.log(`Adding text from last node ${lastNode.id} (${lastNode.title}) to chat`);
