@@ -71,24 +71,40 @@ const WorkflowPanel = {
   },
 
   // Send a message through the workflow
-  sendMessage() {
-    const chatInput = document.getElementById('chatInput');
-    if (!chatInput || !chatInput.value.trim()) return;
+  async sendMessage() {
+    try {
+      const chatInput = document.getElementById('chatInput');
+      if (!chatInput || !chatInput.value.trim()) {
+        console.log("No chat input or empty message");
+        return;
+      }
 
-    const userMessage = chatInput.value.trim();
+      const userMessage = chatInput.value.trim();
+      console.log("Sending message:", userMessage);
 
-    // Add user message to the chat
-    this.addMessage(userMessage, 'user');
+      // Add user message to the chat
+      this.addMessage(userMessage, 'user');
 
-    // Clear the input
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
+      // Clear the input
+      chatInput.value = '';
+      chatInput.style.height = 'auto';
 
-    // Focus the input again
-    chatInput.focus();
+      // Focus the input again
+      chatInput.focus();
 
-    // Process the message through the workflow
-    WorkflowIO.processMessage(userMessage);
+      // Process the message through the workflow
+      try {
+        console.log("Calling WorkflowIO.processMessage with:", userMessage);
+        await WorkflowIO.processMessage(userMessage);
+      } catch (error) {
+        console.error("Error in WorkflowIO.processMessage:", error);
+        this.addMessage(`Error processing message: ${error.message}`, 'assistant');
+        DebugManager.addLog(`Error processing message: ${error.message}`, 'error');
+      }
+    } catch (error) {
+      console.error("Error in sendMessage:", error);
+      DebugManager.addLog(`Error in sendMessage: ${error.message}`, 'error');
+    }
   },
 
   // Add a message to the chat
