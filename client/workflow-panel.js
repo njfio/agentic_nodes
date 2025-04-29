@@ -107,14 +107,18 @@ const WorkflowPanel = {
     }
   },
 
-  // Add a message to the chat
+  // Add a message to the chat and return its ID
   addMessage(content, sender) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
+    if (!chatMessages) return null;
+
+    // Create a unique ID for the message
+    const messageId = `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
     // Create message element
     const messageEl = document.createElement('div');
     messageEl.className = `chat-message ${sender}-message`;
+    messageEl.id = messageId;
 
     // Create message content
     const contentEl = document.createElement('div');
@@ -126,6 +130,9 @@ const WorkflowPanel = {
       img.src = content;
       img.alt = 'Image';
       contentEl.appendChild(img);
+    } else if (content.includes('**') && sender === 'assistant') {
+      // Handle markdown-style bold text for node titles
+      contentEl.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     } else {
       // Text content
       contentEl.textContent = content;
@@ -142,10 +149,31 @@ const WorkflowPanel = {
 
     // Add to message history
     this.messageHistory.push({
+      id: messageId,
       content,
       sender,
       timestamp: new Date().toISOString()
     });
+
+    // Return the message ID so it can be referenced later
+    return messageId;
+  },
+
+  // Remove a message from the chat by ID
+  removeMessage(messageId) {
+    if (!messageId) return false;
+
+    const messageEl = document.getElementById(messageId);
+    if (messageEl) {
+      messageEl.remove();
+
+      // Also remove from message history
+      this.messageHistory = this.messageHistory.filter(msg => msg.id !== messageId);
+
+      return true;
+    }
+
+    return false;
   },
 
   // Clear the chat

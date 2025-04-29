@@ -462,89 +462,91 @@ const WorkflowIO = {
         throw chainError;
       }
 
-      // Add a small delay to ensure all processing is complete
+      // Add a longer delay to ensure all processing is complete
       console.log("Waiting for processing to complete");
-      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // If showAllNodeOutputs is checked, show outputs from all processed nodes
-      if (showAllNodeOutputs) {
-        console.log("Showing outputs from all processed nodes");
-        // Get all nodes connected to the input node
-        const connectedNodes = App.getConnectedNodes(this.inputNode);
+      // Show a waiting message that we'll replace later
+      const waitingMessageId = WorkflowPanel.addMessage('Processing your workflow...', 'assistant');
 
-        // Add the input node to the list
-        const allNodes = [this.inputNode, ...connectedNodes];
+      // Wait for nodes to finish processing (longer delay)
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Sort nodes by their position in the workflow (if possible)
-        allNodes.sort((a, b) => {
-          // Try to sort by y position first (top to bottom)
-          if (Math.abs(a.y - b.y) > 50) {
-            return a.y - b.y;
-          }
-          // If y positions are similar, sort by x position (left to right)
-          return a.x - b.x;
-        });
+      // Check if any nodes are still processing
+      const stillProcessing = App.nodes.some(node => node.processing);
+      if (stillProcessing) {
+        console.log("Some nodes are still processing, waiting longer...");
+        // Wait even longer if nodes are still processing
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
 
-        // Show outputs from all processed nodes
-        let foundAnyOutput = false;
-        for (const node of allNodes) {
-          if (node.hasBeenProcessed && node.content && node !== this.inputNode) {
+      // Remove the waiting message
+      WorkflowPanel.removeMessage(waitingMessageId);
+
+      // Get all nodes connected to the input node
+      const connectedNodes = App.getConnectedNodes(this.inputNode);
+
+      // Add the input node to the list and include the output node if it's not already included
+      let allNodes = [this.inputNode, ...connectedNodes];
+      if (this.outputNode && !allNodes.includes(this.outputNode)) {
+        allNodes.push(this.outputNode);
+      }
+
+      // Sort nodes by their position in the workflow (if possible)
+      allNodes.sort((a, b) => {
+        // Try to sort by y position first (top to bottom)
+        if (Math.abs(a.y - b.y) > 50) {
+          return a.y - b.y;
+        }
+        // If y positions are similar, sort by x position (left to right)
+        return a.x - b.x;
+      });
+
+      // Filter out nodes that haven't been processed or don't have content
+      const processedNodes = allNodes.filter(node =>
+        node && node.hasBeenProcessed && node.content && node !== this.inputNode
+      );
+
+      console.log(`Found ${processedNodes.length} processed nodes with content`);
+
+      // If we have processed nodes with content
+      if (processedNodes.length > 0) {
+        if (showAllNodeOutputs) {
+          // Show outputs from all processed nodes
+          console.log("Showing outputs from all processed nodes");
+          for (const node of processedNodes) {
             console.log(`Adding output from node ${node.id} (${node.title})`);
             WorkflowPanel.addMessage(`**${node.title}**: ${node.content}`, 'assistant');
-            foundAnyOutput = true;
+          }
+          DebugManager.addLog(`Displayed outputs from ${processedNodes.length} nodes`, 'success');
+        } else {
+          // Only show output from the output node or the last processed node
+          if (this.outputNode && this.outputNode.hasBeenProcessed && this.outputNode.content) {
+            // Use the output node's content
+            console.log("Using output node content");
+            WorkflowPanel.addMessage(this.outputNode.content, 'assistant');
+            DebugManager.addLog('Message processed successfully', 'success');
+          } else {
+            // Use the last processed node's content as fallback
+            const lastNode = processedNodes[processedNodes.length - 1];
+            console.log(`Using content from node ${lastNode.id} (${lastNode.title}) as fallback`);
+            WorkflowPanel.addMessage(lastNode.content, 'assistant');
+            DebugManager.addLog(`Using content from node ${lastNode.id} as response`, 'info');
           }
         }
+      } else {
+        // Check if any nodes are still processing
+        const anyProcessing = App.nodes.some(node => node.processing);
 
-        if (!foundAnyOutput) {
+        if (anyProcessing) {
+          // Nodes are still processing, show a message and don't say we couldn't generate a response
+          console.log("Nodes are still processing, showing processing message");
+          WorkflowPanel.addMessage('Still processing your request... This may take a moment.', 'assistant');
+          DebugManager.addLog('Workflow is still processing', 'info');
+        } else {
+          // No nodes processed successfully, show error message
           console.log("No output found in any node");
           WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
           DebugManager.addLog('Message processed but no output was generated', 'warning');
-        }
-      } else {
-        // Get the output from the output node
-        console.log("Getting output from output node");
-        const output = this.outputNode.content;
-        console.log("Output node content:", output ? (output.length > 100 ? output.substring(0, 100) + "..." : output) : "empty");
-
-        DebugManager.addLog(`Output node content: ${output ? (output.length > 50 ? output.substring(0, 50) + '...' : output) : 'empty'}`, 'info');
-
-        // Add the response to the chat
-        if (output) {
-          console.log("Adding output to chat");
-          WorkflowPanel.addMessage(output, 'assistant');
-          DebugManager.addLog('Message processed successfully', 'success');
-        } else {
-          console.log("No output from output node, checking alternatives");
-          // If the output node has been processed but has no content, check if it has inputContent
-          if (this.outputNode.hasBeenProcessed && this.outputNode.inputContent) {
-            console.log("Using output node inputContent as fallback");
-            const fallbackOutput = this.outputNode.inputContent;
-            WorkflowPanel.addMessage(fallbackOutput, 'assistant');
-            DebugManager.addLog('Message processed. Using input content as output.', 'warning');
-          } else {
-            // Check if any node in the chain has content we can use
-            console.log("Checking connected nodes for content");
-            const connectedNodes = App.getConnectedNodes(this.inputNode);
-            console.log("Connected nodes:", connectedNodes.map(n => n.id));
-            let foundOutput = false;
-
-            for (const node of connectedNodes) {
-              console.log(`Checking node ${node.id} - processed: ${node.hasBeenProcessed}, has content: ${!!node.content}`);
-              if (node.hasBeenProcessed && node.content && node !== this.inputNode) {
-                console.log(`Using content from node ${node.id}`);
-                WorkflowPanel.addMessage(node.content, 'assistant');
-                DebugManager.addLog(`Using content from node ${node.id} as response`, 'info');
-                foundOutput = true;
-                break;
-              }
-            }
-
-            if (!foundOutput) {
-              console.log("No output found in any node");
-              WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
-              DebugManager.addLog('Message processed but no output was generated', 'warning');
-            }
-          }
         }
       }
     } catch (error) {
