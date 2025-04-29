@@ -7,12 +7,13 @@ const KeyboardShortcuts = {
   // Properties
   shortcuts: [
     { key: 'n', description: 'Add new node', action: () => App.addNode() },
+    { key: 'q', description: 'Add chat node', action: () => App.addChatNode() },
     { key: 'Delete', description: 'Delete selected node', action: () => App.deleteSelectedNode() },
     { key: 'Escape', description: 'Cancel connection/Close modal', action: () => App.cancelConnection() },
     { key: 'g', description: 'Create group', action: () => NodeGroups.startCreatingGroup() },
     { key: 'e', description: 'Edit selected node', action: () => App.editSelectedNode() },
     { key: 't', description: 'Test workflow', action: () => WorkflowTest.startSelectingStartNode() },
-    { key: 'c', description: 'Copy selected node', action: () => App.copySelectedNode() },
+    { key: 'x', description: 'Copy selected node', action: () => App.copySelectedNode() },
     { key: 'v', description: 'Paste node', action: () => App.pasteNode() },
     { key: 'z', ctrlKey: true, description: 'Undo', action: () => App.undo() },
     { key: 'y', ctrlKey: true, description: 'Redo', action: () => App.redo() },
@@ -181,7 +182,8 @@ AppExtensions.copySelectedNode = function() {
       aiProcessor: selectedNode.aiProcessor,
       inputType: selectedNode.inputType,
       outputType: selectedNode.outputType,
-      autoSize: selectedNode.autoSize
+      autoSize: selectedNode.autoSize,
+      chatHistory: selectedNode.chatHistory || []
     };
 
     localStorage.setItem('clipboard_node', JSON.stringify(nodeData));
@@ -215,6 +217,11 @@ AppExtensions.pasteNode = function() {
       node.inputType = nodeData.inputType || 'text';
       node.outputType = nodeData.outputType || 'text';
       node.autoSize = nodeData.autoSize !== undefined ? nodeData.autoSize : true;
+
+      // Copy chat history if it exists
+      if (nodeData.chatHistory && Array.isArray(nodeData.chatHistory)) {
+        node.chatHistory = [...nodeData.chatHistory];
+      }
 
       // Preload any images
       node.preloadContent();

@@ -472,11 +472,25 @@ const WorkflowIO = {
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Check if any nodes are still processing
-      const stillProcessing = App.nodes.some(node => node.processing);
-      if (stillProcessing) {
-        console.log("Some nodes are still processing, waiting longer...");
+      let stillProcessing = App.nodes.some(node => node.processing);
+      let waitAttempts = 0;
+      const maxWaitAttempts = 3; // Maximum number of additional waits
+
+      // Keep waiting if nodes are still processing, up to a maximum number of attempts
+      while (stillProcessing && waitAttempts < maxWaitAttempts) {
+        console.log(`Some nodes are still processing, waiting longer... (attempt ${waitAttempts + 1}/${maxWaitAttempts})`);
         // Wait even longer if nodes are still processing
         await new Promise(resolve => setTimeout(resolve, 3000));
+        // Check again
+        stillProcessing = App.nodes.some(node => node.processing);
+        waitAttempts++;
+      }
+
+      // If we've waited the maximum time and nodes are still processing,
+      // we'll consider them done anyway to avoid hanging indefinitely
+      if (stillProcessing) {
+        console.log("Maximum wait time reached, proceeding anyway");
+        DebugManager.addLog("Some nodes are still processing, but maximum wait time reached", "warning");
       }
 
       // Remove the waiting message
@@ -534,20 +548,27 @@ const WorkflowIO = {
           }
         }
       } else {
-        // Check if any nodes are still processing
-        const anyProcessing = App.nodes.some(node => node.processing);
+        // Check if any nodes are still processing after our maximum wait time
+        // At this point, we'll consider the workflow complete even if nodes report they're still processing
+        // This prevents the "still processing" message from persisting indefinitely
 
-        if (anyProcessing) {
-          // Nodes are still processing, show a message and don't say we couldn't generate a response
-          console.log("Nodes are still processing, showing processing message");
-          WorkflowPanel.addMessage('Still processing your request... This may take a moment.', 'assistant');
-          DebugManager.addLog('Workflow is still processing', 'info');
-        } else {
-          // No nodes processed successfully, show error message
-          console.log("No output found in any node");
-          WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
-          DebugManager.addLog('Message processed but no output was generated', 'warning');
+        // Force reset processing state on any nodes that might be stuck
+        let stuckNodes = 0;
+        for (const node of App.nodes) {
+          if (node.processing) {
+            node.processing = false;
+            stuckNodes++;
+          }
         }
+
+        if (stuckNodes > 0) {
+          DebugManager.addLog(`Reset processing state on ${stuckNodes} nodes that appeared to be stuck`, 'warning');
+        }
+
+        // No nodes processed successfully, show error message
+        console.log("No output found in any node");
+        WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
+        DebugManager.addLog('Message processed but no output was generated', 'warning');
       }
     } catch (error) {
       console.error("Error in processMessage:", error);
