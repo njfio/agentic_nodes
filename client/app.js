@@ -6458,6 +6458,36 @@ const App = {
     return localToken !== null || sessionToken !== null;
   },
 
+  // Get all nodes connected to a starting node (directly or indirectly)
+  getConnectedNodes(startNode) {
+    if (!startNode) return [];
+
+    const visited = new Set();
+    const result = [];
+    const queue = [startNode];
+
+    while (queue.length > 0) {
+      const currentNode = queue.shift();
+
+      if (visited.has(currentNode.id)) continue;
+
+      visited.add(currentNode.id);
+      if (currentNode !== startNode) {
+        result.push(currentNode);
+      }
+
+      // Find all nodes connected to the current node
+      const connections = this.connections.filter(conn => conn.fromNode === currentNode);
+      for (const connection of connections) {
+        if (!visited.has(connection.toNode.id)) {
+          queue.push(connection.toNode);
+        }
+      }
+    }
+
+    return result;
+  },
+
   // Handle save button click (local storage)
   async handleSave() {
     // Create a JSON representation of the current state

@@ -387,13 +387,18 @@ const WorkflowIO = {
     WorkflowPanel.addMessage('Processing your request...', 'assistant');
 
     try {
+      // Reset the input node's state
+      this.inputNode.reset();
+
       // Set the input node's content
       this.inputNode.content = message;
+      this.inputNode.inputContent = message;
       this.inputNode.hasBeenProcessed = false;
 
       // Clear the output node's content if needed
       if (clearOutputOnRun) {
         this.outputNode.content = '';
+        this.outputNode.inputContent = '';
       }
       this.outputNode.hasBeenProcessed = false;
 
@@ -404,7 +409,7 @@ const WorkflowIO = {
       await App.processNodeChain(this.inputNode);
 
       // Add a small delay to ensure all processing is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Get the output from the output node
       const output = this.outputNode.content;
@@ -422,8 +427,23 @@ const WorkflowIO = {
           WorkflowPanel.addMessage(fallbackOutput, 'assistant');
           DebugManager.addLog('Message processed. Using input content as output.', 'warning');
         } else {
-          WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
-          DebugManager.addLog('Message processed but no output was generated', 'warning');
+          // Check if any node in the chain has content we can use
+          const connectedNodes = App.getConnectedNodes(this.inputNode);
+          let foundOutput = false;
+
+          for (const node of connectedNodes) {
+            if (node.hasBeenProcessed && node.content && node !== this.inputNode) {
+              WorkflowPanel.addMessage(node.content, 'assistant');
+              DebugManager.addLog(`Using content from node ${node.id} as response`, 'info');
+              foundOutput = true;
+              break;
+            }
+          }
+
+          if (!foundOutput) {
+            WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
+            DebugManager.addLog('Message processed but no output was generated', 'warning');
+          }
         }
       }
     } catch (error) {
