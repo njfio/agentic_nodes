@@ -471,10 +471,19 @@ const WorkflowIO = {
       const waitingMessageId = WorkflowPanel.addMessage('Processing your workflow...', 'assistant');
 
       // Wait for nodes to finish processing (longer delay)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Increased to 5 seconds
 
       // Check if any nodes are still processing
       let stillProcessing = App.nodes.some(node => node.processing);
+
+      // Force mark nodes as processed if they have content but aren't marked as processed
+      App.nodes.forEach(node => {
+        if (node.content && !node.hasBeenProcessed) {
+          DebugManager.addLog(`Node ${node.id} (${node.title}) has content but wasn't marked as processed. Fixing...`, 'warning');
+          node.hasBeenProcessed = true;
+        }
+      });
+
       let waitAttempts = 0;
       const maxWaitAttempts = 3; // Maximum number of additional waits
 
@@ -523,6 +532,11 @@ const WorkflowIO = {
         }
         // If y positions are similar, sort by x position (left to right)
         return a.x - b.x;
+      });
+
+      // Debug all nodes to see their processing status
+      allNodes.forEach(node => {
+        DebugManager.addLog(`Node ${node.id} (${node.title}) - processed: ${node.hasBeenProcessed}, has content: ${!!node.content}, content type: ${node.contentType}`, 'info');
       });
 
       // Filter out nodes that haven't been processed or don't have content

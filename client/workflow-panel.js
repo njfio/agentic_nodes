@@ -125,10 +125,18 @@ const WorkflowPanel = {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
 
-    console.log("Adding message to chat:",
-      typeof content === 'string' ? content.substring(0, 50) + "..." : content,
-      "sender:", sender,
-      "forceImage:", forceImage);
+    // Debug the content before rendering
+    DebugManager.addLog(`Adding message to chat: ${typeof content === 'string' ?
+      (content.startsWith('data:image') ? 'Image data URL' : content.substring(0, 30) + '...') :
+      'Non-string content'} (forceImage: ${forceImage})`, 'info');
+
+    // Check if this is an image that needs to be forced
+    if (forceImage || (typeof content === 'string' && (
+        content.startsWith('data:image') ||
+        content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
+    ))) {
+      DebugManager.addLog(`Detected image content in addMessage, forceImage=${forceImage}`, 'info');
+    }
 
     // Create a unique ID for the message
     const messageId = `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
