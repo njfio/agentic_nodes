@@ -388,14 +388,14 @@ class Node {
       });
 
       // Get OpenAI config
-      const config = JSON.parse(localStorage.getItem(Config.storageKeys.openAIConfig) || '{}');
+      const config = ApiService.openai.getConfig();
 
       // Prepare the request data
       const requestData = {
         model: config.model || Config.defaultOpenAIConfig.model,
         messages: messages,
         temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
-        max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
+        max_tokens: config.max_tokens || Config.defaultOpenAIConfig.maxTokens
       };
 
       // Store the request payload and timestamp
@@ -6156,8 +6156,10 @@ const App = {
         `;
       }
 
-      // Store the error in the node
-      this.editingNode.error = err.message;
+      // Store the error in the node if it still exists
+      if (this.editingNode) {
+        this.editingNode.error = err.message;
+      }
 
       DebugManager.addLog(`Node execution failed: ${err.message}`, 'error');
 
