@@ -6469,7 +6469,7 @@ const App = {
     while (queue.length > 0) {
       const currentNode = queue.shift();
 
-      if (visited.has(currentNode.id)) continue;
+      if (!currentNode || visited.has(currentNode.id)) continue;
 
       visited.add(currentNode.id);
       if (currentNode !== startNode) {
@@ -6479,7 +6479,7 @@ const App = {
       // Find all nodes connected to the current node
       const connections = this.connections.filter(conn => conn.fromNode === currentNode);
       for (const connection of connections) {
-        if (!visited.has(connection.toNode.id)) {
+        if (connection.toNode && !visited.has(connection.toNode.id)) {
           queue.push(connection.toNode);
         }
       }
