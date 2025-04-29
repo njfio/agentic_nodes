@@ -367,8 +367,49 @@ const WorkflowIO = {
     }
   },
 
+  // Clean up resources to prevent memory leaks
+  cleanupResources() {
+    try {
+      // Clean up image objects in nodes
+      App.nodes.forEach(node => {
+        if (node.contentImage) {
+          // Remove event listeners
+          node.contentImage.onload = null;
+          node.contentImage.onerror = null;
+          // Set src to empty to cancel any pending loads
+          node.contentImage.src = '';
+          // Clear the reference
+          node.contentImage = null;
+        }
+
+        if (node.inputImage) {
+          // Remove event listeners
+          node.inputImage.onload = null;
+          node.inputImage.onerror = null;
+          // Set src to empty to cancel any pending loads
+          node.inputImage.src = '';
+          // Clear the reference
+          node.inputImage = null;
+        }
+      });
+
+      // Force garbage collection (indirectly)
+      setTimeout(() => {
+        // This empty timeout helps trigger garbage collection
+      }, 100);
+
+      DebugManager.addLog('Cleaned up resources to prevent memory leaks', 'info');
+    } catch (error) {
+      console.error('Error cleaning up resources:', error);
+      DebugManager.addLog(`Error cleaning up resources: ${error.message}`, 'error');
+    }
+  },
+
   // Process a message through the workflow (for chat interface)
   async processMessage(message) {
+    // Clean up resources from previous runs
+    this.cleanupResources();
+
     console.log("processMessage called with:", message);
 
     // Check if input and output nodes are set

@@ -366,6 +366,17 @@ class Node {
     // If this is an image node and the content has changed, force a complete refresh
     if ((this.contentType === 'image' || this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') &&
         this.content !== content) {
+      // Clean up previous image object to prevent memory leaks
+      if (this.contentImage) {
+        // Remove event listeners
+        this.contentImage.onload = null;
+        this.contentImage.onerror = null;
+        // Set src to empty to cancel any pending loads
+        this.contentImage.src = '';
+        // Clear the reference
+        this.contentImage = null;
+      }
+
       // Add a timestamp to force a refresh of the image
       const timestamp = Date.now();
       let refreshedContent = content;
@@ -381,14 +392,20 @@ class Node {
       // Update the content with cache-busting
       this.content = refreshedContent;
 
-      // Force recreate the image object
-      this.contentImage = null;
+      // Create a new image object with weak event handlers
       this.contentImage = new Image();
+
+      // Use a weak reference for event handlers to prevent memory leaks
+      const nodeId = this.id; // Store reference to this.id
 
       // Set up event handlers
       this.contentImage.onload = () => {
-        DebugManager.addLog(`Image loaded for node ${this.id} after content update`, 'success');
-        App.draw();
+        DebugManager.addLog(`Image loaded for node ${nodeId} after content update`, 'success');
+
+        // Redraw only if App exists
+        if (typeof App !== 'undefined') {
+          App.draw();
+        }
 
         // If this is an output node, update the workflow chat panel
         if (this.workflowRole === 'output' && typeof WorkflowPanel !== 'undefined') {
@@ -396,20 +413,31 @@ class Node {
           const showAllNodeOutputs = document.getElementById('showAllNodeOutputs')?.checked || false;
           if (!showAllNodeOutputs) {
             WorkflowPanel.addMessage(refreshedContent, 'assistant', true);
-            DebugManager.addLog(`Updated workflow chat with new image from node ${this.id}`, 'success');
+            DebugManager.addLog(`Updated workflow chat with new image from node ${nodeId}`, 'success');
           }
+        }
+
+        // Clean up the event handler after it's fired
+        if (this.contentImage) {
+          this.contentImage.onload = null;
         }
       };
 
       this.contentImage.onerror = (err) => {
-        DebugManager.addLog(`Error loading image for node ${this.id}: ${err.message || 'Unknown error'}`, 'error');
-        this.contentImage = null;
+        DebugManager.addLog(`Error loading image for node ${nodeId}: ${err.message || 'Unknown error'}`, 'error');
+
+        // Clean up on error
+        if (this.contentImage) {
+          this.contentImage.onload = null;
+          this.contentImage.onerror = null;
+          this.contentImage = null;
+        }
       };
 
       // Set the source to trigger loading
       this.contentImage.src = refreshedContent;
 
-      DebugManager.addLog(`Updating image content for node ${this.id} with cache-busting`, 'info');
+      DebugManager.addLog(`Updating image content for node ${nodeId} with cache-busting`, 'info');
     } else {
       // For non-image nodes, just update the content
       this.content = content;

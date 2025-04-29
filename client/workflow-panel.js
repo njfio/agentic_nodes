@@ -226,8 +226,12 @@ const WorkflowPanel = {
           } else if (!imageUrl.startsWith('data:')) {
             imageUrl = imageUrl + '?t=' + timestamp;
           }
-          console.log(`Adding cache-busting to image URL: ${imageUrl.substring(0, 50)}...`);
+          DebugManager.addLog(`Adding cache-busting to image URL: ${imageUrl.substring(0, 50)}...`, 'info');
         }
+
+        // Limit image size to prevent browser from freezing
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '400px';
 
         // Set the image source with cache-busting
         img.src = imageUrl;
@@ -315,6 +319,10 @@ const WorkflowPanel = {
                 imageUrl = imageUrl + '?t=' + timestamp;
               }
             }
+
+            // Limit image size to prevent browser from freezing
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '400px';
 
             img.src = imageUrl;
             img.alt = 'Image';
