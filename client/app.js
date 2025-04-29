@@ -2202,71 +2202,130 @@ class Node {
     return combinedText;
   }
 
+  // Flag to prevent recursive reloading
+  _isPreloadingContent = false;
+
   // Preload content for rendering
   preloadContent() {
-    // Special handling for image-related nodes
-    if (this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') {
-      // Force content type to image
-      this.contentType = 'image';
+    // Prevent recursive reloading
+    if (this._isPreloadingContent) {
+      return;
+    }
 
-      // If this is an image-related node that has been processed but has no content,
-      // try to recover the image from contentImage
-      if (this.hasBeenProcessed && !this.content && this.contentImage && this.contentImage.src) {
-        this.content = this.contentImage.src;
-        DebugManager.addLog(`Recovered image content for node ${this.id} during preload`, 'info');
-      }
+    // Set the flag to prevent recursion
+    this._isPreloadingContent = true;
 
-      // Always force reload the image for image-related nodes that have been processed
-      if (this.hasBeenProcessed && this.content) {
-        // Force reload the image by creating a new Image object
-        this.contentImage = null;
-        this.contentImage = new Image();
+    try {
+      // Special handling for image-related nodes
+      if (this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') {
+        // Force content type to image
+        this.contentType = 'image';
 
-        // Add a timestamp to prevent browser caching
-        const timestamp = Date.now();
-        let imageUrl = this.content;
-
-        if (imageUrl.includes('?')) {
-          imageUrl = imageUrl.split('?')[0] + '?t=' + timestamp;
-        } else if (!imageUrl.startsWith('data:')) {
-          imageUrl = imageUrl + '?t=' + timestamp;
+        // If this is an image-related node that has been processed but has no content,
+        // try to recover the image from contentImage
+        if (this.hasBeenProcessed && !this.content && this.contentImage && this.contentImage.src) {
+          this.content = this.contentImage.src;
+          DebugManager.addLog(`Recovered image content for node ${this.id} during preload`, 'info');
         }
 
-        // Set up event handlers
-        this.contentImage.onload = () => {
-          DebugManager.addLog(`Image loaded for node ${this.id}`, 'success');
-          // Force a redraw to show the updated image
-          if (typeof App !== 'undefined') {
-            App.draw();
+        // Only reload the image if it's not already loading and has content
+        if (this.hasBeenProcessed && this.content &&
+            (!this.contentImage || !this.contentImage.src || this.contentImage.complete)) {
+
+          // Clean up previous image object to prevent memory leaks
+          if (this.contentImage) {
+            this.contentImage.onload = null;
+            this.contentImage.onerror = null;
           }
-        };
 
-        this.contentImage.onerror = (err) => {
-          DebugManager.addLog(`Error loading image for node ${this.id}: ${err.message || 'Unknown error'}`, 'error');
-          this.contentImage = null;
-        };
+          // Create a new Image object
+          this.contentImage = new Image();
 
-        // Set the source to trigger loading
-        this.contentImage.src = imageUrl;
+          // Add a timestamp to prevent browser caching
+          const timestamp = Date.now();
+          let imageUrl = this.content;
 
-        DebugManager.addLog(`Reloading image for node ${this.id} with cache-busting`, 'info');
+          if (imageUrl.includes('?')) {
+            imageUrl = imageUrl.split('?')[0] + `?t=${timestamp}`;
+          } else if (!imageUrl.startsWith('data:')) {
+            imageUrl = imageUrl + `?t=${timestamp}`;
+          }
+
+          // Store node ID to avoid 'this' reference in callbacks
+          const nodeId = this.id;
+
+          // Set up event handlers
+          this.contentImage.onload = () => {
+            DebugManager.addLog(`Image loaded for node ${nodeId}`, 'success');
+
+            // Force a redraw to show the updated image
+            if (typeof App !== 'undefined') {
+              App.draw();
+            }
+
+            // Clean up the event handler after it's fired
+            if (this.contentImage) {
+              this.contentImage.onload = null;
+            }
+          };
+
+          this.contentImage.onerror = (err) => {
+            DebugManager.addLog(`Error loading image for node ${nodeId}: ${err.message || 'Unknown error'}`, 'error');
+
+            // Clean up on error
+            if (this.contentImage) {
+              this.contentImage.onload = null;
+              this.contentImage.onerror = null;
+              this.contentImage = null;
+            }
+          };
+
+          // Set the source to trigger loading
+          this.contentImage.src = imageUrl;
+
+          DebugManager.addLog(`Reloading image for node ${nodeId} with cache-busting`, 'info');
+        }
       }
+    } finally {
+      // Reset the flag when done
+      this._isPreloadingContent = false;
+    }
+  }
+
+  // Preload input/output images and other content types
+  preloadAllContent() {
+    // Only preload if we're not already in a preloading cycle
+    if (this._isPreloadingContent) {
+      return;
     }
 
-    // Check if we need to load images
-    this.preloadInputImage();
-    this.preloadOutputImage();
+    // Set the flag to prevent recursion
+    this._isPreloadingContent = true;
 
-    if (this.content && !this.contentVideo && this.contentType === 'video') {
-      // For video, we'd need to create a video element and capture a frame
-      // This is more complex and would require a canvas to render a thumbnail
-      // For now, we'll just use a placeholder
-    }
+    try {
+      // Preload input and output images
+      this.preloadInputImage();
+      this.preloadOutputImage();
 
-    if (this.content && !this.contentAudio && this.contentType === 'audio') {
-      // For audio, we'd need to visualize the waveform
-      // For now, we'll just use a placeholder
+      // Handle video content
+      if (this.content && !this.contentVideo && this.contentType === 'video') {
+        // For video, we'd need to create a video element and capture a frame
+        // This is more complex and would require a canvas to render a thumbnail
+        // For now, we'll just use a placeholder
+      }
+
+      // Handle audio content
+      if (this.content && !this.contentAudio && this.contentType === 'audio') {
+        // For audio, we'd need to visualize the waveform
+        // For now, we'll just use a placeholder
+      }
+    } finally {
+      // Reset the flag when done
+      this._isPreloadingContent = false;
     }
+  }
+
+
   }
 
   // Preload input image with error handling and performance optimizations
@@ -2760,7 +2819,7 @@ class Node {
     ctx.fillText('OUTPUT:', contentAreaX + 5, outputAreaY - 2);
 
     // Make sure content is preloaded
-    this.preloadContent();
+    this.preloadAllContent();
 
     // Draw output content based on type if not collapsed
     if (!this.outputCollapsed) {
