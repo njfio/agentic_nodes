@@ -59,7 +59,7 @@ const WorkflowPanel = {
 
   // Initialize the chat input
   initChatInput() {
-    const chatInput = document.getElementById('chatInput');
+    const chatInput = document.getElementById('workflowChatInput');
     if (chatInput) {
       // Set initial height
       chatInput.style.height = 'auto';
@@ -73,9 +73,9 @@ const WorkflowPanel = {
   // Send a message through the workflow
   async sendMessage() {
     try {
-      const chatInput = document.getElementById('chatInput');
+      const chatInput = document.getElementById('workflowChatInput');
       if (!chatInput || !chatInput.value.trim()) {
-        console.log("No chat input or empty message");
+        console.log("No workflow chat input or empty message");
         return;
       }
 
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const originalRunWorkflow = WorkflowIO.runWorkflow;
       WorkflowIO.runWorkflow = function() {
         // Get the input from the chat input instead of the workflow input
-        const chatInput = document.getElementById('chatInput');
+        const chatInput = document.getElementById('workflowChatInput');
         if (chatInput && chatInput.value.trim()) {
           // Use the processMessage method instead
           WorkflowPanel.sendMessage();
