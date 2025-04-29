@@ -394,9 +394,19 @@ const WorkflowIO = {
     WorkflowPanel.addMessage('Processing your request...', 'assistant');
 
     try {
-      // Reset the input node's state
+      // Reset the input node's state if the method exists
       console.log("Resetting input node state");
-      this.inputNode.reset();
+      if (typeof this.inputNode.reset === 'function') {
+        this.inputNode.reset();
+      } else {
+        // Fallback if reset method doesn't exist
+        console.log("Node.reset method not found, using fallback");
+        this.inputNode.inputSources = new Map();
+        this.inputNode.imageInputs = [];
+        this.inputNode.additionalImages = [];
+        this.inputNode.inputImage = null;
+        this.inputNode.waitingForInputs = false;
+      }
 
       // Set the input node's content
       console.log("Setting input node content");
