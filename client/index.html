@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="collaboration.css" />
   <link rel="stylesheet" href="document-view.css" />
   <link rel="stylesheet" href="workflow-io.css" />
+  <link rel="stylesheet" href="workflow-panel.css" />
   <link rel="stylesheet" href="workflow-list.css" />
   <link rel="stylesheet" href="user-profile.css" />
   <link rel="stylesheet" href="auth.css" />
@@ -22,6 +23,7 @@
   <div id="toolbar">
     <button id="addNodeBtn" type="button">Add Node</button>
     <button id="addChatNodeBtn" type="button">Add Chat Node</button>
+    <button id="workflowInterfaceBtn" type="button">Workflow Interface</button>
     <button id="testWorkflowBtn" type="button">Test Workflow</button>
     <button id="configBtn" type="button">OpenAI Config</button>
 
@@ -450,6 +452,62 @@
     </div>
   </div>
 
+  <!-- Workflow Panel -->
+  <div id="workflowPanel" class="workflow-panel">
+    <div class="workflow-panel-header">
+      <h3>Workflow Interface</h3>
+      <button id="toggleWorkflowPanel" class="workflow-panel-toggle" type="button">-</button>
+    </div>
+    <div class="workflow-panel-content">
+      <div id="workflowIOStatus" class="workflow-io-status">
+        <div class="status-item">
+          <span class="status-label">Input Node:</span>
+          <span id="inputNodeStatus" class="status-value not-set">Not Set</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Output Node:</span>
+          <span id="outputNodeStatus" class="status-value not-set">Not Set</span>
+        </div>
+      </div>
+
+      <div class="workflow-input">
+        <h3>Input</h3>
+        <textarea id="workflowInput" placeholder="Enter your request here..."></textarea>
+        <div class="input-options">
+          <div class="checkbox-group">
+            <input type="checkbox" id="clearOutputOnRun" checked>
+            <label for="clearOutputOnRun">Clear output before running</label>
+          </div>
+        </div>
+        <div class="input-actions">
+          <button id="runWorkflowBtn" class="primary-btn" type="button" disabled>Run Workflow</button>
+          <button id="clearInputBtn" class="secondary-btn" type="button">Clear Input</button>
+        </div>
+      </div>
+
+      <div class="workflow-output">
+        <h3>Output</h3>
+        <div id="workflowOutput" class="output-container">
+          <div class="no-output-message">Output will appear here after running the workflow</div>
+        </div>
+        <div class="output-actions">
+          <button id="copyOutputBtn" class="secondary-btn" type="button">Copy Output</button>
+          <button id="clearOutputBtn" class="secondary-btn" type="button">Clear Output</button>
+        </div>
+      </div>
+
+      <div class="workflow-io-help">
+        <h3>How to Use</h3>
+        <ol>
+          <li>Designate one node as the "Input Node" and another as the "Output Node" in the node editor</li>
+          <li>Enter your request in the input field</li>
+          <li>Click "Run Workflow" to process your request</li>
+          <li>View the result in the output area</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
   <!-- Docker Environment Detection -->
   <script>
     // Check if we're in a Docker environment
@@ -539,6 +597,7 @@
   <script src="collaboration.js"></script>
   <script src="document-view.js"></script>
   <script src="workflow-io.js"></script>
+  <script src="workflow-panel.js"></script>
   <script src="workflow-list.js"></script>
   <script src="user-profile.js"></script>
 </body>

@@ -11,9 +11,6 @@ const WorkflowIO = {
 
   // Initialize the workflow I/O interface
   init() {
-    // Create the workflow I/O modal
-    this.createWorkflowIOModal();
-
     // Set up event listeners
     this.setupEventListeners();
 
@@ -24,123 +21,42 @@ const WorkflowIO = {
     this.addNodeRoleOptions();
   },
 
-  // Create the workflow I/O modal
-  createWorkflowIOModal() {
-    // Create the modal HTML
-    const modalHTML = `
-      <div id="workflowIOModal" class="modal">
-        <div class="modal-content workflow-io-modal">
-          <h2>Workflow Interface</h2>
-          <div id="workflowIOStatus" class="workflow-io-status">
-            <div class="status-item">
-              <span class="status-label">Input Node:</span>
-              <span id="inputNodeStatus" class="status-value not-set">Not Set</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Output Node:</span>
-              <span id="outputNodeStatus" class="status-value not-set">Not Set</span>
-            </div>
-          </div>
-
-          <div class="workflow-io-container">
-            <div class="workflow-input">
-              <h3>Input</h3>
-              <textarea id="workflowInput" placeholder="Enter your request here..."></textarea>
-              <div class="input-options">
-                <div class="checkbox-group">
-                  <input type="checkbox" id="clearOutputOnRun" checked>
-                  <label for="clearOutputOnRun">Clear output on run</label>
-                </div>
-              </div>
-              <button id="runWorkflowBtn" class="primary-btn" type="button">Run Workflow</button>
-            </div>
-
-            <div class="workflow-output">
-              <h3>Output</h3>
-              <div id="workflowOutput" class="output-container">
-                <div class="no-output-message">Output will appear here after running the workflow</div>
-              </div>
-              <div class="output-actions">
-                <button id="copyOutputBtn" class="secondary-btn" type="button">Copy Output</button>
-                <button id="clearOutputBtn" class="secondary-btn" type="button">Clear Output</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="workflow-io-help">
-            <h3>How to Use</h3>
-            <ol>
-              <li>Designate one node as the "Input Node" and another as the "Output Node" in the node editor</li>
-              <li>Enter your request in the input field</li>
-              <li>Click "Run Workflow" to process your request</li>
-              <li>View the result in the output area</li>
-            </ol>
-          </div>
-
-          <div class="button-group">
-            <button id="closeWorkflowIO" class="secondary-btn" type="button">Close</button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Add the modal to the document
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-  },
-
   // Set up event listeners
   setupEventListeners() {
-    // Close button
-    document.getElementById('closeWorkflowIO').addEventListener('click', () => {
-      this.closeWorkflowIO();
-    });
-
-    // Run workflow button
-    document.getElementById('runWorkflowBtn').addEventListener('click', () => {
-      this.runWorkflow();
-    });
-
-    // Copy output button
-    document.getElementById('copyOutputBtn').addEventListener('click', () => {
-      this.copyOutput();
-    });
-
-    // Clear output button
-    document.getElementById('clearOutputBtn').addEventListener('click', () => {
-      this.clearOutput();
+    // Workflow interface button in toolbar
+    document.getElementById('workflowInterfaceBtn').addEventListener('click', () => {
+      this.openWorkflowIO();
     });
 
     // Input field enter key
-    document.getElementById('workflowInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.ctrlKey) {
-        this.runWorkflow();
-      }
-    });
+    const workflowInput = document.getElementById('workflowInput');
+    if (workflowInput) {
+      workflowInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+          this.runWorkflow();
+        }
+      });
+    }
+
+    // Clear input button
+    const clearInputBtn = document.getElementById('clearInputBtn');
+    if (clearInputBtn) {
+      clearInputBtn.addEventListener('click', () => {
+        const workflowInput = document.getElementById('workflowInput');
+        if (workflowInput) {
+          workflowInput.value = '';
+        }
+      });
+    }
   },
 
   // Add the workflow I/O button to the toolbar
   addWorkflowIOButton() {
-    // Create the button
-    const workflowIOBtn = document.createElement('button');
-    workflowIOBtn.id = 'workflowIOBtn';
-    workflowIOBtn.type = 'button';
-    workflowIOBtn.textContent = 'Workflow Interface';
-
-    // Add click event listener
-    workflowIOBtn.addEventListener('click', () => {
-      this.openWorkflowIO();
-    });
-
-    // Add the button to the toolbar
-    const toolbar = document.getElementById('toolbar');
-    if (toolbar) {
-      // Insert after the document view button
-      const documentViewBtn = document.getElementById('documentViewBtn');
-      if (documentViewBtn) {
-        toolbar.insertBefore(workflowIOBtn, documentViewBtn.nextSibling);
-      } else {
-        toolbar.appendChild(workflowIOBtn);
-      }
+    // The button is already added in the HTML
+    // We just need to make sure it's properly styled
+    const button = document.getElementById('workflowInterfaceBtn');
+    if (button) {
+      button.style.backgroundColor = '#9b59b6'; // Purple color to make it stand out
     }
   },
 
@@ -238,19 +154,37 @@ const WorkflowIO = {
     this.updateStatus();
   },
 
-  // Open the workflow I/O modal
+  // Open the workflow I/O panel
   openWorkflowIO() {
     // Update the status
     this.updateStatus();
 
-    // Show the modal
-    ModalManager.openModal('workflowIOModal');
+    // Show the panel by removing the collapsed class
+    const panel = document.getElementById('workflowPanel');
+    if (panel) {
+      panel.classList.remove('collapsed');
+
+      // Update the toggle button
+      const toggleBtn = document.getElementById('toggleWorkflowPanel');
+      if (toggleBtn) {
+        toggleBtn.textContent = '-';
+      }
+    }
   },
 
-  // Close the workflow I/O modal
+  // Close the workflow I/O panel (collapse it)
   closeWorkflowIO() {
-    // Hide the modal
-    ModalManager.closeModal('workflowIOModal');
+    // Collapse the panel
+    const panel = document.getElementById('workflowPanel');
+    if (panel) {
+      panel.classList.add('collapsed');
+
+      // Update the toggle button
+      const toggleBtn = document.getElementById('toggleWorkflowPanel');
+      if (toggleBtn) {
+        toggleBtn.textContent = '+';
+      }
+    }
   },
 
   // Update the input and output node status
