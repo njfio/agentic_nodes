@@ -137,19 +137,8 @@ const WorkflowPanel = {
     const contentEl = document.createElement('div');
     contentEl.className = 'message-content';
 
-    // Check if content is an image
-    if (content.startsWith('data:image') || content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)) {
-      const img = document.createElement('img');
-      img.src = content;
-      img.alt = 'Image';
-      contentEl.appendChild(img);
-    } else if (content.includes('**') && sender === 'assistant') {
-      // Handle markdown-style bold text for node titles
-      contentEl.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    } else {
-      // Text content
-      contentEl.textContent = content;
-    }
+    // Process the content
+    this.renderContent(content, contentEl, sender);
 
     // Add content to message
     messageEl.appendChild(contentEl);
@@ -170,6 +159,115 @@ const WorkflowPanel = {
 
     // Return the message ID so it can be referenced later
     return messageId;
+  },
+
+  // Render content in the message element
+  renderContent(content, contentEl, sender) {
+    // Check if content is empty
+    if (!content) {
+      contentEl.textContent = '';
+      return;
+    }
+
+    // Check if content is an image (data URL or image URL)
+    if (typeof content === 'string' && (
+        content.startsWith('data:image') ||
+        content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
+    )) {
+      // Create image element
+      const img = document.createElement('img');
+      img.src = content;
+      img.alt = 'Image';
+      img.className = 'chat-message-image';
+
+      // Add loading indicator
+      const loadingIndicator = document.createElement('div');
+      loadingIndicator.className = 'image-loading-indicator';
+      loadingIndicator.textContent = 'Loading image...';
+      contentEl.appendChild(loadingIndicator);
+
+      // Handle image load
+      img.onload = () => {
+        // Remove loading indicator
+        if (loadingIndicator.parentNode) {
+          loadingIndicator.parentNode.removeChild(loadingIndicator);
+        }
+
+        // Add image info if needed
+        if (content.startsWith('data:image')) {
+          const infoEl = document.createElement('div');
+          infoEl.className = 'image-info';
+          infoEl.textContent = 'Generated image';
+          contentEl.appendChild(infoEl);
+        }
+
+        // Scroll to bottom after image loads
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+      };
+
+      // Handle image error
+      img.onerror = () => {
+        if (loadingIndicator.parentNode) {
+          loadingIndicator.textContent = 'Error loading image';
+          loadingIndicator.className = 'image-error-indicator';
+        }
+      };
+
+      // Add image to content
+      contentEl.appendChild(img);
+    }
+    // Check for mixed content with embedded images
+    else if (typeof content === 'string' && content.includes('data:image')) {
+      // Extract image data URLs
+      const imageMatches = content.match(/data:image\/[^;]+;base64,[^\s"')]+/g);
+
+      if (imageMatches && imageMatches.length > 0) {
+        // Split content by image URLs
+        let parts = content.split(/(data:image\/[^;]+;base64,[^\s"')]+)/g);
+
+        // Process each part
+        parts.forEach(part => {
+          if (part.startsWith('data:image')) {
+            // This part is an image
+            const img = document.createElement('img');
+            img.src = part;
+            img.alt = 'Image';
+            img.className = 'chat-message-image';
+            contentEl.appendChild(img);
+          } else if (part.trim()) {
+            // This part is text
+            const textNode = document.createElement('div');
+
+            // Handle markdown-style bold text for node titles
+            if (part.includes('**') && sender === 'assistant') {
+              textNode.innerHTML = part.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            } else {
+              textNode.textContent = part;
+            }
+
+            contentEl.appendChild(textNode);
+          }
+        });
+      } else {
+        // Handle as regular text with markdown
+        if (content.includes('**') && sender === 'assistant') {
+          contentEl.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        } else {
+          contentEl.textContent = content;
+        }
+      }
+    }
+    // Handle markdown-style bold text for node titles
+    else if (typeof content === 'string' && content.includes('**') && sender === 'assistant') {
+      contentEl.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
+    // Regular text content
+    else {
+      contentEl.textContent = content;
+    }
   },
 
   // Remove a message from the chat by ID

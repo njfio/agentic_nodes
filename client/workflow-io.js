@@ -529,7 +529,18 @@ const WorkflowIO = {
           console.log("Showing outputs from all processed nodes");
           for (const node of processedNodes) {
             console.log(`Adding output from node ${node.id} (${node.title})`);
-            WorkflowPanel.addMessage(`**${node.title}**: ${node.content}`, 'assistant');
+
+            // Check if this is an image node
+            if (node.contentType === 'image' ||
+                (node.content && typeof node.content === 'string' &&
+                 (node.content.startsWith('data:image') ||
+                  node.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)))) {
+              // For image nodes, just send the image content
+              WorkflowPanel.addMessage(`**${node.title}**:\n${node.content}`, 'assistant');
+            } else {
+              // For text nodes, add the title and content
+              WorkflowPanel.addMessage(`**${node.title}**: ${node.content}`, 'assistant');
+            }
           }
           DebugManager.addLog(`Displayed outputs from ${processedNodes.length} nodes`, 'success');
         } else {
@@ -537,13 +548,37 @@ const WorkflowIO = {
           if (this.outputNode && this.outputNode.hasBeenProcessed && this.outputNode.content) {
             // Use the output node's content
             console.log("Using output node content");
-            WorkflowPanel.addMessage(this.outputNode.content, 'assistant');
+
+            // Check if this is an image node
+            if (this.outputNode.contentType === 'image' ||
+                (this.outputNode.content && typeof this.outputNode.content === 'string' &&
+                 (this.outputNode.content.startsWith('data:image') ||
+                  this.outputNode.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)))) {
+              // For image nodes, just send the image content
+              WorkflowPanel.addMessage(this.outputNode.content, 'assistant');
+            } else {
+              // For text nodes, add the content
+              WorkflowPanel.addMessage(this.outputNode.content, 'assistant');
+            }
+
             DebugManager.addLog('Message processed successfully', 'success');
           } else {
             // Use the last processed node's content as fallback
             const lastNode = processedNodes[processedNodes.length - 1];
             console.log(`Using content from node ${lastNode.id} (${lastNode.title}) as fallback`);
-            WorkflowPanel.addMessage(lastNode.content, 'assistant');
+
+            // Check if this is an image node
+            if (lastNode.contentType === 'image' ||
+                (lastNode.content && typeof lastNode.content === 'string' &&
+                 (lastNode.content.startsWith('data:image') ||
+                  lastNode.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)))) {
+              // For image nodes, just send the image content
+              WorkflowPanel.addMessage(lastNode.content, 'assistant');
+            } else {
+              // For text nodes, add the content
+              WorkflowPanel.addMessage(lastNode.content, 'assistant');
+            }
+
             DebugManager.addLog(`Using content from node ${lastNode.id} as response`, 'info');
           }
         }
