@@ -365,6 +365,76 @@ const WorkflowIO = {
     if (workflowOutput) {
       workflowOutput.innerHTML = '<div class="no-output-message">Output will appear here after running the workflow</div>';
     }
+  },
+
+  // Process a message through the workflow (for chat interface)
+  async processMessage(message) {
+    // Check if input and output nodes are set
+    if (!this.inputNode || !this.outputNode) {
+      DebugManager.addLog('Input and output nodes must be set to process messages', 'error');
+      WorkflowPanel.addMessage('Please set input and output nodes before sending messages.', 'assistant');
+      return;
+    }
+
+    // Check if we should clear the output
+    const clearOutputOnRun = document.getElementById('clearOutputOnRun').checked;
+
+    // Set processing state
+    this.isProcessing = true;
+    this.updateStatus();
+
+    // Show processing message
+    WorkflowPanel.addMessage('Processing your request...', 'assistant');
+
+    try {
+      // Set the input node's content
+      this.inputNode.content = message;
+      this.inputNode.hasBeenProcessed = false;
+
+      // Clear the output node's content if needed
+      if (clearOutputOnRun) {
+        this.outputNode.content = '';
+      }
+      this.outputNode.hasBeenProcessed = false;
+
+      // Process the input node
+      DebugManager.addLog(`Processing message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, 'info');
+
+      // Process the node chain starting from the input node
+      await App.processNodeChain(this.inputNode);
+
+      // Add a small delay to ensure all processing is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Get the output from the output node
+      const output = this.outputNode.content;
+
+      DebugManager.addLog(`Output node content: ${output ? (output.length > 50 ? output.substring(0, 50) + '...' : output) : 'empty'}`, 'info');
+
+      // Add the response to the chat
+      if (output) {
+        WorkflowPanel.addMessage(output, 'assistant');
+        DebugManager.addLog('Message processed successfully', 'success');
+      } else {
+        // If the output node has been processed but has no content, check if it has inputContent
+        if (this.outputNode.hasBeenProcessed && this.outputNode.inputContent) {
+          const fallbackOutput = this.outputNode.inputContent;
+          WorkflowPanel.addMessage(fallbackOutput, 'assistant');
+          DebugManager.addLog('Message processed. Using input content as output.', 'warning');
+        } else {
+          WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
+          DebugManager.addLog('Message processed but no output was generated', 'warning');
+        }
+      }
+    } catch (error) {
+      // Show the error in the chat
+      WorkflowPanel.addMessage(`Error: ${error.message}`, 'assistant');
+      DebugManager.addLog(`Message processing failed: ${error.message}`, 'error');
+    } finally {
+      // Reset processing state
+      this.isProcessing = false;
+      this.updateStatus();
+    }
   }
 };
 
