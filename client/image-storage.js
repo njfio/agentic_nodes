@@ -50,14 +50,26 @@ class ImageStorage {
 
   // Store an image and return an ID
   static storeImage(imageData) {
-    // Generate a unique ID
-    const imageId = `img_${Date.now()}_${++this.imageIdCounter}`;
+    try {
+      // Generate a unique ID
+      const imageId = `img_${Date.now()}_${++this.imageIdCounter}`;
 
-    // Store the image data
-    this.imageStore[imageId] = imageData;
+      // Store the image data in memory only, not in localStorage
+      this.imageStore[imageId] = imageData;
 
-    // Return the ID
-    return imageId;
+      // Try to save to server in the background if API is available
+      this.trySaveToServer(imageId, imageData);
+
+      // Return the ID
+      return imageId;
+    } catch (error) {
+      console.error('Error storing image:', error);
+      if (typeof DebugManager !== 'undefined') {
+        DebugManager.addLog(`Error storing image: ${error.message}`, 'error');
+      }
+      // Return a fallback ID even if storage fails
+      return `img_fallback_${Date.now()}`;
+    }
   }
 
   // Store an image synchronously and return an ID
@@ -67,19 +79,55 @@ class ImageStorage {
 
   // Save an image and return an ID (for API payload optimization)
   static saveImage(imageData) {
-    // Generate a unique ID
-    const imageId = `img_${Date.now()}_${++this.imageIdCounter}`;
+    try {
+      // Generate a unique ID
+      const imageId = `img_${Date.now()}_${++this.imageIdCounter}`;
 
-    // Store the image data
-    this.imageStore[imageId] = imageData;
+      // Store the image data in memory only
+      this.imageStore[imageId] = imageData;
 
-    // Log the storage
-    if (typeof DebugManager !== 'undefined') {
-      DebugManager.addLog(`Stored large image with ID ${imageId} for API payload optimization`, 'info');
+      // Try to save to server in the background if API is available
+      this.trySaveToServer(imageId, imageData);
+
+      // Log the storage
+      if (typeof DebugManager !== 'undefined') {
+        DebugManager.addLog(`Stored large image with ID ${imageId} for API payload optimization`, 'info');
+      }
+
+      // Return the ID
+      return imageId;
+    } catch (error) {
+      console.error('Error saving image:', error);
+      if (typeof DebugManager !== 'undefined') {
+        DebugManager.addLog(`Error saving image: ${error.message}`, 'error');
+      }
+      // Return a fallback ID even if storage fails
+      return `img_fallback_${Date.now()}`;
     }
+  }
 
-    // Return the ID
-    return imageId;
+  // Try to save an image to the server in the background
+  static trySaveToServer(imageId, imageData) {
+    // Only try if we're in a context with fetch API
+    if (typeof fetch === 'undefined') return;
+
+    // Don't block the main thread
+    setTimeout(async () => {
+      try {
+        // Check if we have a server API available
+        const response = await fetch('/api/status', { method: 'HEAD' });
+        if (response.ok) {
+          // Server is available, try to save the image
+          await this.saveImageToServer(imageData, null, null);
+          if (typeof DebugManager !== 'undefined') {
+            DebugManager.addLog(`Image ${imageId} saved to server`, 'info');
+          }
+        }
+      } catch (error) {
+        // Silently fail - this is just a background optimization
+        console.warn('Could not save image to server:', error);
+      }
+    }, 100);
   }
 
   // Get an image by ID
@@ -96,7 +144,21 @@ class ImageStorage {
 
   // Get an image by ID synchronously
   static getImageSync(imageId) {
-    return this.imageStore[imageId];
+    try {
+      // Check if the image exists in our in-memory store
+      if (this.imageStore[imageId]) {
+        return this.imageStore[imageId];
+      }
+
+      // If not found, log a warning but don't throw an error
+      console.warn(`Image with ID ${imageId} not found in memory cache`);
+
+      // Return null instead of undefined for better error handling
+      return null;
+    } catch (error) {
+      console.error(`Error retrieving image ${imageId}:`, error);
+      return null;
+    }
   }
 
   // Load workflow images from the server with progressive loading
