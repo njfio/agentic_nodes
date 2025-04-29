@@ -190,58 +190,58 @@ const WorkflowPanel = {
       ))) {
         console.log("Detected image content");
 
-      // Create image element
-      const img = document.createElement('img');
-      img.src = content;
-      img.alt = 'Image';
-      img.className = 'chat-message-image';
+        // Create image element
+        const img = document.createElement('img');
+        img.src = content;
+        img.alt = 'Image';
+        img.className = 'chat-message-image';
 
-      // Add loading indicator
-      const loadingIndicator = document.createElement('div');
-      loadingIndicator.className = 'image-loading-indicator';
-      loadingIndicator.textContent = 'Loading image...';
-      contentEl.appendChild(loadingIndicator);
+        // Add loading indicator
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'image-loading-indicator';
+        loadingIndicator.textContent = 'Loading image...';
+        contentEl.appendChild(loadingIndicator);
 
-      // Handle image load
-      img.onload = () => {
-        console.log("Image loaded successfully");
-        // Remove loading indicator
-        if (loadingIndicator.parentNode) {
-          loadingIndicator.parentNode.removeChild(loadingIndicator);
+        // Handle image load
+        img.onload = () => {
+          console.log("Image loaded successfully");
+          // Remove loading indicator
+          if (loadingIndicator.parentNode) {
+            loadingIndicator.parentNode.removeChild(loadingIndicator);
+          }
+
+          // Add image info if needed
+          if (content.startsWith('data:image')) {
+            const infoEl = document.createElement('div');
+            infoEl.className = 'image-info';
+            infoEl.textContent = 'Generated image';
+            contentEl.appendChild(infoEl);
+          }
+
+          // Scroll to bottom after image loads
+          const chatMessages = document.getElementById('chatMessages');
+          if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+        };
+
+        // Handle image error
+        img.onerror = (e) => {
+          console.error("Error loading image:", e);
+          if (loadingIndicator.parentNode) {
+            loadingIndicator.textContent = 'Error loading image';
+            loadingIndicator.className = 'image-error-indicator';
+          }
+        };
+
+        // Add image to content
+        contentEl.appendChild(img);
+
+        // Force image load
+        if (img.complete) {
+          img.onload();
         }
-
-        // Add image info if needed
-        if (content.startsWith('data:image')) {
-          const infoEl = document.createElement('div');
-          infoEl.className = 'image-info';
-          infoEl.textContent = 'Generated image';
-          contentEl.appendChild(infoEl);
-        }
-
-        // Scroll to bottom after image loads
-        const chatMessages = document.getElementById('chatMessages');
-        if (chatMessages) {
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-      };
-
-      // Handle image error
-      img.onerror = (e) => {
-        console.error("Error loading image:", e);
-        if (loadingIndicator.parentNode) {
-          loadingIndicator.textContent = 'Error loading image';
-          loadingIndicator.className = 'image-error-indicator';
-        }
-      };
-
-      // Add image to content
-      contentEl.appendChild(img);
-
-      // Force image load
-      if (img.complete) {
-        img.onload();
       }
-    }
     // Check for mixed content with embedded images
     else if (typeof content === 'string' && content.includes('data:image')) {
       console.log("Detected mixed content with embedded images");
