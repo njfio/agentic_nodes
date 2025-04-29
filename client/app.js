@@ -7075,7 +7075,7 @@ const App = {
       ];
 
       // Get OpenAI config
-      const config = OpenAIConfig.getConfig();
+      const config = ApiService.openai.getConfig();
 
       // Log the request
       DebugManager.addLog(`Sending chat request to OpenAI API (model: ${config.model})`, 'info');
