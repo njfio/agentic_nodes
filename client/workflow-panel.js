@@ -182,6 +182,15 @@ const WorkflowPanel = {
       console.log("Force image flag is set to true");
     }
 
+    // Add more detailed debugging
+    if (typeof content === 'string' && content.startsWith('data:image')) {
+      console.log("Content is a data:image URL");
+    } else if (typeof content === 'string' && content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)) {
+      console.log("Content is an image URL");
+    } else if (typeof content === 'string' && content.includes('data:image')) {
+      console.log("Content contains embedded image data");
+    }
+
     try {
       // Check if content is an image (data URL or image URL) or if forceImage is true
       if (forceImage || (typeof content === 'string' && (

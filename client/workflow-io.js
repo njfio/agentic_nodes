@@ -549,14 +549,24 @@ const WorkflowIO = {
 
             console.log(`Node ${node.id} (${node.title}) content type:`, node.contentType);
             console.log(`Node ${node.id} is image content:`, isImageContent);
+            console.log(`Node ${node.id} content preview:`, typeof node.content === 'string' ?
+                node.content.substring(0, 100) + "..." : node.content);
 
             if (isImageContent) {
               // For image nodes, add the title and then the image on a new line
               console.log(`Adding image from node ${node.id} (${node.title}) to chat`);
+
+              // Get the actual image content - if it's an image node, use the contentImage.src if available
+              let imageContent = node.content;
+              if (node.contentImage && node.contentImage.src) {
+                console.log(`Using contentImage.src for node ${node.id}`);
+                imageContent = node.contentImage.src;
+              }
+
               // First add the title
               WorkflowPanel.addMessage(`**${node.title}**:`, 'assistant');
               // Then add the image as a separate message
-              WorkflowPanel.addMessage(node.content, 'assistant', true); // true = force image rendering
+              WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
             } else {
               // For text nodes, add the title and content
               console.log(`Adding text from node ${node.id} (${node.title}) to chat`);
@@ -584,8 +594,15 @@ const WorkflowIO = {
             // For image nodes, just send the image content
             if (isImageContent) {
               console.log("Sending image content to chat");
+
+              // Get the actual image content - if it's an image node, use the contentImage.src if available
+              let imageContent = this.outputNode.content;
+              if (this.outputNode.contentImage && this.outputNode.contentImage.src) {
+                console.log(`Using contentImage.src for output node ${this.outputNode.id}`);
+                imageContent = this.outputNode.contentImage.src;
+              }
+
               // Force the content to be treated as an image by adding a special marker
-              const imageContent = this.outputNode.content;
               WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
             } else {
               // For text nodes, add the content
@@ -611,7 +628,15 @@ const WorkflowIO = {
             if (isLastNodeImage) {
               // For image nodes, send the image content with force image flag
               console.log(`Adding image from last node ${lastNode.id} (${lastNode.title}) to chat`);
-              WorkflowPanel.addMessage(lastNode.content, 'assistant', true); // true = force image rendering
+
+              // Get the actual image content - if it's an image node, use the contentImage.src if available
+              let imageContent = lastNode.content;
+              if (lastNode.contentImage && lastNode.contentImage.src) {
+                console.log(`Using contentImage.src for last node ${lastNode.id}`);
+                imageContent = lastNode.contentImage.src;
+              }
+
+              WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
             } else {
               // For text nodes, add the content
               console.log(`Adding text from last node ${lastNode.id} (${lastNode.title}) to chat`);
