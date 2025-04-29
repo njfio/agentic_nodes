@@ -2325,9 +2325,6 @@ class Node {
     }
   }
 
-
-  }
-
   // Preload input image with error handling and performance optimizations
   preloadInputImage() {
     // Detect if input is an image URL
