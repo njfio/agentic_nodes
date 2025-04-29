@@ -402,9 +402,9 @@ class Node {
       this.contentImage.onload = () => {
         DebugManager.addLog(`Image loaded for node ${nodeId} after content update`, 'success');
 
-        // Redraw only if App exists
-        if (typeof App !== 'undefined') {
-          App.draw();
+        // Update size if needed, but don't trigger a redraw
+        if (this.autoSize) {
+          this.calculateOptimalSize();
         }
 
         // If this is an output node, update the workflow chat panel
@@ -2983,8 +2983,12 @@ class Node {
         this.inputImage = new Image();
         this.inputImage.src = this.inputContent;
 
-        // Redraw when image loads
-        this.inputImage.onload = () => App.draw();
+        // Update size when image loads, but don't trigger a redraw
+        this.inputImage.onload = () => {
+          if (this.autoSize) {
+            this.calculateOptimalSize();
+          }
+        };
       }
 
       // If image is loaded, draw it
@@ -3162,8 +3166,7 @@ class Node {
       ctx.font = '12px Arial';
       ctx.fillText('Image generation in progress...', x + 10, y + 20);
 
-      // Force a redraw after a short delay to check if content is available
-      setTimeout(() => App.draw(), 500);
+      // Don't force a redraw to prevent reloading loops
       return;
     }
 
@@ -3184,16 +3187,16 @@ class Node {
         this.contentImage.onerror = () => {
           DebugManager.addLog(`Error loading image for node ${this.id}`, 'error');
           this.contentImage = null; // Clear the broken image
-          App.draw();
+          // Don't call App.draw() here to prevent reloading loops
         };
 
-        // Add load event listener to redraw when image loads
+        // Add load event listener to update size when image loads
         this.contentImage.onload = () => {
           // When image loads, update node size if auto-sizing is enabled
           if (this.autoSize) {
             this.calculateOptimalSize();
           }
-          App.draw();
+          // Don't call App.draw() here to prevent reloading loops
         };
 
         // Set the source after adding event handlers
@@ -3260,8 +3263,7 @@ class Node {
       ctx.font = '12px Arial';
       ctx.fillText('Loading image...', x + 10, y + 20);
 
-      // Add load event listener to redraw when image loads
-      this.contentImage.onload = () => App.draw();
+      // Don't add load event listener to redraw to prevent reloading loops
     }
   }
 
