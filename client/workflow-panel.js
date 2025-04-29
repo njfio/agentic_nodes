@@ -182,12 +182,13 @@ const WorkflowPanel = {
       console.log("Force image flag is set to true");
     }
 
-    // Check if content is an image (data URL or image URL) or if forceImage is true
-    if (forceImage || (typeof content === 'string' && (
-        content.startsWith('data:image') ||
-        content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
-    ))) {
-      console.log("Detected image content");
+    try {
+      // Check if content is an image (data URL or image URL) or if forceImage is true
+      if (forceImage || (typeof content === 'string' && (
+          content.startsWith('data:image') ||
+          content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
+      ))) {
+        console.log("Detected image content");
 
       // Create image element
       const img = document.createElement('img');
@@ -315,6 +316,18 @@ const WorkflowPanel = {
     // Regular text content
     else {
       contentEl.textContent = content;
+    }
+    } catch (error) {
+      // If there's an error rendering the content, show it as text
+      console.error("Error rendering content:", error);
+      contentEl.innerHTML = `<div class="error-content">Error rendering content: ${error.message}</div>`;
+      if (typeof content === 'string') {
+        // Try to show the content as text
+        const textContent = document.createElement('div');
+        textContent.className = 'fallback-content';
+        textContent.textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+        contentEl.appendChild(textContent);
+      }
     }
   },
 

@@ -162,6 +162,29 @@
   font-style: italic;
 }
 
+.error-content {
+  color: #e74c3c;
+  font-size: 12px;
+  margin: 5px 0;
+  padding: 5px;
+  background-color: rgba(231, 76, 60, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #e74c3c;
+}
+
+.fallback-content {
+  color: #aaa;
+  font-size: 12px;
+  margin: 5px 0;
+  padding: 5px;
+  background-color: #333;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 /* Input area */
 .chat-input-container {
   display: flex;

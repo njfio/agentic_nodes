@@ -524,8 +524,9 @@ const WorkflowIO = {
       });
 
       // Filter out nodes that haven't been processed or don't have content
+      // Note: We now include the input node if it has been processed and has content
       const processedNodes = allNodes.filter(node =>
-        node && node.hasBeenProcessed && node.content && node !== this.inputNode
+        node && node.hasBeenProcessed && node.content
       );
 
       console.log(`Found ${processedNodes.length} processed nodes with content`);
