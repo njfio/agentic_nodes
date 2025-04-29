@@ -3,6 +3,16 @@ const WorkflowPanel = {
   // Properties
   isCollapsed: false,
   messageHistory: [],
+  isResizing: false,
+  initialHeight: 300,
+  initialY: 0,
+
+  // Default panel height (px)
+  defaultHeight: 300,
+
+  // Min and max heights (px)
+  minHeight: 150,
+  maxHeight: window.innerHeight - 100,
 
   // Initialize the workflow panel
   init() {
@@ -14,6 +24,9 @@ const WorkflowPanel = {
 
     // Initialize the chat input
     this.initChatInput();
+
+    // Initialize resize functionality
+    this.initResizeHandle();
   },
 
   // Set up event listeners
@@ -190,6 +203,129 @@ const WorkflowPanel = {
       // Clear message history
       this.messageHistory = [];
     }
+  },
+
+  // Initialize the resize handle
+  initResizeHandle() {
+    const resizeHandle = document.getElementById('workflowPanelResizeHandle');
+    const panel = document.getElementById('workflowPanel');
+
+    if (!resizeHandle || !panel) return;
+
+    // Store the initial panel height
+    this.initialHeight = parseInt(window.getComputedStyle(panel).height, 10) || this.defaultHeight;
+
+    // Mouse down event on the resize handle
+    resizeHandle.addEventListener('mousedown', (e) => {
+      // Prevent default to avoid text selection during resize
+      e.preventDefault();
+
+      // Start resizing
+      this.isResizing = true;
+      this.initialY = e.clientY;
+      this.initialHeight = parseInt(window.getComputedStyle(panel).height, 10);
+
+      // Add resizing class to disable transitions during resize
+      panel.classList.add('resizing');
+
+      // Add global mouse move and mouse up event listeners
+      document.addEventListener('mousemove', this.handleMouseMove);
+      document.addEventListener('mouseup', this.handleMouseUp);
+    });
+
+    // Touch events for mobile support
+    resizeHandle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+
+      if (e.touches.length === 1) {
+        this.isResizing = true;
+        this.initialY = e.touches[0].clientY;
+        this.initialHeight = parseInt(window.getComputedStyle(panel).height, 10);
+
+        panel.classList.add('resizing');
+
+        document.addEventListener('touchmove', this.handleTouchMove);
+        document.addEventListener('touchend', this.handleTouchEnd);
+      }
+    });
+  },
+
+  // Handle mouse move during resize
+  handleMouseMove: function(e) {
+    if (!WorkflowPanel.isResizing) return;
+
+    const panel = document.getElementById('workflowPanel');
+    if (!panel) return;
+
+    // Calculate the new height based on mouse movement
+    // Moving up (negative delta) increases height, moving down decreases height
+    const delta = WorkflowPanel.initialY - e.clientY;
+    let newHeight = WorkflowPanel.initialHeight + delta;
+
+    // Constrain the height within min and max bounds
+    newHeight = Math.max(WorkflowPanel.minHeight, Math.min(newHeight, WorkflowPanel.maxHeight));
+
+    // Apply the new height
+    panel.style.height = `${newHeight}px`;
+
+    // Update chat messages container to scroll to bottom if needed
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  },
+
+  // Handle mouse up to stop resizing
+  handleMouseUp: function() {
+    if (!WorkflowPanel.isResizing) return;
+
+    const panel = document.getElementById('workflowPanel');
+    if (panel) {
+      // Remove resizing class to re-enable transitions
+      panel.classList.remove('resizing');
+    }
+
+    // Stop resizing
+    WorkflowPanel.isResizing = false;
+
+    // Remove global event listeners
+    document.removeEventListener('mousemove', WorkflowPanel.handleMouseMove);
+    document.removeEventListener('mouseup', WorkflowPanel.handleMouseUp);
+  },
+
+  // Handle touch move during resize (for mobile)
+  handleTouchMove: function(e) {
+    if (!WorkflowPanel.isResizing || e.touches.length !== 1) return;
+
+    const panel = document.getElementById('workflowPanel');
+    if (!panel) return;
+
+    const delta = WorkflowPanel.initialY - e.touches[0].clientY;
+    let newHeight = WorkflowPanel.initialHeight + delta;
+
+    newHeight = Math.max(WorkflowPanel.minHeight, Math.min(newHeight, WorkflowPanel.maxHeight));
+
+    panel.style.height = `${newHeight}px`;
+
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  },
+
+  // Handle touch end to stop resizing (for mobile)
+  handleTouchEnd: function() {
+    if (!WorkflowPanel.isResizing) return;
+
+    const panel = document.getElementById('workflowPanel');
+    if (panel) {
+      panel.classList.remove('resizing');
+    }
+
+    WorkflowPanel.isResizing = false;
+
+    document.removeEventListener('touchmove', WorkflowPanel.handleTouchMove);
+    document.removeEventListener('touchend', WorkflowPanel.handleTouchEnd);
   }
 };
 
