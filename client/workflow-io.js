@@ -447,10 +447,12 @@ const WorkflowIO = {
       console.log("Setting input node content");
       this.inputNode.content = message;
       this.inputNode.inputContent = message;
-      this.inputNode.hasBeenProcessed = false;
 
       // Process the input node
       DebugManager.addLog(`Processing message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, 'info');
+
+      // Mark the input node as processed with the user's message
+      this.inputNode.hasBeenProcessed = true;
 
       // Process the node chain starting from the input node
       console.log("Calling processNodeChain");
