@@ -361,6 +361,63 @@ class Node {
     }
   }
 
+  // Update the node's content with proper cache-busting for images
+  updateNodeContent(content) {
+    // If this is an image node and the content has changed, force a complete refresh
+    if ((this.contentType === 'image' || this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') &&
+        this.content !== content) {
+      // Add a timestamp to force a refresh of the image
+      const timestamp = Date.now();
+      let refreshedContent = content;
+
+      if (refreshedContent && typeof refreshedContent === 'string') {
+        if (refreshedContent.includes('?')) {
+          refreshedContent = refreshedContent.split('?')[0] + '?t=' + timestamp;
+        } else if (!refreshedContent.startsWith('data:')) {
+          refreshedContent = refreshedContent + '?t=' + timestamp;
+        }
+      }
+
+      // Update the content with cache-busting
+      this.content = refreshedContent;
+
+      // Force recreate the image object
+      this.contentImage = null;
+      this.contentImage = new Image();
+
+      // Set up event handlers
+      this.contentImage.onload = () => {
+        DebugManager.addLog(`Image loaded for node ${this.id} after content update`, 'success');
+        App.draw();
+
+        // If this is an output node, update the workflow chat panel
+        if (this.workflowRole === 'output' && typeof WorkflowPanel !== 'undefined') {
+          // Only update if we're not showing all node outputs
+          const showAllNodeOutputs = document.getElementById('showAllNodeOutputs')?.checked || false;
+          if (!showAllNodeOutputs) {
+            WorkflowPanel.addMessage(refreshedContent, 'assistant', true);
+            DebugManager.addLog(`Updated workflow chat with new image from node ${this.id}`, 'success');
+          }
+        }
+      };
+
+      this.contentImage.onerror = (err) => {
+        DebugManager.addLog(`Error loading image for node ${this.id}: ${err.message || 'Unknown error'}`, 'error');
+        this.contentImage = null;
+      };
+
+      // Set the source to trigger loading
+      this.contentImage.src = refreshedContent;
+
+      DebugManager.addLog(`Updating image content for node ${this.id} with cache-busting`, 'info');
+    } else {
+      // For non-image nodes, just update the content
+      this.content = content;
+    }
+
+    this.hasBeenProcessed = true;
+  }
+
   // Process a chat message to get AI response
   async processChatMessage(message) {
     // Set processing state
@@ -2129,6 +2186,42 @@ class Node {
       if (this.hasBeenProcessed && !this.content && this.contentImage && this.contentImage.src) {
         this.content = this.contentImage.src;
         DebugManager.addLog(`Recovered image content for node ${this.id} during preload`, 'info');
+      }
+
+      // Always force reload the image for image-related nodes that have been processed
+      if (this.hasBeenProcessed && this.content) {
+        // Force reload the image by creating a new Image object
+        this.contentImage = null;
+        this.contentImage = new Image();
+
+        // Add a timestamp to prevent browser caching
+        const timestamp = Date.now();
+        let imageUrl = this.content;
+
+        if (imageUrl.includes('?')) {
+          imageUrl = imageUrl.split('?')[0] + '?t=' + timestamp;
+        } else if (!imageUrl.startsWith('data:')) {
+          imageUrl = imageUrl + '?t=' + timestamp;
+        }
+
+        // Set up event handlers
+        this.contentImage.onload = () => {
+          DebugManager.addLog(`Image loaded for node ${this.id}`, 'success');
+          // Force a redraw to show the updated image
+          if (typeof App !== 'undefined') {
+            App.draw();
+          }
+        };
+
+        this.contentImage.onerror = (err) => {
+          DebugManager.addLog(`Error loading image for node ${this.id}: ${err.message || 'Unknown error'}`, 'error');
+          this.contentImage = null;
+        };
+
+        // Set the source to trigger loading
+        this.contentImage.src = imageUrl;
+
+        DebugManager.addLog(`Reloading image for node ${this.id} with cache-busting`, 'info');
       }
     }
 
@@ -6219,10 +6312,10 @@ const App = {
       // Process the current node
       const output = await node.process(processInput);
 
-      // Store the output in the node's content
-      if (output && node.content !== output) {
-        node.content = output;
-        node.hasBeenProcessed = true;
+      // Store the output in the node's content using our updateNodeContent method
+      if (output) {
+        // Use the new updateNodeContent method to properly handle image cache-busting
+        node.updateNodeContent(output);
 
         // Log for debugging
         DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
@@ -6243,10 +6336,22 @@ const App = {
           if (node.content) {
             // Force recreate the image object to ensure it loads properly
             node.contentImage = null;
+
+            // Create a new image with a timestamp to prevent caching
+            const timestamp = Date.now();
+            if (node.content.includes('?')) {
+              node.content = node.content.split('?')[0] + '?t=' + timestamp;
+            } else if (node.content.startsWith('data:')) {
+              // For data URLs, we don't need to add a timestamp
+            } else {
+              node.content = node.content + '?t=' + timestamp;
+            }
+
+            // Now preload the content with the new URL
             node.preloadContent();
 
             // Log success for debugging
-            DebugManager.addLog(`Image content set for node ${node.id} in workflow: ${node.content.substring(0, 30)}...`, 'info');
+            DebugManager.addLog(`Image content set for node ${node.id} with cache-busting: ${node.content.substring(0, 30)}...`, 'info');
           } else {
             DebugManager.addLog(`Warning: No image content for node ${node.id} in workflow`, 'warning');
           }
@@ -6259,6 +6364,43 @@ const App = {
         if (output && node.content !== output) {
           node.content = output;
           node.hasBeenProcessed = true;
+
+          // If this is an output node and WorkflowPanel exists, update the chat panel immediately
+          if (typeof WorkflowPanel !== 'undefined') {
+            // Check if we should show all node outputs
+            const showAllNodeOutputs = document.getElementById('showAllNodeOutputs')?.checked || false;
+
+            // Only update if we're not showing all node outputs (otherwise it will be handled by WorkflowIO)
+            if (!showAllNodeOutputs) {
+              // Check if this is an image node
+              const isImageContent = node.contentType === 'image' ||
+                  (node.content && typeof node.content === 'string' &&
+                   (node.content.startsWith('data:image') ||
+                    node.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)));
+
+              if (isImageContent) {
+                // Get the actual image content
+                let imageContent = node.content;
+                if (node.contentImage && node.contentImage.src) {
+                  imageContent = node.contentImage.src;
+                }
+
+                // Verify that the image content is valid before adding it to the chat
+                if (imageContent && typeof imageContent === 'string' &&
+                    (imageContent.startsWith('data:image') ||
+                     imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
+
+                  // Force the content to be treated as an image
+                  WorkflowPanel.addMessage(imageContent, 'assistant', true);
+                  DebugManager.addLog(`Updated workflow chat with new image from output node ${node.id}`, 'success');
+                }
+              } else {
+                // For text nodes, add the content
+                WorkflowPanel.addMessage(node.content, 'assistant');
+                DebugManager.addLog(`Updated workflow chat with new text from output node ${node.id}`, 'success');
+              }
+            }
+          }
         }
 
         // Log for debugging
@@ -6589,6 +6731,19 @@ const App = {
     this.nodes = [];
     this.connections = [];
 
+    // Clear the image cache to prevent showing old images
+    if (typeof ImageStorage !== 'undefined') {
+      ImageStorage.clearCache();
+      ImageStorage.imageStore = {}; // Clear the image store as well
+      DebugManager.addLog('Image cache cleared before loading workflow', 'info');
+    }
+
+    // Clear the workflow chat panel if it exists
+    if (typeof WorkflowPanel !== 'undefined') {
+      WorkflowPanel.clearChat();
+      DebugManager.addLog('Workflow chat panel cleared', 'info');
+    }
+
     // Show loading indicator
     DebugManager.addLog('Loading workflow...', 'info');
 
@@ -6674,6 +6829,9 @@ const App = {
       node.inputType = nodeData.inputType || 'text';
       node.outputType = nodeData.outputType || 'text';
 
+      // Explicitly reset contentImage to prevent caching issues
+      node.contentImage = null;
+
       // Restore state properties
       node.hasBeenProcessed = nodeData.hasBeenProcessed || false;
       node.error = nodeData.error || null;
@@ -6744,8 +6902,8 @@ const App = {
                     node.content = imageData.data;
 
                     // Preload the image
+                    node.contentImage = null;
                     node.contentImage = new Image();
-                    node.contentImage.src = node.content;
 
                     // Add load event listener to redraw when image loads
                     node.contentImage.onload = () => {
@@ -6755,9 +6913,20 @@ const App = {
                       }
                       // Force a redraw to show the image
                       App.draw();
+
+                      // Log success for debugging
+                      DebugManager.addLog(`Truncated image loaded for node ${node.id}`, 'success');
                     };
 
-                    DebugManager.addLog(`Image loaded for node ${node.id}`, 'success');
+                    // Add error handler
+                    node.contentImage.onerror = (err) => {
+                      DebugManager.addLog(`Error loading truncated image for node ${node.id}: ${err.message || 'Unknown error'}`, 'error');
+                      // Clear the image reference to allow retry
+                      node.contentImage = null;
+                    };
+
+                    // Set the source last to trigger loading
+                    node.contentImage.src = node.content;
                   }
                 }
               }
@@ -6769,8 +6938,8 @@ const App = {
         // Regular image content
         else if (node.content) {
           // Force recreate the image object to ensure it loads properly
+          node.contentImage = null;
           node.contentImage = new Image();
-          node.contentImage.src = node.content;
 
           // Add load event listener to redraw when image loads
           node.contentImage.onload = () => {
@@ -6780,10 +6949,23 @@ const App = {
             }
             // Force a redraw to show the image
             this.draw();
+
+            // Log success for debugging
+            DebugManager.addLog(`Image loaded for node ${node.id}`, 'success');
           };
 
-          // Log success for debugging
-          DebugManager.addLog(`Image content loaded for node ${node.id}`, 'info');
+          // Add error handler
+          node.contentImage.onerror = (err) => {
+            DebugManager.addLog(`Error loading image for node ${node.id}: ${err.message || 'Unknown error'}`, 'error');
+            // Clear the image reference to allow retry
+            node.contentImage = null;
+          };
+
+          // Set the source last to trigger loading
+          node.contentImage.src = node.content;
+
+          // Log attempt for debugging
+          DebugManager.addLog(`Loading image for node ${node.id}...`, 'info');
         }
       }
 

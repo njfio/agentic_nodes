@@ -217,8 +217,20 @@ const WorkflowPanel = {
         // Create image element
         const img = document.createElement('img');
 
-        // Set the image source
-        img.src = content;
+        // Add a timestamp to force a refresh of the image
+        let imageUrl = content;
+        if (typeof imageUrl === 'string') {
+          const timestamp = Date.now();
+          if (imageUrl.includes('?')) {
+            imageUrl = imageUrl.split('?')[0] + '?t=' + timestamp;
+          } else if (!imageUrl.startsWith('data:')) {
+            imageUrl = imageUrl + '?t=' + timestamp;
+          }
+          console.log(`Adding cache-busting to image URL: ${imageUrl.substring(0, 50)}...`);
+        }
+
+        // Set the image source with cache-busting
+        img.src = imageUrl;
         img.alt = 'Image';
         img.className = 'chat-message-image';
 
@@ -292,7 +304,19 @@ const WorkflowPanel = {
           if (part.startsWith('data:image')) {
             // This part is an image
             const img = document.createElement('img');
-            img.src = part;
+
+            // Add a timestamp to force a refresh of the image
+            let imageUrl = part;
+            if (typeof imageUrl === 'string') {
+              const timestamp = Date.now();
+              if (imageUrl.includes('?')) {
+                imageUrl = imageUrl.split('?')[0] + '?t=' + timestamp;
+              } else if (!imageUrl.startsWith('data:')) {
+                imageUrl = imageUrl + '?t=' + timestamp;
+              }
+            }
+
+            img.src = imageUrl;
             img.alt = 'Image';
             img.className = 'chat-message-image';
 

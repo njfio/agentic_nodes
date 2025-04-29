@@ -470,8 +470,8 @@ const WorkflowIO = {
       // Show a waiting message that we'll replace later
       const waitingMessageId = WorkflowPanel.addMessage('Processing your workflow...', 'assistant');
 
-      // Wait for nodes to finish processing (longer delay)
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Increased to 5 seconds
+      // Wait for nodes to finish processing (reduced delay)
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced to 1 second for better responsiveness
 
       // Check if any nodes are still processing
       let stillProcessing = App.nodes.some(node => node.processing);
@@ -505,8 +505,8 @@ const WorkflowIO = {
       // Keep waiting if nodes are still processing, up to a maximum number of attempts
       while (stillProcessing && waitAttempts < maxWaitAttempts) {
         console.log(`Some nodes are still processing, waiting longer... (attempt ${waitAttempts + 1}/${maxWaitAttempts})`);
-        // Wait even longer if nodes are still processing
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait a bit longer if nodes are still processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
         // Check again
         stillProcessing = App.nodes.some(node => node.processing);
         waitAttempts++;
@@ -604,10 +604,22 @@ const WorkflowIO = {
                   (imageContent.startsWith('data:image') ||
                    imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
 
+                // Add a timestamp to force a refresh of the image
+                const timestamp = Date.now();
+                let refreshedImageUrl = imageContent;
+
+                if (refreshedImageUrl.includes('?')) {
+                  refreshedImageUrl = refreshedImageUrl.split('?')[0] + '?t=' + timestamp;
+                } else if (!refreshedImageUrl.startsWith('data:')) {
+                  refreshedImageUrl = refreshedImageUrl + '?t=' + timestamp;
+                }
+
+                DebugManager.addLog(`Adding image to chat with cache-busting: ${refreshedImageUrl.substring(0, 50)}...`, 'info');
+
                 // First add the title
                 WorkflowPanel.addMessage(`**${node.title}**:`, 'assistant');
-                // Then add the image as a separate message
-                WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+                // Then add the image as a separate message with cache-busting
+                WorkflowPanel.addMessage(refreshedImageUrl, 'assistant', true); // true = force image rendering
               } else {
                 // If image content is invalid, just add the title and a placeholder message
                 console.warn(`Invalid image content for node ${node.id}, skipping image display`);
@@ -653,8 +665,20 @@ const WorkflowIO = {
                   (imageContent.startsWith('data:image') ||
                    imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
 
+                // Add a timestamp to force a refresh of the image
+                const timestamp = Date.now();
+                let refreshedImageUrl = imageContent;
+
+                if (refreshedImageUrl.includes('?')) {
+                  refreshedImageUrl = refreshedImageUrl.split('?')[0] + '?t=' + timestamp;
+                } else if (!refreshedImageUrl.startsWith('data:')) {
+                  refreshedImageUrl = refreshedImageUrl + '?t=' + timestamp;
+                }
+
+                DebugManager.addLog(`Adding output node image to chat with cache-busting: ${refreshedImageUrl.substring(0, 50)}...`, 'info');
+
                 // Force the content to be treated as an image by adding a special marker
-                WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+                WorkflowPanel.addMessage(refreshedImageUrl, 'assistant', true); // true = force image rendering
               } else {
                 // If image content is invalid, just add a placeholder message
                 console.warn(`Invalid image content for output node ${this.outputNode.id}, skipping image display`);
@@ -697,7 +721,19 @@ const WorkflowIO = {
                   (imageContent.startsWith('data:image') ||
                    imageContent.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i))) {
 
-                WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
+                // Add a timestamp to force a refresh of the image
+                const timestamp = Date.now();
+                let refreshedImageUrl = imageContent;
+
+                if (refreshedImageUrl.includes('?')) {
+                  refreshedImageUrl = refreshedImageUrl.split('?')[0] + '?t=' + timestamp;
+                } else if (!refreshedImageUrl.startsWith('data:')) {
+                  refreshedImageUrl = refreshedImageUrl + '?t=' + timestamp;
+                }
+
+                DebugManager.addLog(`Adding last node image to chat with cache-busting: ${refreshedImageUrl.substring(0, 50)}...`, 'info');
+
+                WorkflowPanel.addMessage(refreshedImageUrl, 'assistant', true); // true = force image rendering
               } else {
                 // If image content is invalid, just add a placeholder message
                 console.warn(`Invalid image content for last node ${lastNode.id}, skipping image display`);
