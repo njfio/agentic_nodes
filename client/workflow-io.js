@@ -386,6 +386,10 @@ const WorkflowIO = {
     const clearOutputOnRun = document.getElementById('clearOutputOnRun')?.checked || false;
     console.log("Clear output on run:", clearOutputOnRun);
 
+    // Check if we should show all node outputs
+    const showAllNodeOutputs = document.getElementById('showAllNodeOutputs')?.checked || false;
+    console.log("Show all node outputs:", showAllNodeOutputs);
+
     // Set processing state
     this.isProcessing = true;
     this.updateStatus();
@@ -394,18 +398,49 @@ const WorkflowIO = {
     WorkflowPanel.addMessage('Processing your request...', 'assistant');
 
     try {
-      // Reset the input node's state if the method exists
-      console.log("Resetting input node state");
-      if (typeof this.inputNode.reset === 'function') {
-        this.inputNode.reset();
+      // If clearOutputOnRun is checked, reset all nodes in the workflow
+      if (clearOutputOnRun) {
+        console.log("Clearing all nodes in the workflow");
+        // Get all nodes in the workflow
+        const allNodes = [...App.nodes];
+
+        // Reset each node
+        for (const node of allNodes) {
+          // Reset node state
+          if (typeof node.reset === 'function') {
+            node.reset();
+          } else {
+            // Fallback if reset method doesn't exist
+            node.inputSources = new Map();
+            node.imageInputs = [];
+            node.additionalImages = [];
+            node.inputImage = null;
+            node.waitingForInputs = false;
+          }
+
+          // Clear content and mark as not processed
+          if (node !== this.inputNode) { // Don't clear the input node yet
+            node.content = '';
+            node.inputContent = '';
+            node.hasBeenProcessed = false;
+          }
+        }
+
+        DebugManager.addLog('Reset all nodes in the workflow', 'info');
       } else {
-        // Fallback if reset method doesn't exist
-        console.log("Node.reset method not found, using fallback");
-        this.inputNode.inputSources = new Map();
-        this.inputNode.imageInputs = [];
-        this.inputNode.additionalImages = [];
-        this.inputNode.inputImage = null;
-        this.inputNode.waitingForInputs = false;
+        // Only reset the input node's state if the method exists
+        console.log("Resetting only input node state");
+        if (typeof this.inputNode.reset === 'function') {
+          this.inputNode.reset();
+        } else {
+          // Fallback if reset method doesn't exist
+          console.log("Node.reset method not found, using fallback");
+          this.inputNode.inputSources = new Map();
+          this.inputNode.imageInputs = [];
+          this.inputNode.additionalImages = [];
+          this.inputNode.inputImage = null;
+          this.inputNode.waitingForInputs = false;
+        }
       }
 
       // Set the input node's content
@@ -413,14 +448,6 @@ const WorkflowIO = {
       this.inputNode.content = message;
       this.inputNode.inputContent = message;
       this.inputNode.hasBeenProcessed = false;
-
-      // Clear the output node's content if needed
-      if (clearOutputOnRun) {
-        console.log("Clearing output node content");
-        this.outputNode.content = '';
-        this.outputNode.inputContent = '';
-      }
-      this.outputNode.hasBeenProcessed = false;
 
       // Process the input node
       DebugManager.addLog(`Processing message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, 'info');
@@ -439,48 +466,84 @@ const WorkflowIO = {
       console.log("Waiting for processing to complete");
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Get the output from the output node
-      console.log("Getting output from output node");
-      const output = this.outputNode.content;
-      console.log("Output node content:", output ? (output.length > 100 ? output.substring(0, 100) + "..." : output) : "empty");
+      // If showAllNodeOutputs is checked, show outputs from all processed nodes
+      if (showAllNodeOutputs) {
+        console.log("Showing outputs from all processed nodes");
+        // Get all nodes connected to the input node
+        const connectedNodes = App.getConnectedNodes(this.inputNode);
 
-      DebugManager.addLog(`Output node content: ${output ? (output.length > 50 ? output.substring(0, 50) + '...' : output) : 'empty'}`, 'info');
+        // Add the input node to the list
+        const allNodes = [this.inputNode, ...connectedNodes];
 
-      // Add the response to the chat
-      if (output) {
-        console.log("Adding output to chat");
-        WorkflowPanel.addMessage(output, 'assistant');
-        DebugManager.addLog('Message processed successfully', 'success');
-      } else {
-        console.log("No output from output node, checking alternatives");
-        // If the output node has been processed but has no content, check if it has inputContent
-        if (this.outputNode.hasBeenProcessed && this.outputNode.inputContent) {
-          console.log("Using output node inputContent as fallback");
-          const fallbackOutput = this.outputNode.inputContent;
-          WorkflowPanel.addMessage(fallbackOutput, 'assistant');
-          DebugManager.addLog('Message processed. Using input content as output.', 'warning');
-        } else {
-          // Check if any node in the chain has content we can use
-          console.log("Checking connected nodes for content");
-          const connectedNodes = App.getConnectedNodes(this.inputNode);
-          console.log("Connected nodes:", connectedNodes.map(n => n.id));
-          let foundOutput = false;
-
-          for (const node of connectedNodes) {
-            console.log(`Checking node ${node.id} - processed: ${node.hasBeenProcessed}, has content: ${!!node.content}`);
-            if (node.hasBeenProcessed && node.content && node !== this.inputNode) {
-              console.log(`Using content from node ${node.id}`);
-              WorkflowPanel.addMessage(node.content, 'assistant');
-              DebugManager.addLog(`Using content from node ${node.id} as response`, 'info');
-              foundOutput = true;
-              break;
-            }
+        // Sort nodes by their position in the workflow (if possible)
+        allNodes.sort((a, b) => {
+          // Try to sort by y position first (top to bottom)
+          if (Math.abs(a.y - b.y) > 50) {
+            return a.y - b.y;
           }
+          // If y positions are similar, sort by x position (left to right)
+          return a.x - b.x;
+        });
 
-          if (!foundOutput) {
-            console.log("No output found in any node");
-            WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
-            DebugManager.addLog('Message processed but no output was generated', 'warning');
+        // Show outputs from all processed nodes
+        let foundAnyOutput = false;
+        for (const node of allNodes) {
+          if (node.hasBeenProcessed && node.content && node !== this.inputNode) {
+            console.log(`Adding output from node ${node.id} (${node.title})`);
+            WorkflowPanel.addMessage(`**${node.title}**: ${node.content}`, 'assistant');
+            foundAnyOutput = true;
+          }
+        }
+
+        if (!foundAnyOutput) {
+          console.log("No output found in any node");
+          WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
+          DebugManager.addLog('Message processed but no output was generated', 'warning');
+        }
+      } else {
+        // Get the output from the output node
+        console.log("Getting output from output node");
+        const output = this.outputNode.content;
+        console.log("Output node content:", output ? (output.length > 100 ? output.substring(0, 100) + "..." : output) : "empty");
+
+        DebugManager.addLog(`Output node content: ${output ? (output.length > 50 ? output.substring(0, 50) + '...' : output) : 'empty'}`, 'info');
+
+        // Add the response to the chat
+        if (output) {
+          console.log("Adding output to chat");
+          WorkflowPanel.addMessage(output, 'assistant');
+          DebugManager.addLog('Message processed successfully', 'success');
+        } else {
+          console.log("No output from output node, checking alternatives");
+          // If the output node has been processed but has no content, check if it has inputContent
+          if (this.outputNode.hasBeenProcessed && this.outputNode.inputContent) {
+            console.log("Using output node inputContent as fallback");
+            const fallbackOutput = this.outputNode.inputContent;
+            WorkflowPanel.addMessage(fallbackOutput, 'assistant');
+            DebugManager.addLog('Message processed. Using input content as output.', 'warning');
+          } else {
+            // Check if any node in the chain has content we can use
+            console.log("Checking connected nodes for content");
+            const connectedNodes = App.getConnectedNodes(this.inputNode);
+            console.log("Connected nodes:", connectedNodes.map(n => n.id));
+            let foundOutput = false;
+
+            for (const node of connectedNodes) {
+              console.log(`Checking node ${node.id} - processed: ${node.hasBeenProcessed}, has content: ${!!node.content}`);
+              if (node.hasBeenProcessed && node.content && node !== this.inputNode) {
+                console.log(`Using content from node ${node.id}`);
+                WorkflowPanel.addMessage(node.content, 'assistant');
+                DebugManager.addLog(`Using content from node ${node.id} as response`, 'info');
+                foundOutput = true;
+                break;
+              }
+            }
+
+            if (!foundOutput) {
+              console.log("No output found in any node");
+              WorkflowPanel.addMessage('I couldn\'t generate a response. Please try again.', 'assistant');
+              DebugManager.addLog('Message processed but no output was generated', 'warning');
+            }
           }
         }
       }
