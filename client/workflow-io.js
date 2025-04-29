@@ -495,7 +495,11 @@ const WorkflowIO = {
 
       // Always remove the waiting message before showing results
       try {
+        console.log("Removing waiting message:", waitingMessageId);
+        // Use a small delay to ensure the message is removed before adding new ones
+        await new Promise(resolve => setTimeout(resolve, 100));
         WorkflowPanel.removeMessage(waitingMessageId);
+        await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.warn("Error removing waiting message:", error);
       }

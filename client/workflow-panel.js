@@ -177,6 +177,11 @@ const WorkflowPanel = {
     // Log the content for debugging
     console.log("Rendering content:", typeof content, content.substring ? content.substring(0, 100) : content);
 
+    // Debug the forceImage flag
+    if (forceImage) {
+      console.log("Force image flag is set to true");
+    }
+
     // Check if content is an image (data URL or image URL) or if forceImage is true
     if (forceImage || (typeof content === 'string' && (
         content.startsWith('data:image') ||
@@ -315,16 +320,23 @@ const WorkflowPanel = {
 
   // Remove a message from the chat by ID
   removeMessage(messageId) {
-    if (!messageId) return false;
+    if (!messageId) {
+      console.warn("removeMessage called with no messageId");
+      return false;
+    }
 
+    console.log("Removing message with ID:", messageId);
     const messageEl = document.getElementById(messageId);
     if (messageEl) {
+      console.log("Found message element, removing it");
       messageEl.remove();
 
       // Also remove from message history
       this.messageHistory = this.messageHistory.filter(msg => msg.id !== messageId);
-
+      console.log("Message removed from history");
       return true;
+    } else {
+      console.warn("Message element not found:", messageId);
     }
 
     return false;
