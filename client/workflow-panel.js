@@ -121,9 +121,14 @@ const WorkflowPanel = {
   },
 
   // Add a message to the chat and return its ID
-  addMessage(content, sender) {
+  addMessage(content, sender, forceImage = false) {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
+
+    console.log("Adding message to chat:",
+      typeof content === 'string' ? content.substring(0, 50) + "..." : content,
+      "sender:", sender,
+      "forceImage:", forceImage);
 
     // Create a unique ID for the message
     const messageId = `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -138,7 +143,7 @@ const WorkflowPanel = {
     contentEl.className = 'message-content';
 
     // Process the content
-    this.renderContent(content, contentEl, sender);
+    this.renderContent(content, contentEl, sender, forceImage);
 
     // Add content to message
     messageEl.appendChild(contentEl);
@@ -162,7 +167,7 @@ const WorkflowPanel = {
   },
 
   // Render content in the message element
-  renderContent(content, contentEl, sender) {
+  renderContent(content, contentEl, sender, forceImage = false) {
     // Check if content is empty
     if (!content) {
       contentEl.textContent = '';
@@ -172,11 +177,11 @@ const WorkflowPanel = {
     // Log the content for debugging
     console.log("Rendering content:", typeof content, content.substring ? content.substring(0, 100) : content);
 
-    // Check if content is an image (data URL or image URL)
-    if (typeof content === 'string' && (
+    // Check if content is an image (data URL or image URL) or if forceImage is true
+    if (forceImage || (typeof content === 'string' && (
         content.startsWith('data:image') ||
         content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)
-    )) {
+    ))) {
       console.log("Detected image content");
 
       // Create image element

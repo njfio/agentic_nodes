@@ -535,14 +535,24 @@ const WorkflowIO = {
             console.log(`Adding output from node ${node.id} (${node.title})`);
 
             // Check if this is an image node
-            if (node.contentType === 'image' ||
+            const isImageContent = node.contentType === 'image' ||
                 (node.content && typeof node.content === 'string' &&
                  (node.content.startsWith('data:image') ||
-                  node.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)))) {
-              // For image nodes, just send the image content
-              WorkflowPanel.addMessage(`**${node.title}**:\n${node.content}`, 'assistant');
+                  node.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)));
+
+            console.log(`Node ${node.id} (${node.title}) content type:`, node.contentType);
+            console.log(`Node ${node.id} is image content:`, isImageContent);
+
+            if (isImageContent) {
+              // For image nodes, add the title and then the image on a new line
+              console.log(`Adding image from node ${node.id} (${node.title}) to chat`);
+              // First add the title
+              WorkflowPanel.addMessage(`**${node.title}**:`, 'assistant');
+              // Then add the image as a separate message
+              WorkflowPanel.addMessage(node.content, 'assistant', true); // true = force image rendering
             } else {
               // For text nodes, add the title and content
+              console.log(`Adding text from node ${node.id} (${node.title}) to chat`);
               WorkflowPanel.addMessage(`**${node.title}**: ${node.content}`, 'assistant');
             }
           }
@@ -554,14 +564,25 @@ const WorkflowIO = {
             console.log("Using output node content");
 
             // Check if this is an image node
-            if (this.outputNode.contentType === 'image' ||
+            const isImageContent = this.outputNode.contentType === 'image' ||
                 (this.outputNode.content && typeof this.outputNode.content === 'string' &&
                  (this.outputNode.content.startsWith('data:image') ||
-                  this.outputNode.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)))) {
-              // For image nodes, just send the image content
-              WorkflowPanel.addMessage(this.outputNode.content, 'assistant');
+                  this.outputNode.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)));
+
+            console.log("Output node content type:", this.outputNode.contentType);
+            console.log("Is image content:", isImageContent);
+            console.log("Output content preview:", typeof this.outputNode.content === 'string' ?
+                this.outputNode.content.substring(0, 100) + "..." : this.outputNode.content);
+
+            // For image nodes, just send the image content
+            if (isImageContent) {
+              console.log("Sending image content to chat");
+              // Force the content to be treated as an image by adding a special marker
+              const imageContent = this.outputNode.content;
+              WorkflowPanel.addMessage(imageContent, 'assistant', true); // true = force image rendering
             } else {
               // For text nodes, add the content
+              console.log("Sending text content to chat");
               WorkflowPanel.addMessage(this.outputNode.content, 'assistant');
             }
 
@@ -572,14 +593,21 @@ const WorkflowIO = {
             console.log(`Using content from node ${lastNode.id} (${lastNode.title}) as fallback`);
 
             // Check if this is an image node
-            if (lastNode.contentType === 'image' ||
+            const isLastNodeImage = lastNode.contentType === 'image' ||
                 (lastNode.content && typeof lastNode.content === 'string' &&
                  (lastNode.content.startsWith('data:image') ||
-                  lastNode.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)))) {
-              // For image nodes, just send the image content
-              WorkflowPanel.addMessage(lastNode.content, 'assistant');
+                  lastNode.content.match(/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i)));
+
+            console.log(`Last node ${lastNode.id} (${lastNode.title}) content type:`, lastNode.contentType);
+            console.log(`Last node is image content:`, isLastNodeImage);
+
+            if (isLastNodeImage) {
+              // For image nodes, send the image content with force image flag
+              console.log(`Adding image from last node ${lastNode.id} (${lastNode.title}) to chat`);
+              WorkflowPanel.addMessage(lastNode.content, 'assistant', true); // true = force image rendering
             } else {
               // For text nodes, add the content
+              console.log(`Adding text from last node ${lastNode.id} (${lastNode.title}) to chat`);
               WorkflowPanel.addMessage(lastNode.content, 'assistant');
             }
 
