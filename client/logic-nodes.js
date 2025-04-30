@@ -412,11 +412,11 @@ const LogicNodes = {
       // Mark the node as processed
       node.hasBeenProcessed = true;
 
-      // Process connected nodes with each item
+      // Get all outgoing connections from this splitter node
       const connections = App.connections.filter(conn => conn.fromNode === node);
 
       if (connections.length > 0) {
-        // Process each item with each connected node
+        // For each item, create a separate processing path for each outgoing connection
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
 
@@ -436,13 +436,13 @@ const LogicNodes = {
             splitPathId: pathId
           };
 
-          // For each connected node, create a separate processing path
+          // Create a separate processing path for each outgoing connection
           for (const connection of connections) {
             const toNode = connection.toNode;
 
             // Check if the target node is a collector
             if (toNode.nodeType === 'collector') {
-              // For collector nodes, we can send the metadata directly
+              // For collector nodes, we send the metadata directly
               if (node.splitParallel) {
                 // Process in parallel (don't await)
                 App.processNodeAndConnections(toNode, itemWithMetadata, node).catch(err => {
@@ -457,9 +457,26 @@ const LogicNodes = {
                 }
               }
             } else {
-              // For regular nodes, we need to create a cloned path
-              // Clone the entire path starting from this node
+              // For regular nodes, we create a cloned path for this specific item
+              // First, check if we've already created a cloned path for this connection and item
+              const existingClonedNode = App.nodes.find(n =>
+                n.isCloned &&
+                n.pathId === pathId &&
+                n.originalNodeId === toNode.id
+              );
+
+              if (existingClonedNode) {
+                // We've already created a cloned path for this item, skip
+                continue;
+              }
+
+              // Clone the entire path starting from this node for this specific item
               const clonedNodes = this.cloneProcessingPath(toNode, pathId, i, item);
+
+              if (clonedNodes.length === 0) {
+                DebugManager.addLog(`Failed to create cloned path for item ${i+1}`, 'error');
+                continue;
+              }
 
               // Get the first node in the cloned path
               const firstClonedNode = clonedNodes[0];
@@ -467,7 +484,7 @@ const LogicNodes = {
               // Format the content with metadata
               const formattedItem = `ITEM ${i+1} OF ${items.length}:\n\n${item}`;
 
-              // Process the cloned node
+              // Process the cloned node with this specific item
               if (node.splitParallel) {
                 // Process in parallel (don't await)
                 App.processNodeAndConnections(firstClonedNode, formattedItem, node).catch(err => {
@@ -546,7 +563,16 @@ const LogicNodes = {
         if (toNode.nodeType === 'collector') {
           // Create a connection from the cloned node to the collector
           const clonedFromNode = nodeMap.get(node.id);
-          App.connections.push(new Connection(clonedFromNode, toNode));
+
+          // Check if this connection already exists
+          const existingConnection = App.connections.find(conn =>
+            conn.fromNode === clonedFromNode &&
+            conn.toNode === toNode
+          );
+
+          if (!existingConnection && clonedFromNode) {
+            App.connections.push(new Connection(clonedFromNode, toNode));
+          }
           continue;
         }
 
@@ -558,9 +584,9 @@ const LogicNodes = {
     }
 
     // Create connections between cloned nodes
-    for (const node of processedNodes) {
-      const originalNode = App.nodes.find(n => n.id === node);
-      const clonedNode = nodeMap.get(node);
+    for (const nodeId of processedNodes) {
+      const originalNode = App.nodes.find(n => n.id === nodeId);
+      const clonedNode = nodeMap.get(nodeId);
 
       if (originalNode && clonedNode) {
         // Find all outgoing connections
@@ -578,8 +604,16 @@ const LogicNodes = {
           const clonedToNode = nodeMap.get(toNode.id);
 
           if (clonedToNode) {
-            // Create a connection between cloned nodes
-            App.connections.push(new Connection(clonedNode, clonedToNode));
+            // Check if this connection already exists
+            const existingConnection = App.connections.find(conn =>
+              conn.fromNode === clonedNode &&
+              conn.toNode === clonedToNode
+            );
+
+            if (!existingConnection) {
+              // Create a connection between cloned nodes
+              App.connections.push(new Connection(clonedNode, clonedToNode));
+            }
           }
         }
       }
@@ -590,14 +624,23 @@ const LogicNodes = {
 
   // Clone a node for a specific processing path
   cloneNode(node, pathId, itemIndex, item) {
+    // Create a unique ID for the cloned node
+    const clonedNodeId = `${node.id}_${pathId}`;
+
+    // Check if this node has already been cloned for this path
+    const existingClone = App.nodes.find(n => n.id === clonedNodeId);
+    if (existingClone) {
+      return existingClone;
+    }
+
     // Create a new node with the same properties
-    const clonedNode = new Node(node.x, node.y, `${node.id}_${pathId}`);
+    const clonedNode = new Node(node.x, node.y, clonedNodeId);
 
     // Copy all properties from the original node
     Object.assign(clonedNode, node);
 
-    // Set a unique ID for the cloned node
-    clonedNode.id = `${node.id}_${pathId}`;
+    // Set the unique ID
+    clonedNode.id = clonedNodeId;
 
     // Mark this as a cloned node
     clonedNode.isCloned = true;
@@ -605,6 +648,9 @@ const LogicNodes = {
     clonedNode.pathId = pathId;
     clonedNode.itemIndex = itemIndex;
     clonedNode.splitItem = item;
+
+    // Update the title to indicate which item it's processing
+    clonedNode.title = `${node.title} (Item ${itemIndex + 1})`;
 
     // Adjust position to make it clear this is a cloned node
     // Offset based on the item index to avoid overlap
@@ -789,6 +835,8 @@ const LogicNodes = {
       let sourceNodeId = null;
       let sourceItemIndex = null;
       let splitPathId = null;
+      let fromClonedNode = false;
+      let originalContent = input;
 
       // Check if the input is coming from a split path
       if (typeof input === 'object' && input !== null) {
@@ -796,6 +844,7 @@ const LogicNodes = {
           sourceNodeId = input.sourceNodeId;
           sourceItemIndex = input.sourceItemIndex;
           splitPathId = input.splitPathId;
+          originalContent = input.content; // Store the original content
           input = input.content; // Extract the actual content
         } else if (input.splitPathId) {
           // Legacy format
@@ -803,7 +852,31 @@ const LogicNodes = {
           const pathParts = input.splitPathId.split('_');
           sourceNodeId = pathParts[1];
           sourceItemIndex = parseInt(pathParts[2], 10);
+          originalContent = input.content;
           input = input.content;
+        }
+      }
+
+      // Check if the input is coming from a cloned node
+      const incomingConnections = App.connections.filter(conn => conn.toNode === node);
+      for (const conn of incomingConnections) {
+        if (conn.fromNode.isCloned && conn.fromNode.pathId) {
+          // This is a connection from a cloned node
+          const pathParts = conn.fromNode.pathId.split('_');
+          if (pathParts.length >= 3 && pathParts[0] === 'split') {
+            // Extract the source information from the path ID
+            sourceNodeId = pathParts[1];
+            sourceItemIndex = parseInt(pathParts[2], 10);
+            splitPathId = conn.fromNode.pathId;
+            fromClonedNode = true;
+
+            // If we don't have explicit metadata, use the cloned node's item
+            if (!originalContent) {
+              originalContent = conn.fromNode.splitItem;
+            }
+
+            break;
+          }
         }
       }
 
@@ -840,9 +913,6 @@ const LogicNodes = {
       let allItemsCollected = true;
       let expectedItemCount = 0;
 
-      // Find all incoming connections, including those from cloned nodes
-      const incomingConnections = App.connections.filter(conn => conn.toNode === node);
-
       // Find all splitter nodes that feed into this collector
       const splitterNodes = new Set();
       const clonedNodeSources = new Map(); // Map cloned node IDs to their original source
@@ -867,7 +937,6 @@ const LogicNodes = {
         // Check if this is a direct splitter node
         else if (fromNode.nodeType === 'splitter' && fromNode.splitItems) {
           splitterNodes.add(fromNode.id);
-          expectedItemCount += fromNode.splitItems.length;
         }
       }
 
@@ -903,8 +972,22 @@ const LogicNodes = {
           }
         }
 
-        allItemsCollected = sourceNodeIds.size >= incomingConnections.length;
-        expectedItemCount = incomingConnections.length;
+        // Count direct connections from non-cloned nodes
+        const directConnections = incomingConnections.filter(conn => !conn.fromNode.isCloned);
+
+        // Count unique cloned node sources
+        const clonedSources = new Set();
+        for (const conn of incomingConnections) {
+          if (conn.fromNode.isCloned && conn.fromNode.pathId) {
+            const pathParts = conn.fromNode.pathId.split('_');
+            if (pathParts.length >= 3 && pathParts[0] === 'split') {
+              clonedSources.add(pathParts[1] + '_' + pathParts[2]);
+            }
+          }
+        }
+
+        allItemsCollected = sourceNodeIds.size >= (directConnections.length + clonedSources.size);
+        expectedItemCount = directConnections.length + clonedSources.size;
       }
 
       // If we're not waiting for all inputs, process what we have
@@ -923,8 +1006,14 @@ const LogicNodes = {
       // All items have been collected, combine them
       let combinedOutput = '';
 
+      // Sort the collected items by their keys to ensure consistent ordering
+      const sortedItems = {};
+      Object.keys(node.collectedItems).sort().forEach(key => {
+        sortedItems[key] = node.collectedItems[key];
+      });
+
       // Get the values to combine
-      const itemsToProcess = Object.values(node.collectedItems);
+      const itemsToProcess = Object.values(sortedItems);
 
       switch (node.combineMethod) {
         case 'concatenate':
