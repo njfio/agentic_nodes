@@ -361,9 +361,9 @@ class Node {
     }
   }
 
-  // Update the node's content with proper cache-busting for images
+  // Update the node's content without cache-busting to prevent reloading loops
   updateNodeContent(content) {
-    // If this is an image node and the content has changed, force a complete refresh
+    // If this is an image node and the content has changed, update it
     if ((this.contentType === 'image' || this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') &&
         this.content !== content) {
       // Clean up previous image object to prevent memory leaks
@@ -377,20 +377,8 @@ class Node {
         this.contentImage = null;
       }
 
-      // Add a timestamp to force a refresh of the image
-      const timestamp = Date.now();
-      let refreshedContent = content;
-
-      if (refreshedContent && typeof refreshedContent === 'string') {
-        if (refreshedContent.includes('?')) {
-          refreshedContent = refreshedContent.split('?')[0] + '?t=' + timestamp;
-        } else if (!refreshedContent.startsWith('data:')) {
-          refreshedContent = refreshedContent + '?t=' + timestamp;
-        }
-      }
-
-      // Update the content with cache-busting
-      this.content = refreshedContent;
+      // Update the content directly without cache-busting
+      this.content = content;
 
       // Create a new image object with weak event handlers
       this.contentImage = new Image();
@@ -412,7 +400,7 @@ class Node {
           // Only update if we're not showing all node outputs
           const showAllNodeOutputs = document.getElementById('showAllNodeOutputs')?.checked || false;
           if (!showAllNodeOutputs) {
-            WorkflowPanel.addMessage(refreshedContent, 'assistant', true);
+            WorkflowPanel.addMessage(content, 'assistant', true);
             DebugManager.addLog(`Updated workflow chat with new image from node ${nodeId}`, 'success');
           }
         }
@@ -435,9 +423,9 @@ class Node {
       };
 
       // Set the source to trigger loading
-      this.contentImage.src = refreshedContent;
+      this.contentImage.src = content;
 
-      DebugManager.addLog(`Updating image content for node ${nodeId} with cache-busting`, 'info');
+      DebugManager.addLog(`Updating image content for node ${nodeId}`, 'info');
     } else {
       // For non-image nodes, just update the content
       this.content = content;
@@ -2228,28 +2216,10 @@ class Node {
           DebugManager.addLog(`Recovered image content for node ${this.id} during preload`, 'info');
         }
 
-        // Only reload the image if it's not already loading and has content
-        if (this.hasBeenProcessed && this.content &&
-            (!this.contentImage || !this.contentImage.src || this.contentImage.complete)) {
-
-          // Clean up previous image object to prevent memory leaks
-          if (this.contentImage) {
-            this.contentImage.onload = null;
-            this.contentImage.onerror = null;
-          }
-
+        // Only create a new image object if we don't have one yet or if it failed to load
+        if (this.hasBeenProcessed && this.content && !this.contentImage) {
           // Create a new Image object
           this.contentImage = new Image();
-
-          // Add a timestamp to prevent browser caching
-          const timestamp = Date.now();
-          let imageUrl = this.content;
-
-          if (imageUrl.includes('?')) {
-            imageUrl = imageUrl.split('?')[0] + `?t=${timestamp}`;
-          } else if (!imageUrl.startsWith('data:')) {
-            imageUrl = imageUrl + `?t=${timestamp}`;
-          }
 
           // Store node ID to avoid 'this' reference in callbacks
           const nodeId = this.id;
@@ -2280,10 +2250,10 @@ class Node {
             }
           };
 
-          // Set the source to trigger loading
-          this.contentImage.src = imageUrl;
+          // Set the source to trigger loading (without cache-busting to prevent loops)
+          this.contentImage.src = this.content;
 
-          DebugManager.addLog(`Reloading image for node ${nodeId} with cache-busting`, 'info');
+          DebugManager.addLog(`Loading image for node ${nodeId}`, 'info');
         }
       }
     } finally {
@@ -6419,21 +6389,11 @@ const App = {
             // Force recreate the image object to ensure it loads properly
             node.contentImage = null;
 
-            // Create a new image with a timestamp to prevent caching
-            const timestamp = Date.now();
-            if (node.content.includes('?')) {
-              node.content = node.content.split('?')[0] + '?t=' + timestamp;
-            } else if (node.content.startsWith('data:')) {
-              // For data URLs, we don't need to add a timestamp
-            } else {
-              node.content = node.content + '?t=' + timestamp;
-            }
-
-            // Now preload the content with the new URL
+            // Preload the content without cache-busting to prevent reloading loops
             node.preloadContent();
 
             // Log success for debugging
-            DebugManager.addLog(`Image content set for node ${node.id} with cache-busting: ${node.content.substring(0, 30)}...`, 'info');
+            DebugManager.addLog(`Image content set for node ${node.id}: ${node.content.substring(0, 30)}...`, 'info');
           } else {
             DebugManager.addLog(`Warning: No image content for node ${node.id} in workflow`, 'warning');
           }
