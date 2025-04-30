@@ -1,0 +1,119 @@
+/* Logic Nodes Styles */
+
+/* Splitter Node */
+.node.splitter-node {
+  border-color: #e74c3c;
+}
+
+.node.splitter-node .node-header {
+  background-color: #e74c3c;
+}
+
+.node.splitter-node .node-icon {
+  background-color: #c0392b;
+}
+
+/* Conditional Node */
+.node.conditional-node {
+  border-color: #f39c12;
+}
+
+.node.conditional-node .node-header {
+  background-color: #f39c12;
+}
+
+.node.conditional-node .node-icon {
+  background-color: #d35400;
+}
+
+/* Logic Options Section */
+#logicOptionsSection {
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  padding: 10px;
+  margin-top: 15px;
+  border-left: 3px solid #3498db;
+}
+
+#logicOptionsSection h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #3498db;
+  font-size: 16px;
+}
+
+/* Feedback Connection */
+.feedback-connection {
+  stroke-dasharray: 5, 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Logic Node Toolbar Buttons */
+#addSplitterNodeBtn, #addConditionalNodeBtn {
+  background-color: #2c3e50;
+  border: 1px solid #34495e;
+}
+
+#addSplitterNodeBtn:hover, #addConditionalNodeBtn:hover {
+  background-color: #34495e;
+}
+
+#addSplitterNodeBtn {
+  border-left: 3px solid #e74c3c;
+}
+
+#addConditionalNodeBtn {
+  border-left: 3px solid #f39c12;
+}
+
+/* Logic Node Status Indicators */
+.node-status {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.node-status.iteration {
+  background-color: #f39c12;
+  color: #fff;
+}
+
+.node-status.items {
+  background-color: #e74c3c;
+  color: #fff;
+}
+
+/* Tooltip for logic nodes */
+.logic-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1000;
+  pointer-events: none;
+  max-width: 200px;
+  white-space: normal;
+}
+
+/* Animation for processing items */
+@keyframes processing-pulse {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+.node.processing-items {
+  animation: processing-pulse 1.5s infinite;
+}

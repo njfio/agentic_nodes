@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="workflow-list.css" />
   <link rel="stylesheet" href="user-profile.css" />
   <link rel="stylesheet" href="template-generator.css" />
+  <link rel="stylesheet" href="logic-nodes.css" />
   <link rel="stylesheet" href="auth.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
@@ -205,6 +206,11 @@
           <label for="waitForAllInputs">Wait for all inputs before processing</label>
           <div class="tooltip">When checked, nodes with multiple inputs will wait until all connected nodes have been processed before executing.</div>
         </div>
+      </div>
+
+      <!-- Logic Node Options Section (will be populated by logic-nodes.js) -->
+      <div id="logicOptionsSection" class="form-group" style="display: none;">
+        <!-- Logic node options will be added here dynamically -->
       </div>
 
       <!-- Processing Log Section -->
@@ -636,5 +642,6 @@
   <script src="workflow-list.js"></script>
   <script src="user-profile.js"></script>
   <script src="template-generator.js"></script>
+  <script src="logic-nodes.js"></script>
 </body>
 </html>
