@@ -6,7 +6,7 @@ const AppInit = {
     if (window.App && App.canvas) {
       return;
     }
-    
+
     const canvas = document.getElementById('canvas');
     if (canvas) {
       canvas.width = window.innerWidth;
@@ -30,15 +30,15 @@ const AppInit = {
 
   // Initialize modal handlers
   initModalHandlers() {
-    const modals = ['nodeEditor', 'saveLoadModal', 'helpModal', 'configModal'];
-    
+    const modals = ['nodeEditor', 'saveLoadModal', 'helpModal', 'configModal', 'templateGeneratorModal'];
+
     // Close modals on outside click
     window.addEventListener('click', (e) => {
       modals.forEach(modalId => {
         const modal = document.getElementById(modalId);
         if (modal && e.target === modal) {
           modal.style.display = 'none';
-          
+
           // Reset previews when closing node editor
           if (modalId === 'nodeEditor') {
             ['imagePreview', 'audioPreview', 'videoPreview'].forEach(previewId => {
@@ -93,7 +93,7 @@ const AppInit = {
             const selectedNode = window.nodes.find(n => n.selected);
             if (selectedNode) {
               window.nodes = window.nodes.filter(n => n !== selectedNode);
-              window.connections = window.connections.filter(c => 
+              window.connections = window.connections.filter(c =>
                 c.fromNode !== selectedNode && c.toNode !== selectedNode
               );
               draw();
@@ -103,7 +103,7 @@ const AppInit = {
 
         case 'Escape':
           // Close all modals
-          ['nodeEditor', 'configModal', 'saveLoadModal', 'helpModal'].forEach(id => {
+          ['nodeEditor', 'configModal', 'saveLoadModal', 'helpModal', 'templateGeneratorModal'].forEach(id => {
             const modal = document.getElementById(id);
             if (modal) {
               modal.style.display = 'none';
@@ -151,7 +151,7 @@ const AppInit = {
     this.initResizeHandler();
     this.initModalHandlers();
     this.initKeyboardShortcuts();
-    
+
     if (typeof showStatus === 'function') {
       showStatus('Application initialized successfully');
     }

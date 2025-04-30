@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="workflow-panel.css" />
   <link rel="stylesheet" href="workflow-list.css" />
   <link rel="stylesheet" href="user-profile.css" />
+  <link rel="stylesheet" href="template-generator.css" />
   <link rel="stylesheet" href="auth.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
@@ -48,6 +49,7 @@
     <button id="loadBtn" type="button">Load Canvas</button>
     <button id="exportBtn" type="button">Export</button>
     <button id="importBtn" type="button">Import</button>
+    <button id="templateGeneratorBtn" type="button" title="Generate Template">Template Generator</button>
     <button id="helpBtn" type="button" title="Show Help">?</button>
   </div>
 
@@ -577,6 +579,46 @@
   <script src="data-migration.js"></script>
   <script src="image-storage.js"></script>
 
+  <!-- Template Generator Modal -->
+  <div id="templateGeneratorModal" class="modal">
+    <div class="modal-content">
+      <h2>Template Generator</h2>
+      <div class="form-group">
+        <label for="templateDescription">Describe the workflow you want to create:</label>
+        <textarea id="templateDescription" placeholder="Describe your workflow in natural language. For example: 'A workflow that takes an image, analyzes it for objects, and generates a description.'" rows="5"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Sample Templates:</label>
+        <div class="sample-templates">
+          <button class="sample-template-btn" data-template="image-analysis">Image Analysis</button>
+          <button class="sample-template-btn" data-template="text-summarization">Text Summarization</button>
+          <button class="sample-template-btn" data-template="chat-bot">Chat Bot</button>
+          <button class="sample-template-btn" data-template="content-generator">Content Generator</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="generatedTemplate">Generated Template:</label>
+        <div class="template-output-container">
+          <pre id="generatedTemplate" class="template-output">Your generated template will appear here...</pre>
+          <div class="template-loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Generating template...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="generateTemplateBtn" class="primary-btn" type="button">Generate Template</button>
+        <button id="copyTemplateBtn" class="secondary-btn" type="button">Copy to Clipboard</button>
+        <button id="saveTemplateBtn" class="secondary-btn" type="button">Save as File</button>
+        <button id="loadTemplateBtn" class="secondary-btn" type="button">Load to Canvas</button>
+        <button id="closeTemplateGenerator" class="secondary-btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Application Scripts -->
   <script src="auth.js"></script>
   <script src="app.js"></script>
@@ -593,5 +635,6 @@
   <script src="workflow-panel.js"></script>
   <script src="workflow-list.js"></script>
   <script src="user-profile.js"></script>
+  <script src="template-generator.js"></script>
 </body>
 </html>
