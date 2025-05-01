@@ -20,8 +20,12 @@ const AgentNodes = {
 
       // Override the addNode method to add our custom node types
       App.addNode = function(nodeType) {
+        console.log('App.addNode called with nodeType:', nodeType);
+
         if (nodeType === 'agent') {
-          return AgentNodes.createAgentNode();
+          const agentNode = AgentNodes.createAgentNode();
+          console.log('Created agent node with nodeType:', agentNode.nodeType);
+          return agentNode;
         }
 
         // Call the original method for other node types
@@ -160,7 +164,8 @@ const AgentNodes = {
 
     // Configure as an agent node
     node.title = "Agent Node " + id;
-    node.nodeType = 'agent';
+    node._nodeType = 'agent'; // Use the underlying property directly
+    node.nodeType = 'agent';  // Also set via the setter for good measure
     node.contentType = 'text';
     node.aiProcessor = 'text-to-text';
     node.inputType = 'text';
@@ -168,6 +173,8 @@ const AgentNodes = {
     node.systemPrompt = "You are an agent that can process content and make decisions. Use your tools to complete tasks.";
     node.width = 240;
     node.height = 200;
+
+    console.log('Created agent node:', node);
 
     // Add agent-specific properties
     node.agentType = 'default';       // Type of agent (default, custom, etc.)
@@ -312,24 +319,39 @@ const AgentNodes = {
 
   // Update the node editor to show agent node options
   updateNodeEditor(node) {
+    console.log('Updating node editor for agent node:', node);
+
     if (!node || node.nodeType !== 'agent') {
+      console.log('Not an agent node or node is null');
       return;
     }
 
     // Get the node editor element
     const nodeEditor = document.getElementById('nodeEditor');
-    if (!nodeEditor) return;
+    if (!nodeEditor) {
+      console.log('Node editor element not found');
+      return;
+    }
 
     // Find or create the agent options section
-    let agentOptionsSection = document.getElementById('agentOptionsSection');
-    if (!agentOptionsSection) {
-      agentOptionsSection = document.createElement('div');
-      agentOptionsSection.id = 'agentOptionsSection';
-      agentOptionsSection.className = 'editor-section';
-      nodeEditor.appendChild(agentOptionsSection);
+    // First, remove any existing agent options section to avoid duplicates
+    const existingSection = document.getElementById('agentOptionsSection');
+    if (existingSection) {
+      existingSection.remove();
+    }
+
+    // Create a new agent options section
+    const agentOptionsSection = document.createElement('div');
+    agentOptionsSection.id = 'agentOptionsSection';
+    agentOptionsSection.className = 'editor-section';
+
+    // Find the button group to insert before
+    const buttonGroup = nodeEditor.querySelector('.button-group');
+    if (buttonGroup) {
+      nodeEditor.insertBefore(agentOptionsSection, buttonGroup);
     } else {
-      // Clear existing content
-      agentOptionsSection.innerHTML = '';
+      // If no button group, just append to the end
+      nodeEditor.appendChild(agentOptionsSection);
     }
 
     // Add a header
@@ -486,7 +508,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Add agent node options if needed
       if (node && node.nodeType === 'agent') {
-        AgentNodes.updateNodeEditor(node);
+        // Use setTimeout to ensure the DOM is fully updated after the original method
+        setTimeout(() => {
+          console.log('Calling updateNodeEditor for agent node after delay');
+          AgentNodes.updateNodeEditor(node);
+        }, 100);
       }
     };
   }
