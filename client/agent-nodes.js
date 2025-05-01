@@ -174,8 +174,19 @@ const AgentNodes = {
 
     // Configure as an agent node
     node.title = "Agent Node " + id;
+
+    // Set the node type in multiple ways to ensure it's properly set
     node._nodeType = 'agent'; // Use the underlying property directly
     node.nodeType = 'agent';  // Also set via the setter for good measure
+
+    // Add a direct property to make absolutely sure
+    Object.defineProperty(node, 'isAgentNode', {
+      value: true,
+      writable: false,
+      enumerable: true,
+      configurable: false
+    });
+
     node.contentType = 'text';
     node.aiProcessor = 'text-to-text';
     node.inputType = 'text';
@@ -184,7 +195,12 @@ const AgentNodes = {
     node.width = 240;
     node.height = 200;
 
-    console.log('Created agent node:', node);
+    console.log('Created agent node with properties:', {
+      id: node.id,
+      nodeType: node.nodeType,
+      _nodeType: node._nodeType,
+      isAgentNode: node.isAgentNode
+    });
 
     // Add agent-specific properties
     node.agentType = 'default';       // Type of agent (default, custom, etc.)
@@ -330,6 +346,8 @@ const AgentNodes = {
   // Update the node editor to show agent node options
   updateNodeEditor(node) {
     console.log('Updating node editor for agent node:', node);
+    console.log('Node type:', node.nodeType);
+    console.log('Node _nodeType:', node._nodeType);
 
     if (!node || node.nodeType !== 'agent') {
       console.log('Not an agent node or node is null');
@@ -343,24 +361,48 @@ const AgentNodes = {
       return;
     }
 
-    // Use the existing logic options section as a template
-    const logicOptionsSection = document.getElementById('logicOptionsSection');
-    if (!logicOptionsSection) {
-      console.log('Logic options section not found');
-      return;
+    console.log('Node editor found:', nodeEditor);
+
+    // Create our own agent options section
+    // First, check if there's an existing agent options section
+    let agentOptionsSection = document.getElementById('agentOptionsSection');
+    if (agentOptionsSection) {
+      // If it exists, remove it to avoid duplicates
+      agentOptionsSection.remove();
     }
 
-    // Show the logic options section and repurpose it for agent options
-    logicOptionsSection.style.display = 'block';
-    logicOptionsSection.innerHTML = '';
+    // Create a new agent options section
+    agentOptionsSection = document.createElement('div');
+    agentOptionsSection.id = 'agentOptionsSection';
+    agentOptionsSection.className = 'editor-section';
+    agentOptionsSection.style.marginTop = '20px';
+    agentOptionsSection.style.marginBottom = '20px';
+    agentOptionsSection.style.padding = '15px';
+    agentOptionsSection.style.border = '1px solid #444';
+    agentOptionsSection.style.borderRadius = '5px';
+    agentOptionsSection.style.backgroundColor = '#2a2a2a';
 
     // Create a header for the agent options
     const header = document.createElement('h3');
     header.textContent = 'Agent Options';
-    logicOptionsSection.appendChild(header);
+    header.style.marginTop = '0';
+    agentOptionsSection.appendChild(header);
 
-    // Use the logic options section for our agent options
-    const agentOptionsSection = logicOptionsSection;
+    // Find the button group to insert before
+    const buttonGroup = nodeEditor.querySelector('.button-group');
+    if (buttonGroup) {
+      // Insert before the button group
+      nodeEditor.insertBefore(agentOptionsSection, buttonGroup);
+    } else {
+      // If no button group, insert before the processing log section
+      const logSection = nodeEditor.querySelector('.log-section');
+      if (logSection) {
+        nodeEditor.insertBefore(agentOptionsSection, logSection);
+      } else {
+        // If all else fails, just append to the end
+        nodeEditor.appendChild(agentOptionsSection);
+      }
+    }
 
     // Add agent type selector
     const agentTypeGroup = document.createElement('div');
@@ -509,8 +551,19 @@ document.addEventListener('DOMContentLoaded', function() {
       // Call the original method
       originalOpenNodeEditor.call(App, node);
 
+      console.log('openNodeEditor called with node:', node);
+
+      // Check if this is an agent node in multiple ways
+      const isAgentNode = node && (
+        node.nodeType === 'agent' ||
+        node._nodeType === 'agent' ||
+        node.isAgentNode === true
+      );
+
+      console.log('Is agent node?', isAgentNode);
+
       // Add agent node options if needed
-      if (node && node.nodeType === 'agent') {
+      if (isAgentNode) {
         // Use setTimeout to ensure the DOM is fully updated after the original method
         setTimeout(() => {
           console.log('Calling updateNodeEditor for agent node after delay');
