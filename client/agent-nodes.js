@@ -343,194 +343,116 @@ const AgentNodes = {
     }
   },
 
-  // Update the node editor to show agent node options
-  updateNodeEditor(node) {
-    console.log('Updating node editor for agent node:', node);
-    console.log('Node type:', node.nodeType);
-    console.log('Node _nodeType:', node._nodeType);
-
-    if (!node || node.nodeType !== 'agent') {
-      console.log('Not an agent node or node is null');
+  // Initialize the agent node editor
+  initAgentNodeEditor() {
+    // Get the agent node editor modal
+    const agentNodeEditor = document.getElementById('agentNodeEditor');
+    if (!agentNodeEditor) {
+      console.error('Agent node editor modal not found');
       return;
     }
 
-    // Get the node editor element
-    const nodeEditor = document.getElementById('nodeEditor');
-    if (!nodeEditor) {
-      console.log('Node editor element not found');
-      return;
-    }
-
-    console.log('Node editor found:', nodeEditor);
-
-    // Create our own agent options section
-    // First, check if there's an existing agent options section
-    let agentOptionsSection = document.getElementById('agentOptionsSection');
-    if (agentOptionsSection) {
-      // If it exists, remove it to avoid duplicates
-      agentOptionsSection.remove();
-    }
-
-    // Create a new agent options section
-    agentOptionsSection = document.createElement('div');
-    agentOptionsSection.id = 'agentOptionsSection';
-    agentOptionsSection.className = 'editor-section';
-    agentOptionsSection.style.marginTop = '20px';
-    agentOptionsSection.style.marginBottom = '20px';
-    agentOptionsSection.style.padding = '15px';
-    agentOptionsSection.style.border = '1px solid #444';
-    agentOptionsSection.style.borderRadius = '5px';
-    agentOptionsSection.style.backgroundColor = '#2a2a2a';
-
-    // Create a header for the agent options
-    const header = document.createElement('h3');
-    header.textContent = 'Agent Options';
-    header.style.marginTop = '0';
-    agentOptionsSection.appendChild(header);
-
-    // Find the button group to insert before
-    const buttonGroup = nodeEditor.querySelector('.button-group');
-    if (buttonGroup) {
-      // Insert before the button group
-      nodeEditor.insertBefore(agentOptionsSection, buttonGroup);
-    } else {
-      // If no button group, insert before the processing log section
-      const logSection = nodeEditor.querySelector('.log-section');
-      if (logSection) {
-        nodeEditor.insertBefore(agentOptionsSection, logSection);
-      } else {
-        // If all else fails, just append to the end
-        nodeEditor.appendChild(agentOptionsSection);
-      }
-    }
-
-    // Add agent type selector
-    const agentTypeGroup = document.createElement('div');
-    agentTypeGroup.className = 'form-group';
-
-    const agentTypeLabel = document.createElement('label');
-    agentTypeLabel.htmlFor = 'agentType';
-    agentTypeLabel.textContent = 'Agent Type:';
-
-    const agentTypeSelect = document.createElement('select');
-    agentTypeSelect.id = 'agentType';
-    agentTypeSelect.className = 'form-control';
-
-    const agentTypes = [
-      { value: 'default', text: 'Default Agent' },
-      { value: 'custom', text: 'Custom Agent' }
-    ];
-
-    agentTypes.forEach(type => {
-      const option = document.createElement('option');
-      option.value = type.value;
-      option.textContent = type.text;
-      option.selected = node.agentType === type.value;
-      agentTypeSelect.appendChild(option);
-    });
-
-    agentTypeGroup.appendChild(agentTypeLabel);
-    agentTypeGroup.appendChild(agentTypeSelect);
-    agentOptionsSection.appendChild(agentTypeGroup);
-
-    // Max iterations option
-    const maxIterationsGroup = document.createElement('div');
-    maxIterationsGroup.className = 'form-group';
-
-    const maxIterationsLabel = document.createElement('label');
-    maxIterationsLabel.htmlFor = 'maxIterations';
-    maxIterationsLabel.textContent = 'Maximum Iterations:';
-
-    const maxIterationsInput = document.createElement('input');
-    maxIterationsInput.type = 'number';
-    maxIterationsInput.id = 'maxIterations';
-    maxIterationsInput.className = 'form-control';
-    maxIterationsInput.value = node.maxIterations || 5;
-    maxIterationsInput.min = 1;
-    maxIterationsInput.max = 20;
-
-    maxIterationsGroup.appendChild(maxIterationsLabel);
-    maxIterationsGroup.appendChild(maxIterationsInput);
-    agentOptionsSection.appendChild(maxIterationsGroup);
-
-    // Auto iterate option
-    const autoIterateGroup = document.createElement('div');
-    autoIterateGroup.className = 'form-group';
-
-    const autoIterateCheckbox = document.createElement('div');
-    autoIterateCheckbox.className = 'checkbox-group';
-
-    const autoIterateInput = document.createElement('input');
-    autoIterateInput.type = 'checkbox';
-    autoIterateInput.id = 'autoIterate';
-    autoIterateInput.checked = node.autoIterate !== false;
-
-    const autoIterateLabel = document.createElement('label');
-    autoIterateLabel.htmlFor = 'autoIterate';
-    autoIterateLabel.textContent = 'Auto-iterate';
-
-    autoIterateCheckbox.appendChild(autoIterateInput);
-    autoIterateCheckbox.appendChild(autoIterateLabel);
-    autoIterateGroup.appendChild(autoIterateCheckbox);
-    agentOptionsSection.appendChild(autoIterateGroup);
-
-    // Current iteration display
-    const currentIterationGroup = document.createElement('div');
-    currentIterationGroup.className = 'form-group';
-
-    const currentIterationLabel = document.createElement('label');
-    currentIterationLabel.textContent = 'Current Iteration:';
-
-    const currentIterationValue = document.createElement('span');
-    currentIterationValue.id = 'currentIteration';
-    currentIterationValue.textContent = node.currentIteration || 0;
-
-    currentIterationGroup.appendChild(currentIterationLabel);
-    currentIterationGroup.appendChild(currentIterationValue);
-    agentOptionsSection.appendChild(currentIterationGroup);
-
-    // Add agent-specific options based on the agent type
-    if (node.agentType === 'custom') {
-      // Custom code option
-      const customCodeGroup = document.createElement('div');
-      customCodeGroup.className = 'form-group';
-
-      const customCodeLabel = document.createElement('label');
-      customCodeLabel.htmlFor = 'customCode';
-      customCodeLabel.textContent = 'Custom Code:';
-
-      const customCodeTextarea = document.createElement('textarea');
-      customCodeTextarea.id = 'customCode';
-      customCodeTextarea.className = 'form-control';
-      customCodeTextarea.rows = 10;
-      customCodeTextarea.value = node.customCode || '';
-      customCodeTextarea.placeholder = '// Custom JavaScript code\n// Available variables: input, node, App, DebugManager, ApiService\n// Return the processed result\nreturn input;';
-
-      customCodeGroup.appendChild(customCodeLabel);
-      customCodeGroup.appendChild(customCodeTextarea);
-      agentOptionsSection.appendChild(customCodeGroup);
-
-      // Add event listener for custom code
-      customCodeTextarea.addEventListener('change', () => {
-        node.customCode = customCodeTextarea.value;
+    // Get the agent type select element
+    const agentTypeSelect = document.getElementById('agentType');
+    if (agentTypeSelect) {
+      // Add event listener to show/hide custom code section
+      agentTypeSelect.addEventListener('change', () => {
+        const customCodeSection = document.getElementById('customCodeSection');
+        if (customCodeSection) {
+          customCodeSection.style.display = agentTypeSelect.value === 'custom' ? 'block' : 'none';
+        }
       });
     }
 
-    // Add event listeners to update the node properties
-    agentTypeSelect.addEventListener('change', () => {
-      node.agentType = agentTypeSelect.value;
+    // Set up save button handler
+    const saveButton = document.getElementById('saveAgentNode');
+    if (saveButton) {
+      saveButton.addEventListener('click', () => {
+        this.saveAgentNodeEditor();
+      });
+    }
 
-      // Refresh the node editor to show/hide relevant options
-      AgentNodes.updateNodeEditor(node);
-    });
+    // Set up cancel button handler
+    const cancelButton = document.getElementById('cancelAgentNode');
+    if (cancelButton) {
+      cancelButton.addEventListener('click', () => {
+        this.editingNode = null;
+        ModalManager.closeModal('agentNodeEditor');
+      });
+    }
+  },
 
-    maxIterationsInput.addEventListener('change', () => {
-      node.maxIterations = parseInt(maxIterationsInput.value, 10);
-    });
+  // Open the agent node editor
+  openAgentNodeEditor(node) {
+    // Set the editing node
+    this.editingNode = node;
 
-    autoIterateInput.addEventListener('change', () => {
-      node.autoIterate = autoIterateInput.checked;
-    });
+    // Get the agent node editor modal
+    const agentNodeEditor = document.getElementById('agentNodeEditor');
+    if (!agentNodeEditor) {
+      console.error('Agent node editor modal not found');
+      return;
+    }
+
+    // Set the values in the form
+    document.getElementById('agentNodeTitle').value = node.title || '';
+    document.getElementById('agentSystemPrompt').value = node.systemPrompt || '';
+    document.getElementById('maxIterations').value = node.maxIterations || 5;
+    document.getElementById('autoIterate').checked = node.autoIterate !== false;
+
+    // Set agent type
+    const agentTypeSelect = document.getElementById('agentType');
+    if (agentTypeSelect) {
+      agentTypeSelect.value = node.agentType || 'default';
+
+      // Show/hide custom code section
+      const customCodeSection = document.getElementById('customCodeSection');
+      if (customCodeSection) {
+        customCodeSection.style.display = node.agentType === 'custom' ? 'block' : 'none';
+      }
+    }
+
+    // Set custom code if applicable
+    if (node.agentType === 'custom') {
+      document.getElementById('customCode').value = node.customCode || '';
+    }
+
+    // Open the modal
+    ModalManager.openModal('agentNodeEditor');
+    DebugManager.addLog(`Editing agent node ${node.id}`, 'info');
+  },
+
+  // Save changes from the agent node editor
+  saveAgentNodeEditor() {
+    if (!this.editingNode) {
+      DebugManager.addLog('No agent node being edited', 'error');
+      return;
+    }
+
+    // Get values from the form
+    this.editingNode.title = document.getElementById('agentNodeTitle').value;
+    this.editingNode.systemPrompt = document.getElementById('agentSystemPrompt').value;
+    this.editingNode.maxIterations = parseInt(document.getElementById('maxIterations').value, 10);
+    this.editingNode.autoIterate = document.getElementById('autoIterate').checked;
+
+    // Get agent type
+    const agentType = document.getElementById('agentType').value;
+    this.editingNode.agentType = agentType;
+
+    // Get custom code if applicable
+    if (agentType === 'custom') {
+      this.editingNode.customCode = document.getElementById('customCode').value;
+    }
+
+    // Close the modal
+    ModalManager.closeModal('agentNodeEditor');
+    DebugManager.addLog('Agent node updated', 'success');
+
+    // Redraw the canvas
+    App.draw();
+
+    // Clear the editing node reference
+    this.editingNode = null;
   }
 };
 
@@ -540,19 +462,14 @@ document.addEventListener('DOMContentLoaded', function() {
   AgentNodes.init();
 });
 
-// Extend the App object to update the node editor for agent nodes
+// Extend the App object to handle agent node editing
 document.addEventListener('DOMContentLoaded', function() {
   if (window.App) {
     // Store the original openNodeEditor method
     const originalOpenNodeEditor = App.openNodeEditor;
 
-    // Override the openNodeEditor method to add agent node options
+    // Override the openNodeEditor method to use our custom editor for agent nodes
     App.openNodeEditor = function(node) {
-      // Call the original method
-      originalOpenNodeEditor.call(App, node);
-
-      console.log('openNodeEditor called with node:', node);
-
       // Check if this is an agent node in multiple ways
       const isAgentNode = node && (
         node.nodeType === 'agent' ||
@@ -560,16 +477,16 @@ document.addEventListener('DOMContentLoaded', function() {
         node.isAgentNode === true
       );
 
-      console.log('Is agent node?', isAgentNode);
-
-      // Add agent node options if needed
       if (isAgentNode) {
-        // Use setTimeout to ensure the DOM is fully updated after the original method
-        setTimeout(() => {
-          console.log('Calling updateNodeEditor for agent node after delay');
-          AgentNodes.updateNodeEditor(node);
-        }, 100);
+        // Use our custom agent node editor
+        AgentNodes.openAgentNodeEditor(node);
+      } else {
+        // Call the original method for regular nodes
+        originalOpenNodeEditor.call(App, node);
       }
     };
+
+    // Initialize the agent node editor
+    AgentNodes.initAgentNodeEditor();
   }
 });

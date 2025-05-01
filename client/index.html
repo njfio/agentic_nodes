@@ -645,6 +645,55 @@
   <script src="template-generator.js"></script>
   <script src="logic-nodes.js"></script>
 
+  <!-- Agent Node Editor Modal -->
+  <div id="agentNodeEditor" class="modal">
+    <div class="modal-content">
+      <h2>Agent Node Editor</h2>
+      <form id="agentNodeEditorForm" onsubmit="event.preventDefault(); return false;" action="javascript:void(0);">
+        <div class="form-group">
+          <label for="agentNodeTitle">Title:</label>
+          <input type="text" id="agentNodeTitle">
+        </div>
+
+        <div class="form-group">
+          <label for="agentType">Agent Type:</label>
+          <select id="agentType">
+            <option value="default">Default Agent</option>
+            <option value="custom">Custom Agent</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="agentSystemPrompt">System Prompt:</label>
+          <textarea id="agentSystemPrompt" placeholder="Enter instructions for how the agent should process content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="maxIterations">Maximum Iterations:</label>
+          <input type="number" id="maxIterations" min="1" max="20" value="5">
+        </div>
+
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoIterate" checked>
+            <label for="autoIterate">Auto-iterate</label>
+            <div class="tooltip">When checked, the agent will automatically continue processing until it reaches the maximum iterations or completes its task.</div>
+          </div>
+        </div>
+
+        <div id="customCodeSection" class="form-group" style="display: none;">
+          <label for="customCode">Custom Code:</label>
+          <textarea id="customCode" rows="10" placeholder="// Custom JavaScript code&#10;// Available variables: input, node, App, DebugManager, ApiService&#10;// Return the processed result&#10;return input;"></textarea>
+        </div>
+
+        <div class="button-group">
+          <button id="saveAgentNode" class="primary-btn" type="button">Save</button>
+          <button id="cancelAgentNode" class="secondary-btn" type="button">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Agent Node System -->
   <script src="agent-memory.js"></script>
   <script src="agent-tools.js"></script>
