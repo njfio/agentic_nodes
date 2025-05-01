@@ -47,6 +47,8 @@ const LogicNodes = {
             return LogicNodes.createCollectorNode();
           case 'conditional':
             return LogicNodes.createConditionalNode();
+          case 'programmatic':
+            return LogicNodes.createProgrammaticNode();
           default:
             // Call the original method for unknown types
             return originalAddNode.call(App);
@@ -127,6 +129,8 @@ const LogicNodes = {
           return LogicNodes.processCollectorNode(this, input);
         } else if (this.nodeType === 'conditional') {
           return LogicNodes.processConditionalNode(this, input);
+        } else if (this.nodeType === 'programmatic') {
+          return LogicNodes.processProgrammaticNode(this, input);
         }
 
         // Call the original process method for regular nodes
@@ -173,16 +177,29 @@ const LogicNodes = {
         App.addNode('conditional');
       });
 
+      // Add Programmatic Node button
+      const programmaticBtn = document.createElement('button');
+      programmaticBtn.id = 'addProgrammaticNodeBtn';
+      programmaticBtn.type = 'button';
+      programmaticBtn.textContent = 'Add Programmatic Node';
+      programmaticBtn.title = 'Add a node that processes content programmatically';
+
+      programmaticBtn.addEventListener('click', () => {
+        App.addNode('programmatic');
+      });
+
       // Insert the buttons after the Add Node button
       const addNodeBtn = document.getElementById('addNodeBtn');
       if (addNodeBtn && addNodeBtn.parentNode) {
         addNodeBtn.parentNode.insertBefore(splitterBtn, addNodeBtn.nextSibling);
         addNodeBtn.parentNode.insertBefore(collectorBtn, splitterBtn.nextSibling);
         addNodeBtn.parentNode.insertBefore(conditionalBtn, collectorBtn.nextSibling);
+        addNodeBtn.parentNode.insertBefore(programmaticBtn, conditionalBtn.nextSibling);
       } else {
         toolbar.appendChild(splitterBtn);
         toolbar.appendChild(collectorBtn);
         toolbar.appendChild(conditionalBtn);
+        toolbar.appendChild(programmaticBtn);
       }
     }
 
@@ -208,6 +225,12 @@ const LogicNodes = {
       // Add Conditional Node: Shift + C
       if (e.key === 'C' && e.shiftKey) {
         App.addNode('conditional');
+        e.preventDefault();
+      }
+
+      // Add Programmatic Node: Shift + P
+      if (e.key === 'P' && e.shiftKey) {
+        App.addNode('programmatic');
         e.preventDefault();
       }
     });
@@ -328,6 +351,54 @@ const LogicNodes = {
 
     // Log the creation
     DebugManager.addLog(`Added new Conditional Node "${node.title}" (ID: ${node.id})`, 'info');
+    DebugManager.updateCanvasStats();
+
+    // Redraw the canvas
+    App.draw();
+
+    return node;
+  },
+
+  // Create a Programmatic Node
+  createProgrammaticNode() {
+    const id = App.nodes.length + 1;
+    const x = window.innerWidth/2 - 80;
+    const y = window.innerHeight/2 - 40;
+    const node = new Node(x, y, id);
+
+    // Configure as a programmatic node
+    node.title = "Programmatic Node " + id;
+    node.nodeType = 'programmatic';
+    node.contentType = 'text';
+    node.aiProcessor = 'text-to-text';
+    node.inputType = 'text';
+    node.outputType = 'text';
+    node.systemPrompt = "Process the input programmatically according to the selected program type.";
+    node.width = 240;
+    node.height = 200;
+
+    // Add programmatic-specific properties
+    node.programType = 'chapterProcessor';  // Default program type
+    node.processInParallel = true;          // Process items in parallel by default
+    node.maxItems = 10;                     // Maximum number of items to process
+    node.customCode = '';                   // Custom code for advanced users
+    node.visualGuideNodeId = null;          // ID of the node containing visual guide info
+    node.processingSteps = [                // Steps to perform for each item
+      'write',                              // Write chapter content
+      'createIllustrationPrompt',           // Create illustration prompt
+      'generateIllustration',               // Generate illustration
+      'formatChapter'                       // Format chapter with layout
+    ];
+
+    // Add the node to the canvas
+    App.nodes.push(node);
+
+    // Select the new node
+    App.nodes.forEach(n => n.selected = false);
+    node.selected = true;
+
+    // Log the creation
+    DebugManager.addLog(`Added new Programmatic Node "${node.title}" (ID: ${node.id})`, 'info');
     DebugManager.updateCanvasStats();
 
     // Redraw the canvas
@@ -821,6 +892,459 @@ const LogicNodes = {
     }
   },
 
+  // Process a Programmatic Node
+  async processProgrammaticNode(node, input) {
+    if (!input) {
+      throw new Error('No input provided to Programmatic Node');
+    }
+
+    // Log the start of processing
+    DebugManager.addLog(`Processing Programmatic Node "${node.title}" (ID: ${node.id})`, 'info');
+
+    try {
+      // Handle different program types
+      switch (node.programType) {
+        case 'chapterProcessor':
+          return await this.processChapterProcessor(node, input);
+        case 'custom':
+          return await this.processCustomCode(node, input);
+        default:
+          throw new Error(`Unknown program type: ${node.programType}`);
+      }
+    } catch (error) {
+      // Log the error
+      DebugManager.addLog(`Error in Programmatic Node "${node.title}" (ID: ${node.id}): ${error.message}`, 'error');
+
+      // Set the error on the node
+      node.error = error.message;
+
+      // Throw the error to be handled by the caller
+      throw error;
+    }
+  },
+
+  // Process a Chapter Processor
+  async processChapterProcessor(node, input) {
+    // Log the start of processing
+    DebugManager.addLog(`Processing Chapter Processor "${node.title}" (ID: ${node.id})`, 'info');
+
+    try {
+      // First, use the node's system prompt to process the input
+      // This allows users to customize how the chapters are processed
+      let processedInput = input;
+
+      if (node.systemPrompt) {
+        // Use the OpenAI API to process the input according to the system prompt
+        const config = ApiService.openai.getConfig();
+
+        if (!config.apiKey) {
+          throw new Error('OpenAI API key not configured');
+        }
+
+        const response = await fetch('/api/openai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-openai-api-key': config.apiKey
+          },
+          body: JSON.stringify({
+            model: config.model || 'gpt-4o',
+            messages: [
+              { role: 'system', content: node.systemPrompt },
+              { role: 'user', content: input }
+            ],
+            temperature: 0.7,
+            max_tokens: config.maxTokens || 2000
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        const data = await response.json();
+        processedInput = data.choices[0].message.content;
+      }
+
+      // Split the processed input into chapters
+      // First, try to split by "Chapter X:" pattern
+      let chapters = processedInput.split(/Chapter \d+:/);
+
+      // If that didn't work well, try splitting by newlines
+      if (chapters.length <= 1) {
+        chapters = processedInput.split(/\n\n+/);
+      }
+
+      // Filter out empty chapters
+      chapters = chapters.filter(chapter => chapter.trim());
+
+      // Limit the number of chapters if needed
+      if (node.maxItems && chapters.length > node.maxItems) {
+        DebugManager.addLog(`Limiting Chapter Processor to ${node.maxItems} chapters (${chapters.length} found)`, 'warning');
+        chapters = chapters.slice(0, node.maxItems);
+      }
+
+      // Log the number of chapters
+      DebugManager.addLog(`Chapter Processor "${node.title}" (ID: ${node.id}) found ${chapters.length} chapters`, 'info');
+
+      // Store the chapters in the node for reference
+      node.chapters = chapters;
+
+      // Store the original input
+      node.originalInput = input;
+
+      // Mark the node as processed
+      node.hasBeenProcessed = true;
+
+      // Get visual guide information if specified
+      let visualGuide = null;
+      if (node.visualGuideNodeId) {
+        const visualGuideNode = App.nodes.find(n => n.id === node.visualGuideNodeId);
+        if (visualGuideNode && visualGuideNode.content) {
+          visualGuide = visualGuideNode.content;
+        }
+      }
+
+      // Process each chapter
+      const processedChapters = [];
+
+      // Get all outgoing connections from this node
+      const connections = App.connections.filter(conn => conn.fromNode === node);
+
+      if (connections.length > 0) {
+        // For each chapter, create a separate processing path
+        for (let i = 0; i < chapters.length; i++) {
+          const chapter = chapters[i];
+
+          // Log the chapter being processed
+          DebugManager.addLog(`Processing chapter ${i+1}/${chapters.length}: ${chapter.substring(0, 30)}${chapter.length > 30 ? '...' : ''}`, 'info');
+
+          // Create a unique path ID for this chapter
+          const pathId = `chapter_${node.id}_${i}`;
+
+          // Create a metadata wrapper for the chapter
+          const chapterWithMetadata = {
+            content: chapter,
+            sourceNodeId: node.id,
+            sourceItemIndex: i,
+            chapterNumber: i + 1,
+            totalChapters: chapters.length,
+            chapterPathId: pathId,
+            visualGuide: visualGuide
+          };
+
+          // Process each step for this chapter
+          let processedChapter = await this.processChapterSteps(node, chapterWithMetadata, connections, pathId, i);
+          processedChapters.push(processedChapter);
+        }
+      }
+
+      // Combine the processed chapters
+      const result = processedChapters.join('\n\n---\n\n');
+
+      // Store the result in the node's content
+      node.content = result;
+
+      return result;
+    } catch (error) {
+      // Log the error
+      DebugManager.addLog(`Error in Chapter Processor "${node.title}" (ID: ${node.id}): ${error.message}`, 'error');
+
+      // Set the error on the node
+      node.error = error.message;
+
+      // Throw the error to be handled by the caller
+      throw error;
+    }
+  },
+
+  // Process the steps for a chapter
+  async processChapterSteps(node, chapterWithMetadata, connections, pathId, chapterIndex) {
+    // Initialize the chapter processing result
+    let chapterResult = {
+      chapterNumber: chapterWithMetadata.chapterNumber,
+      chapterTitle: `Chapter ${chapterWithMetadata.chapterNumber}`,
+      chapterText: chapterWithMetadata.content,
+      illustrationPrompt: '',
+      illustration: null,
+      formattedChapter: ''
+    };
+
+    // Process each step
+    for (const step of node.processingSteps) {
+      try {
+        switch (step) {
+          case 'write':
+            // Write the full chapter
+            chapterResult.chapterText = await this.processChapterWriting(node, chapterWithMetadata);
+            break;
+
+          case 'createIllustrationPrompt':
+            // Create an illustration prompt
+            chapterResult.illustrationPrompt = await this.processIllustrationPrompt(node, chapterResult, chapterWithMetadata);
+            break;
+
+          case 'generateIllustration':
+            // Generate an illustration
+            chapterResult.illustration = await this.processIllustrationGeneration(node, chapterResult.illustrationPrompt, chapterWithMetadata);
+            break;
+
+          case 'formatChapter':
+            // Format the chapter
+            chapterResult.formattedChapter = await this.processChapterFormatting(node, chapterResult, chapterWithMetadata);
+            break;
+        }
+      } catch (error) {
+        DebugManager.addLog(`Error processing step ${step} for chapter ${chapterWithMetadata.chapterNumber}: ${error.message}`, 'error');
+      }
+    }
+
+    // For each connection, create a cloned path
+    for (const connection of connections) {
+      const toNode = connection.toNode;
+
+      // Check if the target node is a collector
+      if (toNode.nodeType === 'collector') {
+        // For collector nodes, we send the formatted chapter directly
+        if (node.processInParallel) {
+          // Process in parallel (don't await)
+          App.processNodeAndConnections(toNode, chapterResult.formattedChapter, node).catch(err => {
+            DebugManager.addLog(`Error processing chapter ${chapterWithMetadata.chapterNumber} in collector node "${toNode.title}": ${err.message}`, 'error');
+          });
+        } else {
+          // Process sequentially (await)
+          try {
+            await App.processNodeAndConnections(toNode, chapterResult.formattedChapter, node);
+          } catch (err) {
+            DebugManager.addLog(`Error processing chapter ${chapterWithMetadata.chapterNumber} in collector node "${toNode.title}": ${err.message}`, 'error');
+          }
+        }
+      } else {
+        // For other nodes, we clone the processing path
+        const clonedNodes = this.cloneProcessingPath(toNode, pathId, chapterIndex, chapterResult.formattedChapter);
+
+        if (clonedNodes.length > 0) {
+          // Get the first node in the cloned path
+          const firstClonedNode = clonedNodes[0];
+
+          // Process the cloned node with this specific chapter
+          if (node.processInParallel) {
+            // Process in parallel (don't await)
+            App.processNodeAndConnections(firstClonedNode, chapterResult.formattedChapter, node).catch(err => {
+              DebugManager.addLog(`Error processing chapter ${chapterWithMetadata.chapterNumber} in node "${firstClonedNode.title}": ${err.message}`, 'error');
+            });
+          } else {
+            // Process sequentially (await)
+            try {
+              await App.processNodeAndConnections(firstClonedNode, chapterResult.formattedChapter, node);
+            } catch (err) {
+              DebugManager.addLog(`Error processing chapter ${chapterWithMetadata.chapterNumber} in node "${firstClonedNode.title}": ${err.message}`, 'error');
+            }
+          }
+        }
+      }
+    }
+
+    return chapterResult.formattedChapter;
+  },
+
+  // Process chapter writing
+  async processChapterWriting(node, chapterWithMetadata) {
+    // Use the OpenAI API to write the chapter
+    const config = ApiService.openai.getConfig();
+
+    if (!config.apiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const systemPrompt = `You are a children's book author. Write a full chapter for a children's book based on the chapter outline.
+Use language appropriate for children aged 4-8, with engaging dialogue, descriptive scenes, and a clear narrative flow.
+This is Chapter ${chapterWithMetadata.chapterNumber} of ${chapterWithMetadata.totalChapters}.`;
+
+    const response = await fetch('/api/openai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-openai-api-key': config.apiKey
+      },
+      body: JSON.stringify({
+        model: config.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: chapterWithMetadata.content }
+        ],
+        temperature: 0.7,
+        max_tokens: config.maxTokens || 2000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  },
+
+  // Process illustration prompt creation
+  async processIllustrationPrompt(node, chapterResult, chapterWithMetadata) {
+    // Use the OpenAI API to create an illustration prompt
+    const config = ApiService.openai.getConfig();
+
+    if (!config.apiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const systemPrompt = `You are a children's book illustrator. Create a detailed illustration prompt for this chapter.
+Identify the key scene that best represents this chapter. The prompt should be specific enough to generate a cohesive illustration that matches the story.
+This is for Chapter ${chapterWithMetadata.chapterNumber} of ${chapterWithMetadata.totalChapters}.`;
+
+    const userPrompt = `Chapter: ${chapterResult.chapterText}
+
+${chapterWithMetadata.visualGuide ? `Visual Guide: ${chapterWithMetadata.visualGuide}` : ''}
+
+Create a detailed illustration prompt for the key scene in this chapter.`;
+
+    const response = await fetch('/api/openai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-openai-api-key': config.apiKey
+      },
+      body: JSON.stringify({
+        model: config.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: config.maxTokens || 1000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  },
+
+  // Process illustration generation
+  async processIllustrationGeneration(node, illustrationPrompt, chapterWithMetadata) {
+    // Use the OpenAI API to generate an illustration
+    const config = ApiService.openai.getConfig();
+
+    if (!config.apiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const response = await fetch('/api/openai/images', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-openai-api-key': config.apiKey
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: illustrationPrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard'
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return data.data[0].url;
+  },
+
+  // Process chapter formatting
+  async processChapterFormatting(node, chapterResult, chapterWithMetadata) {
+    // Use the OpenAI API to format the chapter
+    const config = ApiService.openai.getConfig();
+
+    if (!config.apiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    const systemPrompt = `You are a children's book editor. Format this chapter with proper layout for a children's book.
+Include placeholders for the illustration. Format the text with appropriate paragraph breaks, dialogue formatting, and page layout considerations.
+This is Chapter ${chapterWithMetadata.chapterNumber} of ${chapterWithMetadata.totalChapters}.`;
+
+    const userPrompt = `Chapter: ${chapterResult.chapterText}
+
+Illustration Prompt: ${chapterResult.illustrationPrompt}
+
+Format this chapter with proper layout for a children's book.`;
+
+    const response = await fetch('/api/openai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-openai-api-key': config.apiKey
+      },
+      body: JSON.stringify({
+        model: config.model || 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: config.maxTokens || 2000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  },
+
+  // Process custom code
+  async processCustomCode(node, input) {
+    // Log the start of processing
+    DebugManager.addLog(`Processing Custom Code in "${node.title}" (ID: ${node.id})`, 'info');
+
+    try {
+      // Check if custom code is provided
+      if (!node.customCode) {
+        throw new Error('No custom code provided');
+      }
+
+      // Create a function from the custom code
+      const customFunction = new Function('input', 'node', 'App', 'DebugManager', 'ApiService', node.customCode);
+
+      // Execute the custom function
+      const result = await customFunction(input, node, App, DebugManager, ApiService);
+
+      // Store the result in the node's content
+      node.content = result;
+      node.hasBeenProcessed = true;
+
+      return result;
+    } catch (error) {
+      // Log the error
+      DebugManager.addLog(`Error in Custom Code "${node.title}" (ID: ${node.id}): ${error.message}`, 'error');
+
+      // Set the error on the node
+      node.error = error.message;
+
+      // Throw the error to be handled by the caller
+      throw error;
+    }
+  },
+
   // Process a Collector Node
   async processCollectorNode(node, input) {
     if (!input) {
@@ -1088,7 +1612,7 @@ const LogicNodes = {
 
   // Update the node editor to show logic node options
   updateNodeEditor(node) {
-    if (!node || (node.nodeType !== 'splitter' && node.nodeType !== 'collector' && node.nodeType !== 'conditional')) {
+    if (!node || (node.nodeType !== 'splitter' && node.nodeType !== 'collector' && node.nodeType !== 'conditional' && node.nodeType !== 'programmatic')) {
       return;
     }
 
@@ -1375,6 +1899,196 @@ const LogicNodes = {
       maxIterationsInput.addEventListener('change', () => {
         node.maxIterations = parseInt(maxIterationsInput.value, 10);
       });
+    } else if (node.nodeType === 'programmatic') {
+      // Add programmatic options
+
+      // Program type option
+      const programTypeGroup = document.createElement('div');
+      programTypeGroup.className = 'form-group';
+
+      const programTypeLabel = document.createElement('label');
+      programTypeLabel.htmlFor = 'programType';
+      programTypeLabel.textContent = 'Program Type:';
+
+      const programTypeSelect = document.createElement('select');
+      programTypeSelect.id = 'programType';
+
+      const programTypes = [
+        { value: 'chapterProcessor', text: 'Chapter Processor' },
+        { value: 'custom', text: 'Custom Code' }
+      ];
+
+      programTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type.value;
+        option.textContent = type.text;
+        option.selected = node.programType === type.value;
+        programTypeSelect.appendChild(option);
+      });
+
+      programTypeGroup.appendChild(programTypeLabel);
+      programTypeGroup.appendChild(programTypeSelect);
+      logicOptionsSection.appendChild(programTypeGroup);
+
+      // Parallel processing option
+      const parallelGroup = document.createElement('div');
+      parallelGroup.className = 'form-group';
+
+      const parallelCheckbox = document.createElement('div');
+      parallelCheckbox.className = 'checkbox-group';
+
+      const parallelInput = document.createElement('input');
+      parallelInput.type = 'checkbox';
+      parallelInput.id = 'processInParallel';
+      parallelInput.checked = node.processInParallel !== false;
+
+      const parallelLabel = document.createElement('label');
+      parallelLabel.htmlFor = 'processInParallel';
+      parallelLabel.textContent = 'Process items in parallel';
+
+      parallelCheckbox.appendChild(parallelInput);
+      parallelCheckbox.appendChild(parallelLabel);
+      parallelGroup.appendChild(parallelCheckbox);
+      logicOptionsSection.appendChild(parallelGroup);
+
+      // Max items option
+      const maxItemsGroup = document.createElement('div');
+      maxItemsGroup.className = 'form-group';
+
+      const maxItemsLabel = document.createElement('label');
+      maxItemsLabel.htmlFor = 'maxItems';
+      maxItemsLabel.textContent = 'Maximum Items:';
+
+      const maxItemsInput = document.createElement('input');
+      maxItemsInput.type = 'number';
+      maxItemsInput.id = 'maxItems';
+      maxItemsInput.value = node.maxItems || 10;
+      maxItemsInput.min = 1;
+      maxItemsInput.max = 100;
+
+      maxItemsGroup.appendChild(maxItemsLabel);
+      maxItemsGroup.appendChild(maxItemsInput);
+      logicOptionsSection.appendChild(maxItemsGroup);
+
+      // Program-specific options
+      if (node.programType === 'chapterProcessor') {
+        // Visual guide node option
+        const visualGuideGroup = document.createElement('div');
+        visualGuideGroup.className = 'form-group';
+
+        const visualGuideLabel = document.createElement('label');
+        visualGuideLabel.htmlFor = 'visualGuideNodeId';
+        visualGuideLabel.textContent = 'Visual Guide Node ID:';
+
+        const visualGuideInput = document.createElement('input');
+        visualGuideInput.type = 'number';
+        visualGuideInput.id = 'visualGuideNodeId';
+        visualGuideInput.value = node.visualGuideNodeId || '';
+        visualGuideInput.placeholder = 'ID of node with visual guide info';
+
+        visualGuideGroup.appendChild(visualGuideLabel);
+        visualGuideGroup.appendChild(visualGuideInput);
+        logicOptionsSection.appendChild(visualGuideGroup);
+
+        // Processing steps option
+        const stepsGroup = document.createElement('div');
+        stepsGroup.className = 'form-group';
+
+        const stepsLabel = document.createElement('label');
+        stepsLabel.textContent = 'Processing Steps:';
+        stepsGroup.appendChild(stepsLabel);
+
+        const stepsContainer = document.createElement('div');
+        stepsContainer.className = 'checkbox-group';
+
+        const allSteps = [
+          { value: 'write', text: 'Write Chapter' },
+          { value: 'createIllustrationPrompt', text: 'Create Illustration Prompt' },
+          { value: 'generateIllustration', text: 'Generate Illustration' },
+          { value: 'formatChapter', text: 'Format Chapter' }
+        ];
+
+        allSteps.forEach(step => {
+          const stepDiv = document.createElement('div');
+          stepDiv.className = 'form-check';
+
+          const stepInput = document.createElement('input');
+          stepInput.type = 'checkbox';
+          stepInput.className = 'form-check-input';
+          stepInput.id = `step-${step.value}`;
+          stepInput.checked = node.processingSteps && node.processingSteps.includes(step.value);
+
+          const stepLabel = document.createElement('label');
+          stepLabel.className = 'form-check-label';
+          stepLabel.htmlFor = `step-${step.value}`;
+          stepLabel.textContent = step.text;
+
+          stepDiv.appendChild(stepInput);
+          stepDiv.appendChild(stepLabel);
+          stepsContainer.appendChild(stepDiv);
+
+          // Add event listener for this step
+          stepInput.addEventListener('change', () => {
+            if (!node.processingSteps) {
+              node.processingSteps = [];
+            }
+
+            if (stepInput.checked && !node.processingSteps.includes(step.value)) {
+              node.processingSteps.push(step.value);
+            } else if (!stepInput.checked && node.processingSteps.includes(step.value)) {
+              node.processingSteps = node.processingSteps.filter(s => s !== step.value);
+            }
+          });
+        });
+
+        stepsGroup.appendChild(stepsContainer);
+        logicOptionsSection.appendChild(stepsGroup);
+
+        // Add event listener for visual guide node ID
+        visualGuideInput.addEventListener('change', () => {
+          node.visualGuideNodeId = parseInt(visualGuideInput.value, 10) || null;
+        });
+      } else if (node.programType === 'custom') {
+        // Custom code option
+        const customCodeGroup = document.createElement('div');
+        customCodeGroup.className = 'form-group';
+
+        const customCodeLabel = document.createElement('label');
+        customCodeLabel.htmlFor = 'customCode';
+        customCodeLabel.textContent = 'Custom Code:';
+
+        const customCodeTextarea = document.createElement('textarea');
+        customCodeTextarea.id = 'customCode';
+        customCodeTextarea.className = 'form-control';
+        customCodeTextarea.rows = 10;
+        customCodeTextarea.value = node.customCode || '';
+        customCodeTextarea.placeholder = '// Custom JavaScript code\n// Available variables: input, node, App, DebugManager, ApiService\n// Return the processed result\nreturn input;';
+
+        customCodeGroup.appendChild(customCodeLabel);
+        customCodeGroup.appendChild(customCodeTextarea);
+        logicOptionsSection.appendChild(customCodeGroup);
+
+        // Add event listener for custom code
+        customCodeTextarea.addEventListener('change', () => {
+          node.customCode = customCodeTextarea.value;
+        });
+      }
+
+      // Add event listeners to update the node properties
+      programTypeSelect.addEventListener('change', () => {
+        node.programType = programTypeSelect.value;
+
+        // Refresh the node editor to show/hide relevant options
+        LogicNodes.updateNodeEditor(node);
+      });
+
+      parallelInput.addEventListener('change', () => {
+        node.processInParallel = parallelInput.checked;
+      });
+
+      maxItemsInput.addEventListener('change', () => {
+        node.maxItems = parseInt(maxItemsInput.value, 10);
+      });
     }
   }
 };
@@ -1391,7 +2105,7 @@ document.addEventListener('DOMContentLoaded', function() {
       originalOpenNodeEditor.call(App, node);
 
       // Add logic node options if needed
-      if (node && (node.nodeType === 'splitter' || node.nodeType === 'collector' || node.nodeType === 'conditional')) {
+      if (node && (node.nodeType === 'splitter' || node.nodeType === 'collector' || node.nodeType === 'conditional' || node.nodeType === 'programmatic')) {
         LogicNodes.updateNodeEditor(node);
       }
     };

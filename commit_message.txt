@@ -1,0 +1,7 @@
+Add Template Generator Modal
+
+- Added a new modal for generating workflow templates from natural language descriptions
+- Implemented OpenAI integration to convert text descriptions to JSON templates
+- Added sample templates for common workflows
+- Added buttons for copying, saving, and loading templates
+- Updated initialization code to include the new modal
