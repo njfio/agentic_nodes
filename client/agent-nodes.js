@@ -351,7 +351,6 @@ const AgentNodes = {
 
     // Use the logic options section for our agent options
     const agentOptionsSection = logicOptionsSection;
-    }
 
     // Add agent type selector
     const agentTypeGroup = document.createElement('div');
