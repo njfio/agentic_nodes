@@ -333,31 +333,25 @@ const AgentNodes = {
       return;
     }
 
-    // Find or create the agent options section
-    // First, remove any existing agent options section to avoid duplicates
-    const existingSection = document.getElementById('agentOptionsSection');
-    if (existingSection) {
-      existingSection.remove();
+    // Use the existing logic options section as a template
+    const logicOptionsSection = document.getElementById('logicOptionsSection');
+    if (!logicOptionsSection) {
+      console.log('Logic options section not found');
+      return;
     }
 
-    // Create a new agent options section
-    const agentOptionsSection = document.createElement('div');
-    agentOptionsSection.id = 'agentOptionsSection';
-    agentOptionsSection.className = 'editor-section';
+    // Show the logic options section and repurpose it for agent options
+    logicOptionsSection.style.display = 'block';
+    logicOptionsSection.innerHTML = '';
 
-    // Find the button group to insert before
-    const buttonGroup = nodeEditor.querySelector('.button-group');
-    if (buttonGroup) {
-      nodeEditor.insertBefore(agentOptionsSection, buttonGroup);
-    } else {
-      // If no button group, just append to the end
-      nodeEditor.appendChild(agentOptionsSection);
-    }
-
-    // Add a header
+    // Create a header for the agent options
     const header = document.createElement('h3');
     header.textContent = 'Agent Options';
-    agentOptionsSection.appendChild(header);
+    logicOptionsSection.appendChild(header);
+
+    // Use the logic options section for our agent options
+    const agentOptionsSection = logicOptionsSection;
+    }
 
     // Add agent type selector
     const agentTypeGroup = document.createElement('div');
