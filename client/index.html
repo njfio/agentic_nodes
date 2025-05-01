@@ -647,17 +647,19 @@
 
   <!-- Agent Node Editor Modal -->
   <div id="agentNodeEditor" class="modal">
-    <div class="modal-content">
-      <h2>Agent Node Editor</h2>
+    <div class="modal-content" style="max-width: 700px; background-color: #1e1e1e; border: 2px solid #9c27b0;">
+      <h2 style="color: #9c27b0; border-bottom: 1px solid #9c27b0; padding-bottom: 10px;">
+        <span style="margin-right: 10px;">🤖</span>Agent Node Editor
+      </h2>
       <form id="agentNodeEditorForm" onsubmit="event.preventDefault(); return false;" action="javascript:void(0);">
         <div class="form-group">
           <label for="agentNodeTitle">Title:</label>
-          <input type="text" id="agentNodeTitle">
+          <input type="text" id="agentNodeTitle" class="form-control">
         </div>
 
         <div class="form-group">
           <label for="agentType">Agent Type:</label>
-          <select id="agentType">
+          <select id="agentType" class="form-control">
             <option value="default">Default Agent</option>
             <option value="custom">Custom Agent</option>
           </select>
@@ -665,12 +667,12 @@
 
         <div class="form-group">
           <label for="agentSystemPrompt">System Prompt:</label>
-          <textarea id="agentSystemPrompt" placeholder="Enter instructions for how the agent should process content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+          <textarea id="agentSystemPrompt" class="form-control" rows="5" placeholder="Enter instructions for how the agent should process content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
         </div>
 
         <div class="form-group">
           <label for="maxIterations">Maximum Iterations:</label>
-          <input type="number" id="maxIterations" min="1" max="20" value="5">
+          <input type="number" id="maxIterations" class="form-control" min="1" max="20" value="5">
         </div>
 
         <div class="form-group">
@@ -681,13 +683,13 @@
           </div>
         </div>
 
-        <div id="customCodeSection" class="form-group" style="display: none;">
+        <div id="customCodeSection" class="form-group" style="display: none; background-color: #2a2a2a; padding: 15px; border-radius: 5px; margin-top: 15px;">
           <label for="customCode">Custom Code:</label>
-          <textarea id="customCode" rows="10" placeholder="// Custom JavaScript code&#10;// Available variables: input, node, App, DebugManager, ApiService&#10;// Return the processed result&#10;return input;"></textarea>
+          <textarea id="customCode" class="form-control code-editor" rows="10" style="font-family: monospace;" placeholder="// Custom JavaScript code&#10;// Available variables: input, node, App, DebugManager, ApiService&#10;// Return the processed result&#10;return input;"></textarea>
         </div>
 
-        <div class="button-group">
-          <button id="saveAgentNode" class="primary-btn" type="button">Save</button>
+        <div class="button-group" style="margin-top: 20px; text-align: right;">
+          <button id="saveAgentNode" class="primary-btn" type="button" style="background-color: #9c27b0;">Save</button>
           <button id="cancelAgentNode" class="secondary-btn" type="button">Cancel</button>
         </div>
       </form>

@@ -30,7 +30,7 @@ const AppInit = {
 
   // Initialize modal handlers
   initModalHandlers() {
-    const modals = ['nodeEditor', 'saveLoadModal', 'helpModal', 'configModal', 'templateGeneratorModal'];
+    const modals = ['nodeEditor', 'saveLoadModal', 'helpModal', 'configModal', 'templateGeneratorModal', 'agentNodeEditor'];
 
     // Close modals on outside click
     window.addEventListener('click', (e) => {
@@ -103,7 +103,7 @@ const AppInit = {
 
         case 'Escape':
           // Close all modals
-          ['nodeEditor', 'configModal', 'saveLoadModal', 'helpModal', 'templateGeneratorModal'].forEach(id => {
+          ['nodeEditor', 'configModal', 'saveLoadModal', 'helpModal', 'templateGeneratorModal', 'agentNodeEditor'].forEach(id => {
             const modal = document.getElementById(id);
             if (modal) {
               modal.style.display = 'none';
