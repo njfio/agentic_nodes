@@ -1,0 +1,254 @@
+/**
+ * Agent Tools
+ * Implements tools that can be used by agent nodes
+ */
+
+const AgentTools = {
+  // Available tool categories
+  categories: {
+    TEXT_PROCESSING: 'text-processing',
+    IMAGE_PROCESSING: 'image-processing',
+    DATA_MANIPULATION: 'data-manipulation',
+    EXTERNAL_API: 'external-api',
+    WORKFLOW: 'workflow'
+  },
+
+  // Available tools
+  tools: [
+    {
+      id: 'text-summarize',
+      name: 'Summarize Text',
+      description: 'Summarize the input text to a shorter version',
+      category: 'text-processing',
+      async execute(params, node) {
+        const { text, maxLength } = params;
+        if (!text) {
+          throw new Error('No text provided for summarization');
+        }
+
+        // Use the OpenAI API to summarize the text
+        const config = ApiService.openai.getConfig();
+        if (!config.apiKey) {
+          throw new Error('OpenAI API key not configured');
+        }
+
+        try {
+          const response = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-openai-api-key': config.apiKey
+            },
+            body: JSON.stringify({
+              model: config.model || 'gpt-4o',
+              messages: [
+                { 
+                  role: 'system', 
+                  content: `Summarize the following text${maxLength ? ` to approximately ${maxLength} words` : ''}. Maintain the key points and main ideas.` 
+                },
+                { role: 'user', content: text }
+              ],
+              temperature: 0.7,
+              max_tokens: config.maxTokens || 2000
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+          }
+
+          const data = await response.json();
+          return data.choices[0].message.content;
+        } catch (error) {
+          DebugManager.addLog(`Error summarizing text: ${error.message}`, 'error');
+          throw error;
+        }
+      }
+    },
+    {
+      id: 'text-extract-entities',
+      name: 'Extract Entities',
+      description: 'Extract named entities (people, places, organizations, etc.) from text',
+      category: 'text-processing',
+      async execute(params, node) {
+        const { text } = params;
+        if (!text) {
+          throw new Error('No text provided for entity extraction');
+        }
+
+        // Use the OpenAI API to extract entities
+        const config = ApiService.openai.getConfig();
+        if (!config.apiKey) {
+          throw new Error('OpenAI API key not configured');
+        }
+
+        try {
+          const response = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-openai-api-key': config.apiKey
+            },
+            body: JSON.stringify({
+              model: config.model || 'gpt-4o',
+              messages: [
+                { 
+                  role: 'system', 
+                  content: 'Extract named entities from the following text. Return the results as a JSON object with categories for people, places, organizations, dates, and other notable entities. Format the response as valid JSON only.' 
+                },
+                { role: 'user', content: text }
+              ],
+              temperature: 0.3,
+              max_tokens: config.maxTokens || 2000
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+          }
+
+          const data = await response.json();
+          return data.choices[0].message.content;
+        } catch (error) {
+          DebugManager.addLog(`Error extracting entities: ${error.message}`, 'error');
+          throw error;
+        }
+      }
+    },
+    {
+      id: 'image-analyze',
+      name: 'Analyze Image',
+      description: 'Analyze and describe the content of an image',
+      category: 'image-processing',
+      async execute(params, node) {
+        const { imageUrl } = params;
+        if (!imageUrl) {
+          throw new Error('No image URL provided for analysis');
+        }
+
+        // Use the OpenAI API to analyze the image
+        const config = ApiService.openai.getConfig();
+        if (!config.apiKey) {
+          throw new Error('OpenAI API key not configured');
+        }
+
+        try {
+          const response = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-openai-api-key': config.apiKey
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: 'Describe this image in detail.' },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: imageUrl
+                      }
+                    }
+                  ]
+                }
+              ],
+              max_tokens: config.maxTokens || 2000
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+          }
+
+          const data = await response.json();
+          return data.choices[0].message.content;
+        } catch (error) {
+          DebugManager.addLog(`Error analyzing image: ${error.message}`, 'error');
+          throw error;
+        }
+      }
+    },
+    {
+      id: 'data-parse-json',
+      name: 'Parse JSON',
+      description: 'Parse a JSON string into a structured object',
+      category: 'data-manipulation',
+      async execute(params, node) {
+        const { jsonString } = params;
+        if (!jsonString) {
+          throw new Error('No JSON string provided for parsing');
+        }
+
+        try {
+          const parsed = JSON.parse(jsonString);
+          return JSON.stringify(parsed, null, 2);
+        } catch (error) {
+          DebugManager.addLog(`Error parsing JSON: ${error.message}`, 'error');
+          throw new Error(`Invalid JSON: ${error.message}`);
+        }
+      }
+    },
+    {
+      id: 'workflow-get-node-content',
+      name: 'Get Node Content',
+      description: 'Get the content of another node in the workflow',
+      category: 'workflow',
+      async execute(params, node) {
+        const { nodeId } = params;
+        if (!nodeId) {
+          throw new Error('No node ID provided');
+        }
+
+        // Find the node by ID
+        const targetNode = App.nodes.find(n => n.id === parseInt(nodeId, 10));
+        if (!targetNode) {
+          throw new Error(`Node with ID ${nodeId} not found`);
+        }
+
+        return targetNode.content || '';
+      }
+    }
+  ],
+
+  // Get all available tools
+  getAllTools() {
+    return this.tools;
+  },
+
+  // Get tools by category
+  getToolsByCategory(category) {
+    return this.tools.filter(tool => tool.category === category);
+  },
+
+  // Get a tool by ID
+  getToolById(id) {
+    return this.tools.find(tool => tool.id === id);
+  },
+
+  // Execute a tool
+  async executeTool(toolId, params, node) {
+    const tool = this.getToolById(toolId);
+    if (!tool) {
+      throw new Error(`Tool with ID ${toolId} not found`);
+    }
+
+    try {
+      DebugManager.addLog(`Executing tool "${tool.name}" (ID: ${tool.id})`, 'info');
+      const result = await tool.execute(params, node);
+      DebugManager.addLog(`Tool "${tool.name}" executed successfully`, 'success');
+      return result;
+    } catch (error) {
+      DebugManager.addLog(`Error executing tool "${tool.name}": ${error.message}`, 'error');
+      throw error;
+    }
+  }
+};
+
+// Export the AgentTools object
+window.AgentTools = AgentTools;
