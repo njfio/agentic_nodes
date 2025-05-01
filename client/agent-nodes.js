@@ -6,9 +6,14 @@
 const AgentNodes = {
   // Initialize the Agent Nodes
   init() {
-    console.log('Agent Nodes initialized');
+    // Register node types
     this.registerNodeTypes();
-    this.addEventListeners();
+
+    // Add event listeners (with a slight delay to ensure DOM is ready)
+    setTimeout(() => {
+      this.addEventListeners();
+      console.log('Agent Nodes initialized and toolbar button added');
+    }, 100);
   },
 
   // Register node types with the application
@@ -126,6 +131,11 @@ const AgentNodes = {
       agentBtn.type = 'button';
       agentBtn.textContent = 'Add Agent Node';
       agentBtn.title = 'Add a node with agentic capabilities';
+
+      // Add a distinctive style to make it stand out
+      agentBtn.style.backgroundColor = '#9c27b0';
+      agentBtn.style.color = 'white';
+      agentBtn.style.fontWeight = 'bold';
 
       agentBtn.addEventListener('click', () => {
         App.addNode('agent');
