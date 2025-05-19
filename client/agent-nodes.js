@@ -383,36 +383,26 @@ const AgentNodes = {
       node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
 
       // Initialize with all available tools
-      let builtInTools = [];
-      let mcpTools = [];
-
       try {
-        // Get built-in tools
-        if (typeof AgentTools !== 'undefined' && AgentTools.getAllTools) {
-          builtInTools = AgentTools.getAllTools();
-          console.log(`Loaded ${builtInTools.length} built-in tools for agent node`);
-          DebugManager.addLog(`Loaded ${builtInTools.length} built-in tools for agent node`, 'info');
+        // Use the cached tools list if available
+        if (this.availableTools && this.availableTools.length > 0) {
+          node.tools = [...this.availableTools];
+          console.log(`Using ${node.tools.length} cached tools for agent node`);
+          DebugManager.addLog(`Using ${node.tools.length} cached tools for agent node`, 'info');
         } else {
-          console.warn('AgentTools not available or getAllTools method missing');
-          DebugManager.addLog('AgentTools not available or getAllTools method missing', 'warning');
-        }
-
-        // Get MCP tools
-        if (window.MCPTools && MCPTools.getAllTools) {
-          mcpTools = MCPTools.getAllTools();
-          console.log(`Loaded ${mcpTools.length} MCP tools for agent node`);
-          DebugManager.addLog(`Loaded ${mcpTools.length} MCP tools for agent node`, 'info');
-        } else {
-          console.warn('MCPTools not available or getAllTools method missing');
-          DebugManager.addLog('MCPTools not available or getAllTools method missing', 'warning');
+          // Otherwise, get tools directly
+          this.updateToolsList();
+          node.tools = [...this.availableTools];
+          console.log(`Loaded ${node.tools.length} tools for agent node`);
+          DebugManager.addLog(`Loaded ${node.tools.length} tools for agent node`, 'info');
         }
       } catch (error) {
         console.error('Error loading tools for agent node:', error);
         DebugManager.addLog(`Error loading tools for agent node: ${error.message}`, 'error');
-      }
 
-      // Combine all tools
-      node.tools = [...builtInTools, ...mcpTools];
+        // Fallback to empty tools array
+        node.tools = [];
+      }
 
       // Set workflow role properties
       node.workflowRole = 'none';       // Default role is none
@@ -2873,12 +2863,45 @@ AgentNodes.initApiPayloadsModal = function() {
   }
 };
 
-// We no longer need this initialization code here since we're handling it in index.html
-// This prevents duplicate initialization
+// Add a method to update the tools list
+AgentNodes.updateToolsList = function() {
+  try {
+    console.log('Updating AgentNodes tools list');
+
+    // Get all available tools
+    const builtInTools = (typeof AgentTools !== 'undefined' && AgentTools.getAllTools)
+      ? AgentTools.getAllTools()
+      : [];
+
+    const mcpTools = (window.MCPTools && MCPTools.getAllTools)
+      ? MCPTools.getAllTools()
+      : [];
+
+    console.log(`Found ${builtInTools.length} built-in tools and ${mcpTools.length} MCP tools`);
+
+    // Store the tools for future use
+    this.availableTools = [...builtInTools, ...mcpTools];
+
+    return this.availableTools;
+  } catch (error) {
+    console.error('Error updating tools list:', error);
+    return [];
+  }
+};
+
+// Make the AgentNodes object available globally
 document.addEventListener('DOMContentLoaded', function() {
-  // We'll just make sure the AgentNodes object is available globally
   if (typeof window !== 'undefined') {
     window.AgentNodes = AgentNodes;
+    console.log('AgentNodes exposed to global scope');
+
+    // Listen for app initialization complete event
+    document.addEventListener('app-initialization-complete', function() {
+      console.log('App initialization complete event received by AgentNodes');
+
+      // Update the tools list
+      AgentNodes.updateToolsList();
+    });
 
       // Add global click handlers for the agent node buttons
       document.addEventListener('click', (e) => {

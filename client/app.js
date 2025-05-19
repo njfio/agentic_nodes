@@ -7695,25 +7695,47 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       console.log('AgentNodes script already exists in the DOM, waiting for it to initialize');
 
-      // Set up a retry mechanism
+      // Listen for app initialization complete event
+      document.addEventListener('app-initialization-complete', function() {
+        console.log('App initialization complete event received by App');
+
+        // Check if AgentNodes is available
+        if (window.AgentNodes && typeof window.AgentNodes.drawAgentNode === 'function') {
+          console.log('AgentNodes is available and properly initialized');
+          DebugManager.addLog('AgentNodes is available and properly initialized', 'success');
+        } else {
+          console.error('AgentNodes is not properly initialized after app initialization');
+          DebugManager.addLog('AgentNodes is not properly initialized after app initialization', 'error');
+        }
+      });
+
+      // Set up a retry mechanism as a fallback
       let retryCount = 0;
-      const maxRetries = 5;
+      const maxRetries = 10;
+      const retryInterval = 300; // ms
 
       const checkAgentNodes = () => {
-        if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
-          console.log('AgentNodes module found after waiting, initializing now');
-          window.AgentNodes.init();
+        if (window.AgentNodes && typeof window.AgentNodes.drawAgentNode === 'function') {
+          console.log('AgentNodes module found and initialized');
+          DebugManager.addLog('AgentNodes module found and initialized', 'success');
         } else if (retryCount < maxRetries) {
           retryCount++;
           console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes to initialize`);
-          setTimeout(checkAgentNodes, 500);
+          setTimeout(checkAgentNodes, retryInterval);
         } else {
           console.error('Failed to initialize AgentNodes after multiple retries');
+          DebugManager.addLog('Failed to initialize AgentNodes after multiple retries', 'error');
+
+          // Try to force initialization through the AppInitSystem
+          if (window.AppInitSystem) {
+            console.log('Attempting to force initialization through AppInitSystem');
+            AppInitSystem.init();
+          }
         }
       };
 
       // Start the retry process
-      setTimeout(checkAgentNodes, 500);
+      setTimeout(checkAgentNodes, 1000);
     }
   }, 1000); // Wait 1 second to ensure all scripts are loaded
 });

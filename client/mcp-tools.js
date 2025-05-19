@@ -11,18 +11,42 @@ const MCPTools = {
   // Initialize MCP tools
   async init() {
     try {
+      console.log('MCPTools.init called');
       DebugManager.addLog('Initializing MCP tools...', 'info');
 
       // Load MCP configuration
       await this.loadMCPConfig();
 
-      // Register MCP tools with agent tools
-      this.registerWithAgentTools();
+      // Register MCP tools with agent tools if available
+      if (window.AgentTools) {
+        this.registerWithAgentTools();
+        console.log('Registered MCP tools with AgentTools');
+      } else {
+        console.warn('AgentTools not available, will register later');
+      }
 
       DebugManager.addLog(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`, 'success');
+      console.log(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`);
+
+      // Notify the initialization system if available
+      if (window.AppInitSystem && AppInitSystem.markReady) {
+        AppInitSystem.markReady('mcpTools');
+      }
+
+      return true;
     } catch (error) {
       DebugManager.addLog(`Error initializing MCP tools: ${error.message}`, 'error');
       console.error('Error initializing MCP tools:', error);
+
+      // Use fallback configuration
+      this.useFallbackConfig();
+
+      // Notify the initialization system even if there was an error
+      if (window.AppInitSystem && AppInitSystem.markReady) {
+        AppInitSystem.markReady('mcpTools');
+      }
+
+      return false;
     }
   },
 
@@ -427,13 +451,22 @@ const MCPTools = {
   }
 };
 
-// We'll handle initialization in index.html to ensure proper order
-// This prevents duplicate initialization
+// Make the MCPTools object available globally
 document.addEventListener('DOMContentLoaded', function() {
-  // Make sure the MCPTools object is available globally
   if (typeof window !== 'undefined') {
     window.MCPTools = MCPTools;
     console.log('MCPTools exposed to global scope');
+
+    // Listen for app initialization complete event
+    document.addEventListener('app-initialization-complete', function() {
+      console.log('App initialization complete event received by MCPTools');
+
+      // Make sure we're registered with AgentTools
+      if (window.AgentTools && MCPTools.tools && MCPTools.tools.length > 0) {
+        MCPTools.registerWithAgentTools();
+        console.log('Registered MCP tools with AgentTools after initialization');
+      }
+    });
   }
 });
 
