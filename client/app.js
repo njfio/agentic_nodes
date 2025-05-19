@@ -7684,7 +7684,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Create a new script element
       const script = document.createElement('script');
-      script.src = 'agent-nodes.js';
+      script.src = '/agent-nodes.js';
       script.onload = () => {
         console.log('AgentNodes module loaded dynamically');
         if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
