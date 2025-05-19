@@ -3469,6 +3469,27 @@ class Node {
     // Preload content if needed
     this.preloadContent();
 
+    // Check if this is an agent node
+    if (this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true) {
+      // Check if AgentNodes is available
+      if (window.AgentNodes) {
+        // Check if drawAgentNode method exists
+        if (typeof window.AgentNodes.drawAgentNode === 'function') {
+          // Delegate to the agent node drawing function
+          window.AgentNodes.drawAgentNode(this, ctx);
+          return;
+        } else {
+          // Log error if method is missing
+          console.warn('AgentNodes.drawAgentNode method is not available');
+          DebugManager.addLog('AgentNodes.drawAgentNode method is not available', 'warning');
+        }
+      } else {
+        // Log error if AgentNodes is not available
+        console.warn('AgentNodes module is not available');
+        DebugManager.addLog('AgentNodes module is not available', 'warning');
+      }
+    }
+
     // Node box with status-based colors
     const bgColor = this.selected ? '#4a90e2' :
                  this.processing ? '#d4af37' :
@@ -3744,6 +3765,7 @@ const App = {
   hoveredConnector: null,
   hoveredConnection: null,
   editingNode: null,
+  selectedNode: null, // Add this property to track the currently selected node
 
   CONNECTOR_RADIUS: 8,
   CONNECTOR_HOVER_RADIUS: 10,
@@ -4493,6 +4515,8 @@ const App = {
       this.isDragging = true;
       this.dragNode = clickedNode;
       this.dragNode.selected = true;
+      this.selectedNode = clickedNode; // Set the selectedNode property
+      DebugManager.addLog(`Selected node: ${clickedNode.id}`, 'info');
       this.dragOffsetX = canvasX - clickedNode.x;
       this.dragOffsetY = canvasY - clickedNode.y;
       this.nodes.forEach(n => {
@@ -4505,6 +4529,7 @@ const App = {
       this.canvas.style.cursor = 'grabbing';
 
       this.nodes.forEach(n => n.selected = false);
+      this.selectedNode = null; // Clear the selectedNode property
     }
     this.draw();
   },
@@ -4734,7 +4759,27 @@ const App = {
 
     const clickedNode = this.nodes.find(node => node.containsPoint(canvasX, canvasY));
     if (clickedNode) {
-      this.openNodeEditor(clickedNode);
+      // Set the selected node
+      this.selectedNode = clickedNode;
+      clickedNode.selected = true;
+      this.nodes.forEach(n => {
+        if (n !== clickedNode) n.selected = false;
+      });
+      DebugManager.addLog(`Selected node: ${clickedNode.id} (double-click)`, 'info');
+
+      // Check if this is an agent node
+      const isAgentNode = clickedNode.nodeType === 'agent' ||
+                         clickedNode._nodeType === 'agent' ||
+                         clickedNode.isAgentNode === true;
+
+      if (isAgentNode && window.AgentNodes && typeof window.AgentNodes.openAgentNodeEditor === 'function') {
+        // Use the agent node editor
+        DebugManager.addLog(`Opening agent node editor for node ${clickedNode.id}`, 'info');
+        window.AgentNodes.openAgentNodeEditor(clickedNode);
+      } else {
+        // Use the regular node editor
+        this.openNodeEditor(clickedNode);
+      }
     }
   },
 
@@ -4893,6 +4938,11 @@ const App = {
 
         // Remove the node
         this.nodes = this.nodes.filter(node => node !== selectedNode);
+
+        // Clear the selectedNode property
+        if (this.selectedNode === selectedNode) {
+          this.selectedNode = null;
+        }
 
         DebugManager.addLog(`Deleted node ${selectedNode.id}`, 'info');
         DebugManager.updateCanvasStats();
@@ -5086,8 +5136,16 @@ const App = {
 
   // Open the node editor modal
   openNodeEditor(node) {
-    // Set the editing node
+    // Set the editing node and selected node
     this.editingNode = node;
+    this.selectedNode = node; // Set the selectedNode property
+
+    // Update the selected state of all nodes
+    this.nodes.forEach(n => {
+      n.selected = (n === node);
+    });
+
+    DebugManager.addLog(`Selected node: ${node.id} (editor)`, 'info');
 
     // Get the node editor modal
     const nodeEditor = document.getElementById('nodeEditor');
@@ -7066,6 +7124,12 @@ const App = {
     const x = window.innerWidth/2 - 80;
     const y = window.innerHeight/2 - 40;
     const node = new Node(x, y, id);
+
+    // Clear selection on all nodes and select the new one
+    this.nodes.forEach(n => n.selected = false);
+    node.selected = true;
+    this.selectedNode = node;
+
     this.nodes.push(node);
     DebugManager.addLog(`Added new node "Node ${id}" (ID: ${id})`, 'info');
     DebugManager.updateCanvasStats();
@@ -7218,6 +7282,8 @@ const App = {
       // Select the new node
       this.nodes.forEach(n => n.selected = false);
       node.selected = true;
+      this.selectedNode = node; // Set the selectedNode property
+      DebugManager.addLog(`Selected node: ${node.id} (chat node)`, 'info');
 
       this.nodes.push(node);
       DebugManager.addLog(`Added new chat node "Chat Node ${id}" (ID: ${id})`, 'info');
@@ -7600,4 +7666,54 @@ const App = {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
+
+  // Wait for all scripts to load before checking for AgentNodes
+  setTimeout(() => {
+    // Check if the AgentNodes script is already loaded in the DOM
+    const agentNodesScriptExists = Array.from(document.scripts).some(script =>
+      script.src && script.src.includes('agent-nodes.js')
+    );
+
+    // Explicitly initialize agent nodes if the module exists
+    if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
+      console.log('Explicitly initializing AgentNodes module');
+      window.AgentNodes.init();
+    } else if (!agentNodesScriptExists) {
+      // Only try to load the script if it's not already in the DOM
+      console.warn('AgentNodes module not found or init method not available');
+
+      // Create a new script element
+      const script = document.createElement('script');
+      script.src = 'agent-nodes.js';
+      script.onload = () => {
+        console.log('AgentNodes module loaded dynamically');
+        if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
+          window.AgentNodes.init();
+        }
+      };
+      document.head.appendChild(script);
+    } else {
+      console.log('AgentNodes script already exists in the DOM, waiting for it to initialize');
+
+      // Set up a retry mechanism
+      let retryCount = 0;
+      const maxRetries = 5;
+
+      const checkAgentNodes = () => {
+        if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
+          console.log('AgentNodes module found after waiting, initializing now');
+          window.AgentNodes.init();
+        } else if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes to initialize`);
+          setTimeout(checkAgentNodes, 500);
+        } else {
+          console.error('Failed to initialize AgentNodes after multiple retries');
+        }
+      };
+
+      // Start the retry process
+      setTimeout(checkAgentNodes, 500);
+    }
+  }, 1000); // Wait 1 second to ensure all scripts are loaded
 });

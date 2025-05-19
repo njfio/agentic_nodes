@@ -4,10 +4,17 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const mongoose = require('mongoose');
+const helmet = require('helmet');
+const compression = require('compression');
 const { startMemoryServer } = require('./db-memory-server');
+const { errorHandler } = require('./middleware/errorHandler');
+const websocketService = require('./services/websocketService');
+const monitoringService = require('./services/monitoringService');
+const { createIndexes } = require('./utils/db-indexes');
 
 // Import routes
 const apiRoutes = require('./routes/api');
+const apiImprovedRoutes = require('./routes/api-improved');
 
 // Create Express app
 const app = express();
@@ -15,22 +22,77 @@ const app = express();
 // Set port
 const PORT = process.env.PORT || 8732;
 
-// Middleware
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "https://api.openai.com"]
+    }
+  }
+}));
+
+// Performance middleware
+app.use(compression());
+
+// Standard middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Logging middleware
 app.use(morgan('dev'));
+
+// Request tracking for monitoring
+app.use((req, res, next) => {
+  req.requestTime = Date.now();
+  res.on('finish', () => {
+    monitoringService.recordRequest(req, res, req.requestTime);
+  });
+  next();
+});
 
 // Serve static files from the 'client' directory
 app.use(express.static(path.join(__dirname, 'client')));
 
 // API routes
 app.use('/api', apiRoutes);
+app.use('/api/v2', apiImprovedRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'UP',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memoryUsage: process.memoryUsage(),
+    version: process.env.npm_package_version || '1.0.0'
+  });
+});
+
+// Monitoring dashboard endpoint (protected in production)
+if (process.env.NODE_ENV === 'development') {
+  app.get('/monitoring', (req, res) => {
+    res.json(monitoringService.getMetrics());
+  });
+} else {
+  // In production, require authentication
+  const authMiddleware = require('./middleware/auth');
+  app.get('/monitoring', authMiddleware, (req, res) => {
+    res.json(monitoringService.getMetrics());
+  });
+}
 
 // Serve the main HTML file for any other routes
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client', 'index.html'));
 });
+
+// Error handling middleware (must be after all other middleware and routes)
+app.use(errorHandler);
 
 // Create a default test user
 const createDefaultUser = async () => {
@@ -85,6 +147,9 @@ const connectWithRetry = async () => {
         });
         console.log('Connected to Docker MongoDB successfully');
 
+        // Create indexes for optimal performance
+        await createIndexes();
+        
         // Create default test user
         await createDefaultUser();
         return;
@@ -101,6 +166,9 @@ const connectWithRetry = async () => {
       });
       console.log('Connected to local MongoDB successfully');
 
+      // Create indexes for optimal performance
+      await createIndexes();
+      
       // Create default test user
       await createDefaultUser();
       return;
@@ -121,6 +189,9 @@ const connectWithRetry = async () => {
     });
     console.log('Connected to in-memory MongoDB successfully');
 
+    // Create indexes for optimal performance
+    await createIndexes();
+    
     // Create default test user
     await createDefaultUser();
 
@@ -141,7 +212,45 @@ const startServer = async () => {
   console.log(`Attempting to start server on port ${PORT}...`);
   const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    
+    // Start the WebSocket server
+    websocketService.initialize(server);
+    
+    // Start the monitoring service
+    monitoringService.start();
   });
+
+  // Graceful shutdown
+  const gracefulShutdown = () => {
+    console.log('Received shutdown signal. Shutting down gracefully...');
+    
+    // Stop the WebSocket server
+    websocketService.shutdown();
+    
+    // Stop the monitoring service
+    monitoringService.stop();
+    
+    // Close the server
+    server.close(() => {
+      console.log('HTTP server closed.');
+      
+      // Close database connection
+      mongoose.connection.close(false, () => {
+        console.log('MongoDB connection closed.');
+        process.exit(0);
+      });
+    });
+    
+    // Force close if graceful shutdown fails
+    setTimeout(() => {
+      console.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  };
+  
+  // Listen for termination signals
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 
   return server;
 };

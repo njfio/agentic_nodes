@@ -10,7 +10,10 @@ const AgentTools = {
     IMAGE_PROCESSING: 'image-processing',
     DATA_MANIPULATION: 'data-manipulation',
     EXTERNAL_API: 'external-api',
-    WORKFLOW: 'workflow'
+    WORKFLOW: 'workflow',
+    MCP_MEMORY: 'mcp-memory',
+    MCP_SEARCH: 'mcp-search',
+    MCP_DOCUMENTATION: 'mcp-documentation'
   },
 
   // Available tools
@@ -42,9 +45,9 @@ const AgentTools = {
             body: JSON.stringify({
               model: config.model || 'gpt-4o',
               messages: [
-                { 
-                  role: 'system', 
-                  content: `Summarize the following text${maxLength ? ` to approximately ${maxLength} words` : ''}. Maintain the key points and main ideas.` 
+                {
+                  role: 'system',
+                  content: `Summarize the following text${maxLength ? ` to approximately ${maxLength} words` : ''}. Maintain the key points and main ideas.`
                 },
                 { role: 'user', content: text }
               ],
@@ -93,9 +96,9 @@ const AgentTools = {
             body: JSON.stringify({
               model: config.model || 'gpt-4o',
               messages: [
-                { 
-                  role: 'system', 
-                  content: 'Extract named entities from the following text. Return the results as a JSON object with categories for people, places, organizations, dates, and other notable entities. Format the response as valid JSON only.' 
+                {
+                  role: 'system',
+                  content: 'Extract named entities from the following text. Return the results as a JSON object with categories for people, places, organizations, dates, and other notable entities. Format the response as valid JSON only.'
                 },
                 { role: 'user', content: text }
               ],
@@ -212,6 +215,144 @@ const AgentTools = {
         }
 
         return targetNode.content || '';
+      }
+    },
+    // MCP Search tool
+    {
+      id: 'search_perplexity-server',
+      name: 'Search with Perplexity',
+      description: 'Perform a general search query to get comprehensive information on any topic',
+      category: 'mcp-search',
+      async execute(params, node) {
+        const { query, detail_level } = params;
+        if (!query) {
+          throw new Error('No search query provided');
+        }
+
+        try {
+          // Log the search query
+          DebugManager.addLog(`Searching for: ${query}`, 'info');
+
+          // Call the MCP API endpoint
+          const response = await fetch('/api/mcp/execute', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tool: 'search_perplexity-server',
+              params: {
+                query,
+                detail_level: detail_level || 'normal'
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`MCP API request failed: ${errorData.error || 'Unknown error'}`);
+          }
+
+          const data = await response.json();
+          return data.result;
+        } catch (error) {
+          DebugManager.addLog(`Error searching with Perplexity: ${error.message}`, 'error');
+          throw error;
+        }
+      }
+    },
+    // MCP Documentation tool
+    {
+      id: 'get_documentation_perplexity-server',
+      name: 'Get Documentation',
+      description: 'Get documentation and usage examples for a specific technology, library, or API',
+      category: 'mcp-documentation',
+      async execute(params, node) {
+        const { query, context } = params;
+        if (!query) {
+          throw new Error('No query provided for documentation');
+        }
+
+        try {
+          // Log the documentation query
+          DebugManager.addLog(`Getting documentation for: ${query}`, 'info');
+
+          // Call the MCP API endpoint
+          const response = await fetch('/api/mcp/execute', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tool: 'get_documentation_perplexity-server',
+              params: {
+                query,
+                context: context || ''
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`MCP API request failed: ${errorData.error || 'Unknown error'}`);
+          }
+
+          const data = await response.json();
+          return data.result;
+        } catch (error) {
+          DebugManager.addLog(`Error getting documentation: ${error.message}`, 'error');
+          throw error;
+        }
+      }
+    },
+    // MCP Chat tool
+    {
+      id: 'chat_perplexity_perplexity-server',
+      name: 'Chat with Perplexity',
+      description: 'Maintains ongoing conversations with Perplexity AI. Creates new chats or continues existing ones with full history context.',
+      category: 'mcp-search',
+      async execute(params, node) {
+        const { message, chat_id } = params;
+        if (!message) {
+          throw new Error('No message provided for chat');
+        }
+
+        try {
+          // Log the chat message
+          DebugManager.addLog(`Sending chat message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, 'info');
+
+          // Call the MCP API endpoint
+          const response = await fetch('/api/mcp/execute', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              tool: 'chat_perplexity_perplexity-server',
+              params: {
+                message,
+                chat_id: chat_id || undefined
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`MCP API request failed: ${errorData.error || 'Unknown error'}`);
+          }
+
+          const data = await response.json();
+
+          // Store the chat ID for future use
+          if (node && data.chat_id) {
+            node.chatId = data.chat_id;
+          }
+
+          return data.result;
+        } catch (error) {
+          DebugManager.addLog(`Error chatting with Perplexity: ${error.message}`, 'error');
+          throw error;
+        }
       }
     }
   ],

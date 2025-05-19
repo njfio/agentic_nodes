@@ -1,4 +1,6 @@
 const Workflow = require('../models/Workflow');
+const VersioningService = require('../services/versioningService');
+const { logger } = require('../services/loggingService');
 
 // Get all workflows
 exports.getAllWorkflows = async (req, res) => {
@@ -263,6 +265,20 @@ exports.updateWorkflow = async (req, res) => {
   } catch (error) {
     console.error('Error updating workflow:', error);
     res.status(500).json({ message: error.message || 'Server error' });
+  }
+};
+
+// Rollback a workflow to a specific version
+exports.rollbackToVersion = async (req, res) => {
+  const { id, versionId } = req.params;
+  const user = req.user;
+
+  try {
+    const restoredWorkflow = await VersioningService.restoreVersion(id, versionId, user);
+    res.json({ success: true, workflow: restoredWorkflow });
+  } catch (error) {
+    logger.error('Error rolling back workflow version', { error });
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 

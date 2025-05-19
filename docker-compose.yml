@@ -18,6 +18,9 @@ services:
       - ./controllers:/app/controllers
       - ./models:/app/models
       - ./routes:/app/routes
+      - ./server:/app/server
+      - ./utils:/app/utils
+      - ./middleware:/app/middleware
       - ./server.js:/app/server.js
       - ./.env:/app/.env
     restart: unless-stopped

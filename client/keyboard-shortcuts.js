@@ -148,6 +148,11 @@ const AppExtensions = {
         this.nodes.splice(index, 1);
       }
 
+      // Clear the selectedNode property if it matches the deleted node
+      if (this.selectedNode === selectedNode) {
+        this.selectedNode = null;
+      }
+
       DebugManager.addLog(`Node ${selectedNode.id} deleted`, 'info');
       DebugManager.updateCanvasStats();
       this.draw();
@@ -232,6 +237,8 @@ AppExtensions.pasteNode = function() {
       // Select the new node
       this.nodes.forEach(n => n.selected = false);
       node.selected = true;
+      this.selectedNode = node; // Set the selectedNode property
+      DebugManager.addLog(`Selected node: ${node.id} (pasted)`, 'info');
 
       DebugManager.addLog('Node pasted from clipboard', 'success');
       DebugManager.updateCanvasStats();

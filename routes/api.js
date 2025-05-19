@@ -9,6 +9,9 @@ const userController = require('../controllers/userController');
 const imageController = require('../controllers/imageController');
 const dockerController = require('../controllers/dockerController');
 
+// Import MCP API routes
+const mcpRoutes = require('../server/api/mcp');
+
 // Import utilities
 const dataMigration = require('../utils/data-migration');
 
@@ -139,6 +142,43 @@ router.post('/openai/chat', async (req, res) => {
 
       // Process the optimized payload to restore any image references
       req.body = await processOptimizedPayload(req.body);
+    }
+
+    // Log the request payload for debugging
+    if (req.body.tools && req.body.tools.length > 0) {
+      console.log(`[API] Request includes ${req.body.tools.length} tools`);
+      console.log(`[API] Tool names: ${req.body.tools.map(t => t.function?.name).filter(Boolean).join(', ')}`);
+
+      // Validate the tools format
+      const validTools = req.body.tools.filter(tool => {
+        if (!tool.type || tool.type !== 'function') {
+          console.log(`[API] Invalid tool type: ${tool.type}`);
+          return false;
+        }
+        if (!tool.function || !tool.function.name) {
+          console.log('[API] Tool missing function name');
+          return false;
+        }
+        if (!tool.function.parameters) {
+          console.log(`[API] Tool ${tool.function.name} missing parameters`);
+          return false;
+        }
+        return true;
+      });
+
+      // If some tools were invalid, replace with valid ones
+      if (validTools.length !== req.body.tools.length) {
+        console.log(`[API] Filtered out ${req.body.tools.length - validTools.length} invalid tools`);
+        req.body.tools = validTools;
+      }
+
+      // If tool_choice is not set, set it to auto
+      if (!req.body.tool_choice) {
+        console.log('[API] Setting tool_choice to auto');
+        req.body.tool_choice = 'auto';
+      }
+    } else {
+      console.log('[API] Request does not include any tools');
     }
 
     // Check if OpenAI API key is set
@@ -313,5 +353,8 @@ router.get('/images/workflow/:workflowId', imageController.getWorkflowImages);
 router.get('/images/:id', imageController.getImageById);
 router.post('/images', optionalAuth, imageController.saveImage);
 router.delete('/images/:id', optionalAuth, imageController.deleteImage);
+
+// MCP routes
+router.use('/mcp', mcpRoutes);
 
 module.exports = router;

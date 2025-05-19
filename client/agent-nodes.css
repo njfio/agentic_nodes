@@ -21,6 +21,69 @@
   content: "🤖";
 }
 
+/* Node Editor Styling for Agent Nodes */
+#nodeEditor.agent-node-editor {
+  /* Purple theme for agent node editor */
+  border: 2px solid #9c27b0;
+}
+
+#nodeEditor.agent-node-editor .modal-content {
+  background-color: #1e1e1e;
+  border: 2px solid #9c27b0;
+  box-shadow: 0 0 20px rgba(156, 39, 176, 0.3);
+}
+
+#nodeEditor.agent-node-editor h2 {
+  color: #9c27b0;
+  border-bottom: 1px solid #9c27b0;
+  padding-bottom: 10px;
+}
+
+#nodeEditor.agent-node-editor h2::before {
+  content: "🤖";
+  margin-right: 10px;
+}
+
+#nodeEditor.agent-node-editor .form-group label {
+  color: #bb86fc;
+}
+
+#nodeEditor.agent-node-editor input[type="text"],
+#nodeEditor.agent-node-editor textarea,
+#nodeEditor.agent-node-editor select {
+  border: 1px solid #9c27b0;
+  background-color: #2a2a2a;
+}
+
+#nodeEditor.agent-node-editor input[type="text"]:focus,
+#nodeEditor.agent-node-editor textarea:focus,
+#nodeEditor.agent-node-editor select:focus {
+  border-color: #bb86fc;
+  box-shadow: 0 0 5px rgba(187, 134, 252, 0.5);
+}
+
+#nodeEditor.agent-node-editor .primary-btn {
+  background-color: #9c27b0;
+}
+
+#nodeEditor.agent-node-editor .primary-btn:hover {
+  background-color: #bb86fc;
+}
+
+/* Agent badge for the node editor */
+#nodeEditor.agent-node-editor::after {
+  content: "Agent Node";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #9c27b0;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
 /* Agent options section */
 #agentOptionsSection {
   margin-top: 15px;

@@ -326,6 +326,68 @@ const ApiService = {
     }
   },
 
+  /**
+   * Get the current agent node being processed
+   * @returns {object|null} - The current agent node or null
+   */
+  getCurrentAgentNode() {
+    // Check if we're in an agent node context
+    if (window.AgentNodes && AgentNodes.editingNode) {
+      return AgentNodes.editingNode;
+    }
+
+    // Check if we're in the App context with a selected node that's an agent
+    if (window.App && App.selectedNode &&
+        (App.selectedNode.nodeType === 'agent' || App.selectedNode._nodeType === 'agent')) {
+      return App.selectedNode;
+    }
+
+    return null;
+  },
+
+  /**
+   * Log API request and response for agent nodes
+   * @param {string} endpoint - API endpoint
+   * @param {object} requestData - Request data
+   * @param {object} responseData - Response data
+   * @param {Error|null} error - Error if any
+   */
+  logApiCall(endpoint, requestData, responseData, error = null) {
+    // Only log OpenAI API calls
+    if (!endpoint.includes('/openai/')) {
+      return;
+    }
+
+    // Get the current agent node
+    const agentNode = this.getCurrentAgentNode();
+    if (!agentNode) {
+      return;
+    }
+
+    // Make sure AgentLogger is available
+    if (!window.AgentLogger) {
+      console.warn('AgentLogger not available for logging API call');
+      return;
+    }
+
+    // Store the request/response payloads in the node
+    agentNode.lastRequestPayload = requestData;
+    agentNode.lastResponsePayload = responseData;
+
+    // Log the API call
+    AgentLogger.addApiLog(agentNode, requestData, responseData, error);
+
+    // Log a message
+    if (error) {
+      AgentLogger.addLog(agentNode, `API call to ${endpoint} failed: ${error.message}`, 'error');
+    } else {
+      AgentLogger.addLog(agentNode, `API call to ${endpoint} completed successfully`, 'success');
+    }
+
+    // Debug log
+    DebugManager.addLog(`API call logged for agent node ${agentNode.id}`, 'info');
+  },
+
   // OpenAI API calls
   openai: {
     /**
@@ -397,17 +459,31 @@ const ApiService = {
       // Add debug log
       DebugManager.addLog(`Using timeout of ${timeoutMs}ms for OpenAI chat request`, 'info');
 
-      return ApiService.request(
-        '/openai/chat',
-        'POST',
-        data,
-        true,
-        headers,
-        3,    // maxRetries
-        1000, // retryDelay
-        0,    // retryCount
-        timeoutMs
-      );
+      try {
+        // Make the API request
+        const response = await ApiService.request(
+          '/openai/chat',
+          'POST',
+          data,
+          true,
+          headers,
+          3,    // maxRetries
+          1000, // retryDelay
+          0,    // retryCount
+          timeoutMs
+        );
+
+        // Log the API call for agent nodes
+        ApiService.logApiCall('/openai/chat', data, response);
+
+        return response;
+      } catch (error) {
+        // Log the failed API call for agent nodes
+        ApiService.logApiCall('/openai/chat', data, { error: error.message }, error);
+
+        // Re-throw the error
+        throw error;
+      }
     },
 
     /**
@@ -436,17 +512,31 @@ const ApiService = {
       // Add debug log
       DebugManager.addLog(`Using timeout of ${IMAGE_GENERATION_TIMEOUT}ms for OpenAI image generation request`, 'info');
 
-      return ApiService.request(
-        '/openai/images',
-        'POST',
-        data,
-        true,
-        headers,
-        3,    // maxRetries
-        1000, // retryDelay
-        0,    // retryCount
-        IMAGE_GENERATION_TIMEOUT
-      );
+      try {
+        // Make the API request
+        const response = await ApiService.request(
+          '/openai/images',
+          'POST',
+          data,
+          true,
+          headers,
+          3,    // maxRetries
+          1000, // retryDelay
+          0,    // retryCount
+          IMAGE_GENERATION_TIMEOUT
+        );
+
+        // Log the API call for agent nodes
+        ApiService.logApiCall('/openai/images', data, response);
+
+        return response;
+      } catch (error) {
+        // Log the failed API call for agent nodes
+        ApiService.logApiCall('/openai/images', data, { error: error.message }, error);
+
+        // Re-throw the error
+        throw error;
+      }
     }
   },
 

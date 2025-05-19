@@ -415,3 +415,19 @@ exports.logoutAll = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// Refresh token endpoint
+exports.refreshToken = async (req, res) => {
+  try {
+    // For simplicity, just return a new token if the user is authenticated
+    if (!req.user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const token = await req.user.generateAuthToken();
+    res.json({ token });
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

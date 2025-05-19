@@ -48,6 +48,17 @@ const WorkflowIO = {
         }
       });
     }
+
+    // Refresh workflow nodes button
+    const refreshWorkflowNodesBtn = document.getElementById('refreshWorkflowNodesBtn');
+    if (refreshWorkflowNodesBtn) {
+      refreshWorkflowNodesBtn.addEventListener('click', () => {
+        DebugManager.addLog('Manually refreshing workflow nodes...', 'info');
+        this.scanForAgentNodes();
+        this.updateStatus();
+        DebugManager.addLog('Workflow nodes refreshed', 'success');
+      });
+    }
   },
 
   // Add the workflow I/O button to the toolbar
@@ -119,6 +130,17 @@ const WorkflowIO = {
 
   // Set the role of a node
   setNodeRole(node, role) {
+    DebugManager.addLog(`Setting node ${node.id} role to ${role}`, 'info');
+
+    // Check if this is an agent node
+    const isAgentNode = node.nodeType === 'agent' || node._nodeType === 'agent' || node.isAgentNode === true;
+    if (isAgentNode) {
+      DebugManager.addLog(`Node ${node.id} is an agent node`, 'info');
+
+      // Always allow agent nodes to be workflow nodes
+      node.canBeWorkflowNode = true;
+    }
+
     // If this node was previously an input or output node, remove that role
     if (node.workflowRole === 'input' && this.inputNode === node) {
       this.inputNode = null;
@@ -128,12 +150,22 @@ const WorkflowIO = {
 
     // Set the new role
     node.workflowRole = role;
+    node._workflowRole = role; // Set both properties to ensure compatibility
+
+    // Store the role in a data attribute for easier detection
+    if (node.element) {
+      node.element.setAttribute('data-workflow-role', role);
+    }
 
     // If the new role is input or output, update the corresponding property
     if (role === 'input') {
       // If there was a previous input node, remove its role
       if (this.inputNode && this.inputNode !== node) {
         this.inputNode.workflowRole = 'none';
+        this.inputNode._workflowRole = 'none'; // Set both properties
+        if (this.inputNode.element) {
+          this.inputNode.element.setAttribute('data-workflow-role', 'none');
+        }
         DebugManager.addLog(`Node ${this.inputNode.id} is no longer the input node`, 'info');
       }
 
@@ -143,6 +175,10 @@ const WorkflowIO = {
       // If there was a previous output node, remove its role
       if (this.outputNode && this.outputNode !== node) {
         this.outputNode.workflowRole = 'none';
+        this.outputNode._workflowRole = 'none'; // Set both properties
+        if (this.outputNode.element) {
+          this.outputNode.element.setAttribute('data-workflow-role', 'none');
+        }
         DebugManager.addLog(`Node ${this.outputNode.id} is no longer the output node`, 'info');
       }
 
@@ -150,8 +186,29 @@ const WorkflowIO = {
       DebugManager.addLog(`Node ${node.id} set as output node`, 'success');
     }
 
+    // If this is an agent node, log the role change in the agent logger
+    if (isAgentNode) {
+      // Log the role change
+      if (role === 'input' || role === 'output') {
+        DebugManager.addLog(`Agent node ${node.id} set as ${role} node`, 'info');
+      } else {
+        DebugManager.addLog(`Agent node ${node.id} role set to none`, 'info');
+      }
+
+      // If the agent node has a logger, log this change
+      if (window.AgentLogger && typeof AgentLogger.addLog === 'function') {
+        AgentLogger.addLog(node, `Node role set to ${role}`, 'info');
+      }
+    }
+
     // Update the status in the modal if it's open
     this.updateStatus();
+
+    // Enable or disable the run button based on whether input and output nodes are set
+    const runWorkflowBtn = document.getElementById('runWorkflowBtn');
+    if (runWorkflowBtn) {
+      runWorkflowBtn.disabled = !this.inputNode || !this.outputNode;
+    }
   },
 
   // Open the workflow I/O panel
@@ -194,9 +251,13 @@ const WorkflowIO = {
 
     if (!inputNodeStatus || !outputNodeStatus) return;
 
+    // Scan for agent nodes that might be set as input/output nodes
+    this.scanForAgentNodes();
+
     // Update input node status
     if (this.inputNode) {
-      inputNodeStatus.textContent = `Node ${this.inputNode.id}: ${this.inputNode.title || 'Untitled'}`;
+      const isAgentNode = this.inputNode.nodeType === 'agent' || this.inputNode._nodeType === 'agent' || this.inputNode.isAgentNode === true;
+      inputNodeStatus.textContent = `Node ${this.inputNode.id}: ${this.inputNode.title || 'Untitled'}${isAgentNode ? ' (Agent)' : ''}`;
       inputNodeStatus.className = 'status-value set';
     } else {
       inputNodeStatus.textContent = 'Not Set';
@@ -205,7 +266,8 @@ const WorkflowIO = {
 
     // Update output node status
     if (this.outputNode) {
-      outputNodeStatus.textContent = `Node ${this.outputNode.id}: ${this.outputNode.title || 'Untitled'}`;
+      const isAgentNode = this.outputNode.nodeType === 'agent' || this.outputNode._nodeType === 'agent' || this.outputNode.isAgentNode === true;
+      outputNodeStatus.textContent = `Node ${this.outputNode.id}: ${this.outputNode.title || 'Untitled'}${isAgentNode ? ' (Agent)' : ''}`;
       outputNodeStatus.className = 'status-value set';
     } else {
       outputNodeStatus.textContent = 'Not Set';
@@ -216,6 +278,61 @@ const WorkflowIO = {
     const runWorkflowBtn = document.getElementById('runWorkflowBtn');
     if (runWorkflowBtn) {
       runWorkflowBtn.disabled = !this.inputNode || !this.outputNode || this.isProcessing;
+    }
+  },
+
+  // Scan for agent nodes that might be set as input/output nodes
+  scanForAgentNodes() {
+    // Log that we're scanning for agent nodes
+    DebugManager.addLog('Scanning for agent nodes...', 'info');
+
+    // Check all nodes
+    let foundInputNode = false;
+    let foundOutputNode = false;
+
+    // First, log all agent nodes for debugging
+    App.nodes.forEach(node => {
+      // Check if this is an agent node (check multiple properties to be safe)
+      const isAgentNode =
+        node.nodeType === 'agent' ||
+        node._nodeType === 'agent' ||
+        node.isAgentNode === true;
+
+      if (isAgentNode) {
+        // Log the node's properties
+        DebugManager.addLog(`Agent node found: ${node.id} (${node.title})`, 'info');
+        DebugManager.addLog(`  - nodeType: ${node.nodeType}`, 'info');
+        DebugManager.addLog(`  - _nodeType: ${node._nodeType}`, 'info');
+        DebugManager.addLog(`  - isAgentNode: ${node.isAgentNode}`, 'info');
+        DebugManager.addLog(`  - workflowRole: ${node.workflowRole}`, 'info');
+        DebugManager.addLog(`  - _workflowRole: ${node._workflowRole}`, 'info');
+        DebugManager.addLog(`  - canBeWorkflowNode: ${node.canBeWorkflowNode}`, 'info');
+      }
+    });
+
+    // Now find input and output nodes
+    App.nodes.forEach(node => {
+      // Check if this is an agent node
+      const isAgentNode = node.nodeType === 'agent' || node._nodeType === 'agent' || node.isAgentNode === true;
+
+      // Check if this node has a workflow role
+      if (node.workflowRole === 'input' || node._workflowRole === 'input') {
+        DebugManager.addLog(`Found input node: ${node.id} (${node.title}) - Agent Node: ${isAgentNode}`, 'info');
+        this.inputNode = node;
+        foundInputNode = true;
+      } else if (node.workflowRole === 'output' || node._workflowRole === 'output') {
+        DebugManager.addLog(`Found output node: ${node.id} (${node.title}) - Agent Node: ${isAgentNode}`, 'info');
+        this.outputNode = node;
+        foundOutputNode = true;
+      }
+    });
+
+    if (!foundInputNode) {
+      DebugManager.addLog('No input node found', 'warning');
+    }
+
+    if (!foundOutputNode) {
+      DebugManager.addLog('No output node found', 'warning');
     }
   },
 
@@ -415,10 +532,25 @@ const WorkflowIO = {
     // Check if input and output nodes are set
     if (!this.inputNode || !this.outputNode) {
       console.error("Input or output node not set:", { inputNode: this.inputNode, outputNode: this.outputNode });
+
+      // Log all nodes and their roles to help diagnose the issue
+      DebugManager.addLog('Checking all nodes for workflow roles...', 'info');
+      App.nodes.forEach(node => {
+        const isAgentNode = node.nodeType === 'agent' || node._nodeType === 'agent' || node.isAgentNode === true;
+        DebugManager.addLog(`Node ${node.id} (${node.title}) - Role: ${node.workflowRole || 'none'}, Agent Node: ${isAgentNode}`, 'info');
+      });
+
       DebugManager.addLog('Input and output nodes must be set to process messages', 'error');
       WorkflowPanel.addMessage('Please set input and output nodes before sending messages.', 'assistant');
       return;
     }
+
+    // Log input and output node details
+    const inputIsAgent = this.inputNode.nodeType === 'agent' || this.inputNode._nodeType === 'agent' || this.inputNode.isAgentNode === true;
+    const outputIsAgent = this.outputNode.nodeType === 'agent' || this.outputNode._nodeType === 'agent' || this.outputNode.isAgentNode === true;
+
+    DebugManager.addLog(`Input node: ${this.inputNode.id} (${this.inputNode.title}) - Agent Node: ${inputIsAgent}`, 'info');
+    DebugManager.addLog(`Output node: ${this.outputNode.id} (${this.outputNode.title}) - Agent Node: ${outputIsAgent}`, 'info');
 
     console.log("Input node:", this.inputNode.id, this.inputNode.title);
     console.log("Output node:", this.outputNode.id, this.outputNode.title);

@@ -480,6 +480,11 @@
           <span class="status-label">Output Node:</span>
           <span id="outputNodeStatus" class="status-value not-set">Not Set</span>
         </div>
+        <div class="status-item">
+          <button id="refreshWorkflowNodesBtn" class="btn btn-sm btn-info" title="Refresh node detection">
+            <i class="fas fa-sync-alt"></i> Refresh Nodes
+          </button>
+        </div>
       </div>
 
       <!-- Chat Messages Area -->
@@ -683,9 +688,97 @@
           </div>
         </div>
 
+        <!-- MCP Tools Section -->
+        <div class="form-group">
+          <h3 style="color: #bb86fc; margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 5px;">MCP Tools Integration</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="useMCPTools" checked>
+            <label for="useMCPTools">Use MCP Tools</label>
+            <div class="tooltip">When checked, the agent will have access to Model Context Protocol (MCP) tools like Perplexity search, Context7 documentation, and memory tools.</div>
+          </div>
+
+          <div id="mcpToolsSection" style="margin-top: 10px; padding: 10px; background-color: #2a2a2a; border-radius: 5px;">
+            <div id="mcpToolsList" style="margin-bottom: 10px;">
+              <p style="color: #aaa; font-style: italic;">Available MCP tools will be shown here when loaded.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reflection Section -->
+        <div class="form-group">
+          <h3 style="color: #bb86fc; margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 5px;">Reflection Capabilities</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="enableReflection" checked>
+            <label for="enableReflection">Enable Reflection</label>
+            <div class="tooltip">When checked, the agent will periodically reflect on its actions and improve its approach.</div>
+          </div>
+
+          <div id="reflectionSection" style="margin-top: 10px; padding: 10px; background-color: #2a2a2a; border-radius: 5px;">
+            <div class="form-group">
+              <label for="reflectionFrequency">Reflection Frequency:</label>
+              <select id="reflectionFrequency" class="form-control">
+                <option value="1">Every iteration</option>
+                <option value="2" selected>Every 2 iterations</option>
+                <option value="3">Every 3 iterations</option>
+                <option value="5">Every 5 iterations</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="reflectionPrompt">Reflection Prompt:</label>
+              <textarea id="reflectionPrompt" class="form-control" rows="3" placeholder="Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?">Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workflow Integration Section -->
+        <div class="form-group">
+          <h3 style="color: #bb86fc; margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 5px;">Workflow Integration</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="canBeWorkflowNode" checked>
+            <label for="canBeWorkflowNode">Can be Input/Output Node</label>
+            <div class="tooltip">When checked, this agent node can be selected as an input or output node in workflows.</div>
+          </div>
+
+          <div id="workflowNodeRoleSection" style="margin-top: 10px; padding: 10px; background-color: #2a2a2a; border-radius: 5px;">
+            <div class="form-group">
+              <label>Node Role:</label>
+              <div class="radio-group-container">
+                <div class="radio-group">
+                  <input type="radio" id="agentNodeRoleNone" name="agentNodeRole" value="none" checked>
+                  <label for="agentNodeRoleNone">None</label>
+                </div>
+                <div class="radio-group">
+                  <input type="radio" id="agentNodeRoleInput" name="agentNodeRole" value="input">
+                  <label for="agentNodeRoleInput">Input Node</label>
+                </div>
+                <div class="radio-group">
+                  <input type="radio" id="agentNodeRoleOutput" name="agentNodeRole" value="output">
+                  <label for="agentNodeRoleOutput">Output Node</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="customCodeSection" class="form-group" style="display: none; background-color: #2a2a2a; padding: 15px; border-radius: 5px; margin-top: 15px;">
           <label for="customCode">Custom Code:</label>
-          <textarea id="customCode" class="form-control code-editor" rows="10" style="font-family: monospace;" placeholder="// Custom JavaScript code&#10;// Available variables: input, node, App, DebugManager, ApiService&#10;// Return the processed result&#10;return input;"></textarea>
+          <textarea id="customCode" class="form-control code-editor" rows="10" style="font-family: monospace;" placeholder="// Custom JavaScript code&#10;// Available variables: input, node, App, DebugManager, ApiService, AgentMemory, AgentTools, MCPTools, reflectionResult&#10;// Return the processed result&#10;return input;"></textarea>
+        </div>
+
+        <!-- Agent Logs and API Payloads Buttons -->
+        <div class="form-group" style="margin-top: 20px;">
+          <div style="display: flex; gap: 10px;">
+            <button id="viewAgentLogs" class="secondary-btn" style="flex: 1;" type="button">
+              <i class="fas fa-list"></i> View Agent Logs
+            </button>
+            <button id="viewApiPayloads" class="secondary-btn" style="flex: 1;" type="button">
+              <i class="fas fa-exchange-alt"></i> View API Payloads
+            </button>
+            <button id="captureApiPayloads" class="secondary-btn" style="flex: 1;" type="button">
+              <i class="fas fa-camera"></i> Generate Test API Logs
+            </button>
+          </div>
         </div>
 
         <div class="button-group" style="margin-top: 20px; text-align: right;">
@@ -696,10 +789,76 @@
     </div>
   </div>
 
+  <!-- Agent Logs Modal -->
+  <div id="agentLogsModal" class="modal">
+    <div class="modal-content" style="max-width: 800px; background-color: #1e1e1e; border: 2px solid #9c27b0;">
+      <h2 style="color: #9c27b0; border-bottom: 1px solid #9c27b0; padding-bottom: 10px;">
+        <span style="margin-right: 10px;">📋</span>Agent Logs
+      </h2>
+
+      <div class="tabs">
+        <button class="tab-button active" data-tab="activityLog">Activity Log</button>
+        <button class="tab-button" data-tab="apiLog">API Log</button>
+      </div>
+
+      <div class="tab-content">
+        <div id="activityLog" class="tab-pane active">
+          <pre id="activityLogContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+        <div id="apiLog" class="tab-pane" style="display: none;">
+          <pre id="apiLogContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <div class="button-group" style="margin-top: 20px; text-align: right;">
+        <button id="clearLogs" class="secondary-btn" type="button">Clear Logs</button>
+        <button id="copyLogs" class="secondary-btn" type="button">Copy Logs</button>
+        <button id="closeAgentLogs" class="primary-btn" type="button" style="background-color: #9c27b0;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Payloads Modal -->
+  <div id="apiPayloadsModal" class="modal">
+    <div class="modal-content" style="max-width: 800px; background-color: #1e1e1e; border: 2px solid #9c27b0;">
+      <h2 style="color: #9c27b0; border-bottom: 1px solid #9c27b0; padding-bottom: 10px;">
+        <span style="margin-right: 10px;">🔄</span>API Payloads
+      </h2>
+
+      <div class="tabs">
+        <button class="tab-button active" data-tab="requestPayload">Request Payload</button>
+        <button class="tab-button" data-tab="responsePayload">Response Payload</button>
+      </div>
+
+      <div class="tab-content">
+        <div id="requestPayload" class="tab-pane active">
+          <pre id="requestPayloadContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+        <div id="responsePayload" class="tab-pane" style="display: none;">
+          <pre id="responsePayloadContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <button id="prevApiLog" class="secondary-btn" type="button">← Previous</button>
+          <span id="apiLogCounter" style="margin: 0 10px; color: #aaa;">Log 0 of 0</span>
+          <button id="nextApiLog" class="secondary-btn" type="button">Next →</button>
+        </div>
+        <div class="button-group">
+          <button id="copyPayload" class="secondary-btn" type="button">Copy Payload</button>
+          <button id="closeApiPayloads" class="primary-btn" type="button" style="background-color: #9c27b0;">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Agent Node System -->
   <script src="agent-memory.js"></script>
   <script src="agent-tools.js"></script>
   <script src="agent-planner.js"></script>
+  <script src="agent-logger.js"></script>
+  <script src="mcp-tools.js"></script>
   <script src="agent-nodes.js"></script>
 </body>
 </html>
