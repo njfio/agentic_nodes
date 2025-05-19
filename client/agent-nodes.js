@@ -355,6 +355,15 @@ const AgentNodes = {
       node.reflectionFrequency = 2;     // How often to reflect (every N iterations)
       node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
 
+      // Initialize with all available tools
+      const builtInTools = (typeof AgentTools !== 'undefined' && AgentTools.getAllTools)
+        ? AgentTools.getAllTools()
+        : [];
+      const mcpTools = (window.MCPTools && MCPTools.getAllTools)
+        ? MCPTools.getAllTools()
+        : [];
+      node.tools = [...builtInTools, ...mcpTools];
+
       // Set workflow role properties
       node.workflowRole = 'none';       // Default role is none
       node._workflowRole = 'none';      // Set both properties to ensure compatibility
@@ -542,14 +551,8 @@ const AgentNodes = {
 
       // Check if we need to continue iterating
       if (node.autoIterate && node.isIterating && node.currentIteration < node.maxIterations) {
-        // Schedule the next iteration
-        AgentLogger.addLog(node, `Scheduling next iteration (${node.currentIteration + 1})`, 'info');
-        setTimeout(() => {
-          // Process the node with the result as input
-          App.processNodeAndConnections(node, result, node).catch(err => {
-            AgentLogger.addLog(node, `Error in agent iteration: ${err.message}`, 'error');
-          });
-        }, 100);
+        AgentLogger.addLog(node, `Continuing to iteration ${node.currentIteration + 1}`, 'info');
+        await App.processNodeAndConnections(node, result, node);
       } else {
         // Mark the agent as done iterating
         node.isIterating = false;
@@ -727,6 +730,19 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         }
       }
 
+      // Ensure built-in tools are available
+      if (!node.tools || node.tools.length === 0) {
+        const builtIn = (typeof AgentTools !== 'undefined' && AgentTools.getAllTools)
+          ? AgentTools.getAllTools()
+          : [];
+        if (builtIn.length > 0) {
+          node.tools = builtIn;
+          AgentLogger.addLog(node, `Loaded ${builtIn.length} default tools`, 'info');
+        } else {
+          AgentLogger.addLog(node, 'No default tools found', 'warning');
+        }
+      }
+
       // Get the OpenAI configuration
       const config = ApiService.openai.getConfig();
       if (!config.apiKey) {
@@ -876,6 +892,7 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
         // Log the full request payload for debugging
         AgentLogger.addLog(node, `Sending request with ${messages.length} messages and ${tools.length} tools`, 'info');
+        console.debug('OpenAI request payload:', requestPayload);
 
         // Log the first few tools for debugging
         if (tools.length > 0) {
@@ -979,6 +996,7 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
             messages
           };
 
+          console.debug('OpenAI final request payload:', { model: config.model || 'gpt-4o', messages });
           const finalResponse = await fetch('/api/openai/chat', {
             method: 'POST',
             headers: {

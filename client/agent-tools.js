@@ -440,6 +440,8 @@ const AgentTools = {
     }
 
     try {
+      // Output the parameters to the console for easier debugging
+      console.debug(`Executing tool ${tool.id} with params:`, params);
       DebugManager.addLog(`Executing tool "${tool.name}" (ID: ${tool.id})`, 'info');
       const result = await tool.execute(params, node);
       DebugManager.addLog(`Tool "${tool.name}" executed successfully`, 'success');
