@@ -335,7 +335,9 @@ const AgentNodes = {
       node.aiProcessor = 'text-to-text';
       node.inputType = 'text';
       node.outputType = 'text';
-      node.systemPrompt = "You are an agent that can process content and make decisions. Use your tools to complete tasks.";
+      node.systemPrompt = "You are an autonomous agent that reasons step by step. " +
+        "You can access various tools, including MCP tools for search, memory, and documentation. " +
+        "Use these tools whenever they help you fulfill the user's request.";
       node.width = 240;
       node.height = 200;
 
@@ -826,8 +828,12 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         // Add the tools to the node for reference
         node.availableTools = tools;
 
-        // Create the system prompt
-        const systemPrompt = node.systemPrompt || 'You are a helpful assistant that can use tools to accomplish tasks.';
+        // Create the system prompt and include available tool names for better awareness
+        let systemPrompt = node.systemPrompt || 'You are a helpful assistant that can use tools to accomplish tasks.';
+        if (node.useMCPTools && tools.length > 0) {
+          const toolNames = tools.map(t => t.function.name).slice(0, 10).join(', ');
+          systemPrompt += `\n\nAvailable tools: ${toolNames}. Use them through function calls when helpful.`;
+        }
 
         // Create the messages array
         const messages = [
