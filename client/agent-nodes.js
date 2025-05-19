@@ -6,14 +6,41 @@
 const AgentNodes = {
   // Initialize the Agent Nodes
   init() {
-    // Register node types
-    this.registerNodeTypes();
+    try {
+      console.log('AgentNodes.init called');
 
-    // Add event listeners (with a slight delay to ensure DOM is ready)
-    setTimeout(() => {
-      this.addEventListeners();
-      console.log('Agent Nodes initialized and toolbar button added');
-    }, 100);
+      // Check if MCP tools are available
+      if (window.MCPTools) {
+        console.log('MCPTools available during AgentNodes initialization');
+        DebugManager.addLog('MCPTools available during AgentNodes initialization', 'info');
+      } else {
+        console.warn('MCPTools not available during AgentNodes initialization');
+        DebugManager.addLog('MCPTools not available during AgentNodes initialization', 'warning');
+      }
+
+      // Register node types
+      this.registerNodeTypes();
+
+      // Add event listeners (with a slight delay to ensure DOM is ready)
+      setTimeout(() => {
+        this.addEventListeners();
+        console.log('Agent Nodes initialized and toolbar button added');
+        DebugManager.addLog('Agent Nodes initialized successfully', 'success');
+      }, 100);
+
+      // Initialize the agent logs modal
+      this.initAgentLogsModal();
+
+      // Explicitly expose the drawAgentNode method to the global scope
+      if (typeof window !== 'undefined') {
+        // Make sure the AgentNodes object is available globally
+        window.AgentNodes = this;
+        console.log('AgentNodes exposed to global scope with drawAgentNode method');
+      }
+    } catch (error) {
+      console.error('Error initializing AgentNodes:', error);
+      DebugManager.addLog(`Error initializing AgentNodes: ${error.message}`, 'error');
+    }
   },
 
   // Register node types with the application
@@ -356,12 +383,35 @@ const AgentNodes = {
       node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
 
       // Initialize with all available tools
-      const builtInTools = (typeof AgentTools !== 'undefined' && AgentTools.getAllTools)
-        ? AgentTools.getAllTools()
-        : [];
-      const mcpTools = (window.MCPTools && MCPTools.getAllTools)
-        ? MCPTools.getAllTools()
-        : [];
+      let builtInTools = [];
+      let mcpTools = [];
+
+      try {
+        // Get built-in tools
+        if (typeof AgentTools !== 'undefined' && AgentTools.getAllTools) {
+          builtInTools = AgentTools.getAllTools();
+          console.log(`Loaded ${builtInTools.length} built-in tools for agent node`);
+          DebugManager.addLog(`Loaded ${builtInTools.length} built-in tools for agent node`, 'info');
+        } else {
+          console.warn('AgentTools not available or getAllTools method missing');
+          DebugManager.addLog('AgentTools not available or getAllTools method missing', 'warning');
+        }
+
+        // Get MCP tools
+        if (window.MCPTools && MCPTools.getAllTools) {
+          mcpTools = MCPTools.getAllTools();
+          console.log(`Loaded ${mcpTools.length} MCP tools for agent node`);
+          DebugManager.addLog(`Loaded ${mcpTools.length} MCP tools for agent node`, 'info');
+        } else {
+          console.warn('MCPTools not available or getAllTools method missing');
+          DebugManager.addLog('MCPTools not available or getAllTools method missing', 'warning');
+        }
+      } catch (error) {
+        console.error('Error loading tools for agent node:', error);
+        DebugManager.addLog(`Error loading tools for agent node: ${error.message}`, 'error');
+      }
+
+      // Combine all tools
       node.tools = [...builtInTools, ...mcpTools];
 
       // Set workflow role properties
@@ -2823,19 +2873,12 @@ AgentNodes.initApiPayloadsModal = function() {
   }
 };
 
-// Initialize the Agent Nodes when the DOM is loaded
+// We no longer need this initialization code here since we're handling it in index.html
+// This prevents duplicate initialization
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize the Agent Nodes with a slight delay to ensure all other components are loaded
-  setTimeout(() => {
-    AgentNodes.init();
-
-    // Initialize the agent logs modal
-    AgentNodes.initAgentLogsModal();
-
-    // Explicitly expose the drawAgentNode method to the global scope
-    if (typeof window !== 'undefined') {
-      // Make sure the AgentNodes object is available globally
-      window.AgentNodes = AgentNodes;
+  // We'll just make sure the AgentNodes object is available globally
+  if (typeof window !== 'undefined') {
+    window.AgentNodes = AgentNodes;
 
       // Add global click handlers for the agent node buttons
       document.addEventListener('click', (e) => {

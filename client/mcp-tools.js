@@ -86,6 +86,7 @@ const MCPTools = {
 
   // Use fallback configuration for development
   useFallbackConfig() {
+    console.warn('Using fallback MCP configuration');
     DebugManager.addLog('Using fallback MCP configuration', 'warning');
 
     // Define fallback servers
@@ -158,6 +159,14 @@ const MCPTools = {
         autoApprove: false
       }
     ];
+
+    // Register the fallback tools with AgentTools if available
+    if (window.AgentTools) {
+      this.registerWithAgentTools();
+    } else {
+      console.warn('AgentTools not available, cannot register fallback MCP tools');
+      DebugManager.addLog('AgentTools not available, cannot register fallback MCP tools', 'warning');
+    }
   },
 
   // Get tools from a server
@@ -418,17 +427,14 @@ const MCPTools = {
   }
 };
 
-// Initialize MCP tools when the DOM is loaded
+// We'll handle initialization in index.html to ensure proper order
+// This prevents duplicate initialization
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize with a slight delay to ensure all other components are loaded
-  setTimeout(() => {
-    MCPTools.init();
-
-    // Make sure the MCPTools object is available globally
-    if (typeof window !== 'undefined') {
-      window.MCPTools = MCPTools;
-    }
-  }, 1000);
+  // Make sure the MCPTools object is available globally
+  if (typeof window !== 'undefined') {
+    window.MCPTools = MCPTools;
+    console.log('MCPTools exposed to global scope');
+  }
 });
 
 // Export the MCPTools object

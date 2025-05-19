@@ -865,6 +865,49 @@
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
   <script src="mcp-tools.js"></script>
+
+  <!-- Add a script to ensure proper initialization order -->
+  <script>
+    // Initialize MCP tools first, then agent nodes
+    document.addEventListener('DOMContentLoaded', function() {
+      // Initialize MCP tools with a callback to initialize agent nodes
+      if (window.MCPTools) {
+        console.log('Initializing MCP tools with callback to agent nodes');
+        // Override the init method to call AgentNodes.init after MCP tools are initialized
+        const originalInit = MCPTools.init;
+        MCPTools.init = async function() {
+          try {
+            await originalInit.call(MCPTools);
+            console.log('MCP tools initialized, now initializing AgentNodes');
+            // Initialize AgentNodes after MCP tools are ready
+            if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
+              window.AgentNodes.init();
+            } else {
+              console.warn('AgentNodes not available after MCP tools initialization');
+            }
+          } catch (error) {
+            console.error('Error during initialization sequence:', error);
+            // Initialize AgentNodes anyway, even if MCP tools fail
+            if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
+              window.AgentNodes.init();
+            }
+          }
+        };
+
+        // Start the initialization sequence
+        setTimeout(() => MCPTools.init(), 500);
+      } else {
+        console.warn('MCPTools not available, will try to initialize AgentNodes directly');
+        // If MCPTools is not available, initialize AgentNodes directly
+        setTimeout(() => {
+          if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
+            window.AgentNodes.init();
+          }
+        }, 1000);
+      }
+    });
+  </script>
+
   <script src="agent-nodes.js"></script>
   <script src="keyboard-config.js" type="module"></script>
   <script src="theme-switcher.js" type="module"></script>
