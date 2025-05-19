@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "projectType": "node",
+  "setupDate": "Mon May 19 18:02:46 UTC 2025",
+  "features": {
+    "linting": true,
+    "testing": true,
+    "formatting": true
+  }
+}

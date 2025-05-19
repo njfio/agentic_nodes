@@ -8,6 +8,7 @@ const AgentTools = {
   categories: {
     TEXT_PROCESSING: 'text-processing',
     IMAGE_PROCESSING: 'image-processing',
+    OPENAI: 'openai',
     DATA_MANIPULATION: 'data-manipulation',
     EXTERNAL_API: 'external-api',
     WORKFLOW: 'workflow',
@@ -353,6 +354,65 @@ const AgentTools = {
           DebugManager.addLog(`Error chatting with Perplexity: ${error.message}`, 'error');
           throw error;
         }
+      }
+    }
+    },
+    // OpenAI Browser Search tool
+    {
+      id: 'browser.search',
+      name: 'OpenAI Browser Search',
+      description: "Use OpenAI's built-in browser tool to search the web",
+      category: 'openai',
+      async execute(params) {
+        const { query } = params;
+        if (!query) {
+          throw new Error('No search query provided');
+        }
+        const response = await fetch('/api/openai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: query }],
+            tools: [{ type: 'function', function: { name: 'browser.search', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } }],
+            tool_choice: { type: 'function', function: { name: 'browser.search' } }
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`OpenAI search failed: ${errorData.error?.message || response.statusText}`);
+        }
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
+      }
+    },
+    // OpenAI Computer tool
+    {
+      id: 'computer.execute',
+      name: 'OpenAI Computer',
+      description: "Execute commands using OpenAI's computer tool",
+      category: 'openai',
+      async execute(params) {
+        const { command } = params;
+        if (!command) {
+          throw new Error('No command provided');
+        }
+        const response = await fetch('/api/openai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [{ role: 'user', content: command }],
+            tools: [{ type: 'function', function: { name: 'computer.execute', parameters: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } } }],
+            tool_choice: { type: 'function', function: { name: 'computer.execute' } }
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`OpenAI computer failed: ${errorData.error?.message || response.statusText}`);
+        }
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
       }
     }
   ],

@@ -378,8 +378,6 @@ const AgentNodes = {
       AgentLogger.addLog(node, 'Agent node created successfully', 'success');
       AgentLogger.addLog(node, 'To view API payloads, click the "View API Payloads" button in the agent node editor', 'info');
 
-      // Generate sample API payloads for testing
-      this.generateSampleApiPayloads(node);
 
       // Force a redraw of the canvas
       App.draw();
@@ -858,12 +856,14 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         // Log the request
         AgentLogger.addLog(node, 'Sending request to OpenAI API with function calling', 'info');
 
+        // Choose whether to force a search tool based on the input
+        const toolChoice = "auto";
         // Store the request payload for logging
         node.lastRequestPayload = {
           model: config.model || 'gpt-4o',
           messages,
           tools,
-          tool_choice: "auto"
+          tool_choice: toolChoice
         };
 
         // Create the request payload
@@ -871,7 +871,7 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
           model: config.model || 'gpt-4o',
           messages,
           tools,
-          tool_choice: "auto"
+          tool_choice: toolChoice
         };
 
         // Log the full request payload for debugging
@@ -1618,63 +1618,6 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       });
     }
 
-    // Set up Generate Test API Logs button handler
-    const captureApiPayloadsButton = document.getElementById('captureApiPayloads');
-    if (captureApiPayloadsButton) {
-      // Remove any existing event listeners by cloning and replacing
-      const newCaptureApiPayloadsButton = captureApiPayloadsButton.cloneNode(true);
-      captureApiPayloadsButton.parentNode.replaceChild(newCaptureApiPayloadsButton, captureApiPayloadsButton);
-
-      // Add the event listener
-      newCaptureApiPayloadsButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        DebugManager.addLog('Generate Test API Logs button clicked in agent node editor', 'info');
-
-        try {
-          // We're in the agent node editor, so we should already have an editing node
-          // No need to check for App.selectedNode since we're already editing a node
-
-          // Explicitly set the editing node if it's not set
-          if (!this.editingNode && window.App && App.selectedNode) {
-            this.editingNode = App.selectedNode;
-          }
-
-          // Check if we have a node to work with
-          if (!this.editingNode) {
-            DebugManager.addLog('No node selected for generating test API logs', 'error');
-            alert('Please select a node first.');
-            return;
-          }
-
-          // Confirm with the user that this is only for testing
-          if (confirm('This will generate sample API logs for testing purposes only. Real API logs are captured automatically during normal agent node processing. Continue?')) {
-            // Generate sample API payloads
-            this.generateSampleApiPayloads(this.editingNode);
-
-            // Show a confirmation message with the number of logs generated
-            const numLogs = this.editingNode.apiLogs ? this.editingNode.apiLogs.length : 0;
-            alert(`${numLogs} sample API logs have been generated for testing. Click "View API Payloads" to see them.`);
-          }
-        } catch (error) {
-          DebugManager.addLog(`Error generating sample API logs: ${error.message}`, 'error');
-          console.error('Error generating sample API logs:', error);
-        }
-      });
-    }
-
-    // Set up workflow node role handler
-    const canBeWorkflowNodeCheckbox = document.getElementById('canBeWorkflowNode');
-    if (canBeWorkflowNodeCheckbox) {
-      // Remove any existing event listeners by cloning and replacing
-      const newCanBeWorkflowNodeCheckbox = canBeWorkflowNodeCheckbox.cloneNode(true);
-      canBeWorkflowNodeCheckbox.parentNode.replaceChild(newCanBeWorkflowNodeCheckbox, canBeWorkflowNodeCheckbox);
-
-      // Add the event listener
-      newCanBeWorkflowNodeCheckbox.addEventListener('change', () => {
-        const workflowNodeRoleSection = document.getElementById('workflowNodeRoleSection');
-        if (workflowNodeRoleSection) {
-          workflowNodeRoleSection.style.display = newCanBeWorkflowNodeCheckbox.checked ? 'block' : 'none';
 
           // If unchecked, reset the role to 'none'
           if (!newCanBeWorkflowNodeCheckbox.checked) {
@@ -2584,135 +2527,6 @@ AgentNodes.createPayloadsModal = function() {
   DebugManager.addLog(`Viewing API payloads for agent node ${this.editingNode.id}`, 'info');
 };
 
-// Generate sample API payloads for testing purposes only
-// This function is only used for testing the API payloads display functionality
-// Real API logs are captured automatically during agent node processing
-AgentNodes.generateSampleApiPayloads = function(node) {
-  // Use the provided node or the currently editing node
-  let targetNode = node || this.editingNode;
-
-  // If no node is provided and no editing node is set, try to use the selected node from App
-  if (!targetNode && window.App && App.selectedNode) {
-    targetNode = App.selectedNode;
-    this.editingNode = App.selectedNode; // Set the editingNode reference
-    DebugManager.addLog(`Using selected node ${App.selectedNode.id} for generating sample API payloads`, 'info');
-  }
-
-  // If we still don't have a node, return early
-  if (!targetNode) {
-    DebugManager.addLog('No node selected for generating sample API payloads', 'error');
-    return false;
-  }
-
-  // Initialize API logs array if it doesn't exist
-  if (!targetNode.apiLogs) {
-    targetNode.apiLogs = [];
-  }
-
-  // Create multiple sample API logs for testing
-  for (let i = 0; i < 3; i++) {
-    // Create a sample request payload
-    const requestPayload = {
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: targetNode.systemPrompt || "You are a helpful assistant." },
-        { role: "user", content: `This is test message #${i+1} to generate sample API payloads for viewing.` }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-      // Add all available tools for the first sample payload
-      tools: i === 0 ? (() => {
-        // Get all available tools from AgentTools
-        const allTools = AgentTools.getAllTools();
-
-        // Map the tools to the format expected by the OpenAI API
-        const mappedTools = allTools.map(tool => ({
-          type: "function",
-          function: {
-            name: tool.id,
-            description: tool.description,
-            parameters: {
-              type: "object",
-              properties: AgentNodes.getToolParameters(tool),
-              required: AgentNodes.getToolRequiredParameters(tool)
-            }
-          }
-        }));
-
-        // Log the number of tools added
-        AgentLogger.addLog(targetNode, `Added ${mappedTools.length} tools to sample API payload`, 'info');
-
-        return mappedTools;
-      })() : [],
-      timestamp: new Date(Date.now() - (i * 60000)).toISOString(), // Timestamps 1 minute apart
-      _note: `This is sample request payload #${i+1} for testing. Generated on ${new Date(Date.now() - (i * 60000)).toLocaleString()}`
-    };
-
-    // Create a sample response payload
-    const responsePayload = {
-      id: `chatcmpl-${Math.random().toString(36).substring(2, 12)}`,
-      object: "chat.completion",
-      created: Math.floor((Date.now() - (i * 60000)) / 1000),
-      model: "gpt-4o",
-      choices: [
-        {
-          index: 0,
-          message: i === 0 ? {
-            role: "assistant",
-            content: null,
-            tool_calls: [
-              {
-                id: `call_${Math.random().toString(36).substring(2, 10)}`,
-                type: "function",
-                function: {
-                  name: "search_web",
-                  arguments: JSON.stringify({
-                    query: "latest AI developments"
-                  })
-                }
-              }
-            ]
-          } : {
-            role: "assistant",
-            content: `This is sample response #${i+1} for testing API payload viewing. I'm here to help you with your tasks and answer any questions you might have.`
-          },
-          finish_reason: i === 0 ? "tool_calls" : "stop"
-        }
-      ],
-      usage: {
-        prompt_tokens: 100 + (i * 25),
-        completion_tokens: 50 + (i * 25),
-        total_tokens: 150 + (i * 50)
-      },
-      timestamp: new Date(Date.now() - (i * 60000)).toISOString(),
-      _note: `This is sample response payload #${i+1} for testing. Generated on ${new Date(Date.now() - (i * 60000)).toLocaleString()}`
-    };
-
-    // Add the API log
-    AgentLogger.addApiLog(targetNode, requestPayload, responsePayload);
-
-    // Log the action
-    AgentLogger.addLog(targetNode, `Generated sample API payload #${i+1} for testing`, 'info');
-  }
-
-  // Set the last request/response payloads to the most recent ones
-  if (targetNode.apiLogs && targetNode.apiLogs.length > 0) {
-    const lastLog = targetNode.apiLogs[targetNode.apiLogs.length - 1];
-    targetNode.lastRequestPayload = lastLog.request;
-    targetNode.lastResponsePayload = lastLog.response;
-  }
-
-  DebugManager.addLog(`Generated ${targetNode.apiLogs.length} sample API logs for agent node ${targetNode.id}`, 'info');
-
-  return true;
-};
-
-// Update the API payloads display
-AgentNodes.updatePayloadsDisplay = function() {
-  if (!this.editingNode) return;
-
-  // Get the payload content elements
-  const requestPayloadContent = document.getElementById('requestPayloadContent');
   const responsePayloadContent = document.getElementById('responsePayloadContent');
   const apiLogCounter = document.getElementById('apiLogCounter');
   const prevApiLogBtn = document.getElementById('prevApiLog');
@@ -2798,13 +2612,13 @@ AgentNodes.updatePayloadsDisplay = function() {
     // Format the request payload
     if (requestPayloadContent) {
       requestPayloadContent.style.whiteSpace = 'pre-wrap';
-      requestPayloadContent.textContent = 'No API logs available. Process the agent node to generate real API logs, or use the "Capture Test Payloads" button to generate sample logs for testing.';
+      requestPayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
     }
 
     // Format the response payload
     if (responsePayloadContent) {
       responsePayloadContent.style.whiteSpace = 'pre-wrap';
-      responsePayloadContent.textContent = 'No API logs available. Process the agent node to generate real API logs, or use the "Capture Test Payloads" button to generate sample logs for testing.';
+      responsePayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
     }
   }
 };
@@ -3017,14 +2831,6 @@ document.addEventListener('DOMContentLoaded', function() {
           const isAgentButton = e.target &&
             (e.target.id === 'viewAgentLogs' ||
              e.target.id === 'viewApiPayloads' ||
-             e.target.id === 'captureApiPayloads' ||
-             e.target.id === 'saveAgentNode' ||
-             e.target.id === 'cancelAgentNode' ||
-             (e.target.parentElement &&
-              (e.target.parentElement.id === 'viewAgentLogs' ||
-               e.target.parentElement.id === 'viewApiPayloads' ||
-               e.target.parentElement.id === 'captureApiPayloads' ||
-               e.target.parentElement.id === 'saveAgentNode' ||
                e.target.parentElement.id === 'cancelAgentNode')));
 
           // If it's one of our buttons, handle it directly
@@ -3127,32 +2933,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error opening API payloads:', error);
                 alert('Error opening API payloads: ' + error.message);
               }
-            } else if (buttonId === 'captureApiPayloads') {
-              try {
-                // Make sure we have an editing node
-                if (!AgentNodes.editingNode && window.App && App.selectedNode) {
-                  AgentNodes.editingNode = App.selectedNode;
-                }
-
-                // Check if we have a node to work with
-                if (!AgentNodes.editingNode) {
-                  alert('Please select an agent node first.');
-                  return;
-                }
-
-                // Confirm with the user that this is only for testing
-                if (confirm('This will generate sample API logs for testing purposes only. Real API logs are captured automatically during normal agent node processing. Continue?')) {
-                  // Generate sample API payloads using our improved function
-                  AgentNodes.generateSampleApiPayloads(AgentNodes.editingNode);
-
-                  // Show a confirmation message with the number of logs generated
-                  const numLogs = AgentNodes.editingNode.apiLogs ? AgentNodes.editingNode.apiLogs.length : 0;
-                  alert(`${numLogs} sample API logs have been generated for testing. Click "View API Payloads" to see them.`);
-                }
-              } catch (error) {
-                console.error('Error generating sample API logs:', error);
-                alert(`Error generating sample API logs: ${error.message}`);
-              }
             } else if (buttonId === 'saveAgentNode') {
               console.log('Global handler: Save Agent Node button clicked');
 
@@ -3249,29 +3029,6 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
 
-        // Handle "Generate Test API Logs" button
-        if (e.target && e.target.id === 'captureApiPayloads' ||
-            (e.target.parentElement && e.target.parentElement.id === 'captureApiPayloads')) {
-          // Get the currently selected node from the App object
-          if (window.App && App.selectedNode) {
-            // Set the editingNode reference
-            AgentNodes.editingNode = App.selectedNode;
-            DebugManager.addLog(`Global handler: Using selected node ${App.selectedNode.id} for generating test API logs`, 'info');
-
-            // Confirm with the user that this is only for testing
-            if (confirm('This will generate sample API logs for testing purposes only. Real API logs are captured automatically during normal agent node processing. Continue?')) {
-              // Generate sample API payloads using our improved function
-              AgentNodes.generateSampleApiPayloads(App.selectedNode);
-
-              // Show a confirmation message with the number of logs generated
-              const numLogs = App.selectedNode.apiLogs ? App.selectedNode.apiLogs.length : 0;
-              alert(`${numLogs} sample API logs have been generated for testing. Click "View API Payloads" to see them.`);
-            }
-          } else {
-            DebugManager.addLog('No node selected for generating test API logs', 'error');
-            alert('Please select a node first.');
-          }
-        }
       });
 
       // Initialize the API Payloads modal
