@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "name": "codes",
+  "description": "Development environment setup tool for Codex",
+  "defaultSettings": {
+    "projectTypes": ["rust", "node", "python", "java", "go"],
+    "features": {
+      "linting": true,
+      "testing": true,
+      "formatting": true,
+      "dockerIntegration": true
+    },
+    "paths": {
+      "workspace": "/workspace",
+      "config": ".codes"
+    }
+  },
+  "languageConfigs": {
+    "rust": {
+      "requiredFiles": ["Cargo.toml"],
+      "configFiles": [".cargo/config.toml", "rustfmt.toml"],
+      "directories": ["src", "tests"],
+      "commands": {
+        "build": "cargo build",
+        "test": "cargo test",
+        "run": "cargo run",
+        "lint": "cargo clippy"
+      }
+    },
+    "node": {
+      "requiredFiles": ["package.json"],
+      "configFiles": [".eslintrc.js", ".prettierrc", "jest.config.js"],
+      "directories": ["src", "tests"],
+      "commands": {
+        "build": "npm run build",
+        "test": "npm test",
+        "run": "npm start",
+        "lint": "npm run lint"
+      }
+    },
+    "python": {
+      "requiredFiles": ["requirements.txt", "setup.py"],
+      "configFiles": ["pyproject.toml"],
+      "directories": ["src", "tests"],
+      "commands": {
+        "build": "python setup.py build",
+        "test": "pytest",
+        "run": "python main.py",
+        "lint": "flake8"
+      }
+    }
+  },
+  "dockerTemplates": {
+    "rust": {
+      "dockerfile": "FROM rust:1.70 as builder\nWORKDIR /app\nCOPY . .\nRUN cargo build --release\n\nFROM debian:bullseye-slim\nCOPY --from=builder /app/target/release/codes_project /usr/local/bin/\nCMD [\"codes_project\"]",
+      "dockerCompose": "version: '3.8'\nservices:\n  app:\n    build: .\n    volumes:\n      - .:/app\n    command: codes_project"
+    },
+    "node": {
+      "dockerfile": "FROM node:18-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nCMD [\"npm\", \"start\"]",
+      "dockerCompose": "version: '3.8'\nservices:\n  app:\n    build: .\n    volumes:\n      - .:/app\n    ports:\n      - \"3000:3000\"\n    command: npm start"
+    },
+    "python": {
+      "dockerfile": "FROM python:3.10-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nCMD [\"python\", \"main.py\"]",
+      "dockerCompose": "version: '3.8'\nservices:\n  app:\n    build: .\n    volumes:\n      - .:/app\n    command: python main.py"
+    }
+  }
+}

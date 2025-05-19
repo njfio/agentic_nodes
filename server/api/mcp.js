@@ -13,7 +13,46 @@ const axios = require('axios');
 // Get MCP configuration
 router.get('/config', async (req, res) => {
   try {
-    // Check if the user has a custom MCP configuration file
+    // Check if we're running in Docker
+    const isDocker = process.env.DOCKER_ENV === 'true' || process.env.NODE_ENV === 'production';
+
+    // If we're in Docker, always return the default configuration
+    if (isDocker) {
+      console.log('Running in Docker environment, using default MCP configuration');
+      return res.json({
+        mcpServers: {
+          "github.com/modelcontextprotocol/servers/tree/main/src/memory": {
+            "autoApprove": [
+              "create_entities",
+              "create_relations",
+              "add_observations",
+              "delete_entities",
+              "delete_observations",
+              "delete_relations",
+              "read_graph",
+              "search_nodes",
+              "open_nodes"
+            ],
+            "disabled": false
+          },
+          "github.com/upstash/context7-mcp": {
+            "autoApprove": [],
+            "disabled": false
+          },
+          "github.com.pashpashpash/perplexity-mcp": {
+            "autoApprove": [
+              "search",
+              "get_documentation",
+              "find_apis",
+              "check_deprecated_code"
+            ],
+            "disabled": false
+          }
+        }
+      });
+    }
+
+    // For local development, try to find user's MCP configuration
     // Try multiple possible paths for MCP settings
     const possiblePaths = [
       path.join(process.env.HOME || process.env.USERPROFILE, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json'),
@@ -95,38 +134,77 @@ router.post('/execute', async (req, res) => {
       return res.status(400).json({ error: 'Server and method are required' });
     }
 
-    // Get the MCP configuration
-    // Try multiple possible paths for MCP settings
-    const possiblePaths = [
-      path.join(process.env.HOME || process.env.USERPROFILE, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json'),
-      path.join(process.env.HOME || process.env.USERPROFILE, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'rooveterinaryinc.roo-cline', 'settings', 'mcp_settings.json')
-    ];
-
-    // Find the first path that exists
-    let userConfigPath = null;
-    for (const configPath of possiblePaths) {
-      if (fs.existsSync(configPath)) {
-        userConfigPath = configPath;
-        console.log(`Found MCP settings at: ${userConfigPath}`);
-        break;
-      }
-    }
-
-    // If no path exists, use the last one as default
-    if (!userConfigPath) {
-      userConfigPath = possiblePaths[possiblePaths.length - 1];
-      console.log(`No MCP settings found, using default path: ${userConfigPath}`);
-    }
+    // Check if we're running in Docker
+    const isDocker = process.env.DOCKER_ENV === 'true' || process.env.NODE_ENV === 'production';
 
     let mcpConfig = {};
 
-    // Check if the file exists
-    if (fs.existsSync(userConfigPath)) {
-      // Read the file
-      const configData = fs.readFileSync(userConfigPath, 'utf8');
+    // If we're in Docker, use default configuration
+    if (isDocker) {
+      console.log('Running in Docker environment, using default MCP configuration for execution');
+      mcpConfig = {
+        mcpServers: {
+          "github.com/modelcontextprotocol/servers/tree/main/src/memory": {
+            "autoApprove": [
+              "create_entities",
+              "create_relations",
+              "add_observations",
+              "delete_entities",
+              "delete_observations",
+              "delete_relations",
+              "read_graph",
+              "search_nodes",
+              "open_nodes"
+            ],
+            "disabled": false
+          },
+          "github.com/upstash/context7-mcp": {
+            "autoApprove": [],
+            "disabled": false
+          },
+          "github.com.pashpashpash/perplexity-mcp": {
+            "autoApprove": [
+              "search",
+              "get_documentation",
+              "find_apis",
+              "check_deprecated_code"
+            ],
+            "disabled": false
+          }
+        }
+      };
+    } else {
+      // For local development, try to find user's MCP configuration
+      // Try multiple possible paths for MCP settings
+      const possiblePaths = [
+        path.join(process.env.HOME || process.env.USERPROFILE, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json'),
+        path.join(process.env.HOME || process.env.USERPROFILE, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'rooveterinaryinc.roo-cline', 'settings', 'mcp_settings.json')
+      ];
 
-      // Parse the JSON
-      mcpConfig = JSON.parse(configData);
+      // Find the first path that exists
+      let userConfigPath = null;
+      for (const configPath of possiblePaths) {
+        if (fs.existsSync(configPath)) {
+          userConfigPath = configPath;
+          console.log(`Found MCP settings at: ${userConfigPath}`);
+          break;
+        }
+      }
+
+      // If no path exists, use the last one as default
+      if (!userConfigPath) {
+        userConfigPath = possiblePaths[possiblePaths.length - 1];
+        console.log(`No MCP settings found, using default path: ${userConfigPath}`);
+      }
+
+      // Check if the file exists
+      if (fs.existsSync(userConfigPath)) {
+        // Read the file
+        const configData = fs.readFileSync(userConfigPath, 'utf8');
+
+        // Parse the JSON
+        mcpConfig = JSON.parse(configData);
+      }
     }
 
     // Check if the server is configured

@@ -1,0 +1,302 @@
+#!/bin/bash
+# Codes - Command Line Interface
+# This script provides a simple CLI for the Codes tool
+
+set -e  # Exit immediately if a command exits with a non-zero status
+
+# Colors for better readability
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Print banner
+print_banner() {
+    echo -e "${BLUE}======================================================${NC}"
+    echo -e "${BLUE}                      CODES CLI                       ${NC}"
+    echo -e "${BLUE}======================================================${NC}"
+}
+
+# Print help
+print_help() {
+    echo -e "${GREEN}Usage:${NC}"
+    echo -e "  codes [command]"
+    echo ""
+    echo -e "${GREEN}Commands:${NC}"
+    echo -e "  setup       Setup a new project environment"
+    echo -e "  info        Display information about the current project"
+    echo -e "  lint        Run linting tools for the current project"
+    echo -e "  test        Run tests for the current project"
+    echo -e "  docker      Setup Docker configuration for the current project"
+    echo -e "  help        Display this help message"
+    echo ""
+    echo -e "${GREEN}Examples:${NC}"
+    echo -e "  codes setup     # Setup a new project environment"
+    echo -e "  codes test      # Run tests for the current project"
+}
+
+# Setup command
+cmd_setup() {
+    echo -e "${GREEN}Setting up project environment...${NC}"
+    bash "$SCRIPT_DIR/codes-startup.sh"
+}
+
+# Info command
+cmd_info() {
+    echo -e "${GREEN}Project Information:${NC}"
+    
+    # Check if .codes directory exists
+    if [ -d ".codes" ] && [ -f ".codes/config.json" ]; then
+        echo -e "${BLUE}Project configured with Codes${NC}"
+        echo -e "${YELLOW}Configuration:${NC}"
+        cat .codes/config.json
+    else
+        echo -e "${RED}No Codes configuration found.${NC}"
+        echo -e "${YELLOW}Run 'codes setup' to configure your project.${NC}"
+    fi
+    
+    # Detect project type
+    if [ -f "Cargo.toml" ]; then
+        echo -e "${BLUE}Project Type:${NC} Rust"
+        echo -e "${YELLOW}Cargo.toml:${NC}"
+        grep -E "name|version|edition" Cargo.toml | head -3
+    elif [ -f "package.json" ]; then
+        echo -e "${BLUE}Project Type:${NC} Node.js"
+        echo -e "${YELLOW}package.json:${NC}"
+        grep -E "\"name\"|\"version\"|\"description\"" package.json | head -3
+    elif [ -f "requirements.txt" ]; then
+        echo -e "${BLUE}Project Type:${NC} Python"
+        echo -e "${YELLOW}requirements.txt:${NC}"
+        cat requirements.txt | head -3
+    else
+        echo -e "${BLUE}Project Type:${NC} Unknown"
+    fi
+}
+
+# Lint command
+cmd_lint() {
+    echo -e "${GREEN}Running linting tools...${NC}"
+    
+    # Detect project type and run appropriate linting tools
+    if [ -f "Cargo.toml" ]; then
+        echo -e "${BLUE}Running Rust linting tools...${NC}"
+        if command -v cargo >/dev/null 2>&1; then
+            cargo clippy
+        else
+            echo -e "${RED}Cargo not found. Cannot run linting tools.${NC}"
+        fi
+    elif [ -f "package.json" ]; then
+        echo -e "${BLUE}Running Node.js linting tools...${NC}"
+        if [ -f "node_modules/.bin/eslint" ]; then
+            ./node_modules/.bin/eslint .
+        elif command -v eslint >/dev/null 2>&1; then
+            eslint .
+        else
+            echo -e "${RED}ESLint not found. Cannot run linting tools.${NC}"
+        fi
+    elif [ -f "requirements.txt" ]; then
+        echo -e "${BLUE}Running Python linting tools...${NC}"
+        if command -v flake8 >/dev/null 2>&1; then
+            flake8 .
+        else
+            echo -e "${RED}Flake8 not found. Cannot run linting tools.${NC}"
+        fi
+    else
+        echo -e "${RED}Unknown project type. Cannot run linting tools.${NC}"
+    fi
+}
+
+# Test command
+cmd_test() {
+    echo -e "${GREEN}Running tests...${NC}"
+    
+    # Detect project type and run appropriate tests
+    if [ -f "Cargo.toml" ]; then
+        echo -e "${BLUE}Running Rust tests...${NC}"
+        if command -v cargo >/dev/null 2>&1; then
+            cargo test
+        else
+            echo -e "${RED}Cargo not found. Cannot run tests.${NC}"
+        fi
+    elif [ -f "package.json" ]; then
+        echo -e "${BLUE}Running Node.js tests...${NC}"
+        if [ -f "package.json" ] && grep -q "\"test\"" package.json; then
+            npm test
+        else
+            echo -e "${RED}No test script found in package.json.${NC}"
+        fi
+    elif [ -f "requirements.txt" ]; then
+        echo -e "${BLUE}Running Python tests...${NC}"
+        if command -v pytest >/dev/null 2>&1; then
+            pytest
+        else
+            echo -e "${RED}Pytest not found. Cannot run tests.${NC}"
+        fi
+    else
+        echo -e "${RED}Unknown project type. Cannot run tests.${NC}"
+    fi
+}
+
+# Docker command
+cmd_docker() {
+    echo -e "${GREEN}Setting up Docker configuration...${NC}"
+    
+    # Check if Docker is installed
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${RED}Docker not found. Cannot setup Docker configuration.${NC}"
+        return 1
+    fi
+    
+    # Detect project type and create appropriate Docker configuration
+    if [ -f "Cargo.toml" ]; then
+        echo -e "${BLUE}Creating Docker configuration for Rust project...${NC}"
+        
+        # Create Dockerfile if it doesn't exist
+        if [ ! -f "Dockerfile" ]; then
+            cat > Dockerfile << EOF
+FROM rust:1.70 as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bullseye-slim
+COPY --from=builder /app/target/release/codes_project /usr/local/bin/
+CMD ["codes_project"]
+EOF
+            echo -e "${GREEN}Created Dockerfile${NC}"
+        else
+            echo -e "${YELLOW}Dockerfile already exists. Skipping.${NC}"
+        fi
+        
+        # Create docker-compose.yml if it doesn't exist
+        if [ ! -f "docker-compose.yml" ]; then
+            cat > docker-compose.yml << EOF
+version: '3.8'
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+    command: codes_project
+EOF
+            echo -e "${GREEN}Created docker-compose.yml${NC}"
+        else
+            echo -e "${YELLOW}docker-compose.yml already exists. Skipping.${NC}"
+        fi
+    elif [ -f "package.json" ]; then
+        echo -e "${BLUE}Creating Docker configuration for Node.js project...${NC}"
+        
+        # Create Dockerfile if it doesn't exist
+        if [ ! -f "Dockerfile" ]; then
+            cat > Dockerfile << EOF
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+CMD ["npm", "start"]
+EOF
+            echo -e "${GREEN}Created Dockerfile${NC}"
+        else
+            echo -e "${YELLOW}Dockerfile already exists. Skipping.${NC}"
+        fi
+        
+        # Create docker-compose.yml if it doesn't exist
+        if [ ! -f "docker-compose.yml" ]; then
+            cat > docker-compose.yml << EOF
+version: '3.8'
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    command: npm start
+EOF
+            echo -e "${GREEN}Created docker-compose.yml${NC}"
+        else
+            echo -e "${YELLOW}docker-compose.yml already exists. Skipping.${NC}"
+        fi
+    elif [ -f "requirements.txt" ]; then
+        echo -e "${BLUE}Creating Docker configuration for Python project...${NC}"
+        
+        # Create Dockerfile if it doesn't exist
+        if [ ! -f "Dockerfile" ]; then
+            cat > Dockerfile << EOF
+FROM python:3.10-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]
+EOF
+            echo -e "${GREEN}Created Dockerfile${NC}"
+        else
+            echo -e "${YELLOW}Dockerfile already exists. Skipping.${NC}"
+        fi
+        
+        # Create docker-compose.yml if it doesn't exist
+        if [ ! -f "docker-compose.yml" ]; then
+            cat > docker-compose.yml << EOF
+version: '3.8'
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+    command: python main.py
+EOF
+            echo -e "${GREEN}Created docker-compose.yml${NC}"
+        else
+            echo -e "${YELLOW}docker-compose.yml already exists. Skipping.${NC}"
+        fi
+    else
+        echo -e "${RED}Unknown project type. Cannot create Docker configuration.${NC}"
+        return 1
+    fi
+    
+    echo -e "${GREEN}Docker configuration setup complete!${NC}"
+    echo -e "${YELLOW}To build and run your Docker container:${NC}"
+    echo -e "  docker-compose build"
+    echo -e "  docker-compose up"
+}
+
+# Main function
+main() {
+    print_banner
+    
+    # Parse command
+    case "$1" in
+        setup)
+            cmd_setup
+            ;;
+        info)
+            cmd_info
+            ;;
+        lint)
+            cmd_lint
+            ;;
+        test)
+            cmd_test
+            ;;
+        docker)
+            cmd_docker
+            ;;
+        help|--help|-h)
+            print_help
+            ;;
+        *)
+            echo -e "${RED}Unknown command: $1${NC}"
+            print_help
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function with all arguments
+main "$@"

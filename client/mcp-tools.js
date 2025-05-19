@@ -33,13 +33,25 @@ const MCPTools = {
       const response = await fetch('/api/mcp/config');
 
       if (!response.ok) {
-        throw new Error(`Failed to load MCP configuration: ${response.statusText}`);
+        console.error(`Failed to load MCP configuration: ${response.statusText}`);
+        DebugManager.addLog(`Failed to load MCP configuration: ${response.statusText}. Using fallback configuration.`, 'error');
+        // Use fallback configuration if the server request fails
+        this.useFallbackConfig();
+        return;
       }
 
       const config = await response.json();
 
       // Store server configurations
       this.servers = config.mcpServers || {};
+
+      // If no servers are configured, use fallback
+      if (Object.keys(this.servers).length === 0) {
+        console.warn('No MCP servers configured, using fallback configuration');
+        DebugManager.addLog('No MCP servers configured, using fallback configuration', 'warning');
+        this.useFallbackConfig();
+        return;
+      }
 
       // Parse tools from each server
       this.tools = [];
@@ -53,6 +65,13 @@ const MCPTools = {
         // Add tools from this server
         const serverTools = await this.getServerTools(serverId, serverConfig);
         this.tools.push(...serverTools);
+      }
+
+      // If no tools were found, use fallback
+      if (this.tools.length === 0) {
+        console.warn('No MCP tools found, using fallback configuration');
+        DebugManager.addLog('No MCP tools found, using fallback configuration', 'warning');
+        this.useFallbackConfig();
       }
 
       DebugManager.addLog(`Loaded ${this.tools.length} MCP tools from ${Object.keys(this.servers).length} servers`, 'info');
