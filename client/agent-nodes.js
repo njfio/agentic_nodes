@@ -1514,6 +1514,16 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
     DebugManager.addLog('Initializing agent node editor', 'info');
 
+    // Update MCP tools list once tools finish loading
+    if (!this.mcpToolsReadyListenerAdded) {
+      document.addEventListener('mcpToolsReady', () => {
+        if (this.editingNode) {
+          this.updateMCPToolsList();
+        }
+      });
+      this.mcpToolsReadyListenerAdded = true;
+    }
+
     // Get the agent type select element
     const agentTypeSelect = document.getElementById('agentType');
     if (agentTypeSelect) {
@@ -1637,29 +1647,6 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
     }
 
 
-          // If unchecked, reset the role to 'none'
-          if (!newCanBeWorkflowNodeCheckbox.checked) {
-            const nodeRoleNone = document.getElementById('agentNodeRoleNone');
-            if (nodeRoleNone) {
-              nodeRoleNone.checked = true;
-            }
-
-            // If we have a node being edited, update its role
-            if (this.editingNode) {
-              // Use the WorkflowIO object to set the role if available
-              if (window.WorkflowIO && typeof WorkflowIO.setNodeRole === 'function') {
-                WorkflowIO.setNodeRole(this.editingNode, 'none');
-                DebugManager.addLog('Reset node role to none (can\'t be workflow node)', 'info');
-              } else {
-                // Fallback if WorkflowIO is not available
-                this.editingNode.workflowRole = 'none';
-                DebugManager.addLog('Reset node role to none (fallback method)', 'warning');
-              }
-            }
-          }
-        }
-      });
-    }
 
     // Set up cancel button handler
     const cancelButton = document.getElementById('cancelAgentNode');
@@ -2545,6 +2532,8 @@ AgentNodes.createPayloadsModal = function() {
   DebugManager.addLog(`Viewing API payloads for agent node ${this.editingNode.id}`, 'info');
 };
 
+AgentNodes.updatePayloadsDisplay = function() {
+
   const responsePayloadContent = document.getElementById('responsePayloadContent');
   const apiLogCounter = document.getElementById('apiLogCounter');
   const prevApiLogBtn = document.getElementById('prevApiLog');
@@ -2849,7 +2838,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const isAgentButton = e.target &&
             (e.target.id === 'viewAgentLogs' ||
              e.target.id === 'viewApiPayloads' ||
-               e.target.parentElement.id === 'cancelAgentNode')));
+             (e.target.parentElement && e.target.parentElement.id === 'cancelAgentNode'));
 
           // If it's one of our buttons, handle it directly
           if (isAgentButton) {

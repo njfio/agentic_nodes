@@ -20,6 +20,9 @@ const MCPTools = {
       this.registerWithAgentTools();
 
       DebugManager.addLog(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`, 'success');
+
+      // Notify listeners that MCP tools are ready
+      document.dispatchEvent(new Event('mcpToolsReady'));
     } catch (error) {
       DebugManager.addLog(`Error initializing MCP tools: ${error.message}`, 'error');
       console.error('Error initializing MCP tools:', error);
