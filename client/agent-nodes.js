@@ -777,7 +777,9 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       };
 
       // Check if the model supports function calling
-      const supportsFunctionCalling = ['gpt-4o', 'gpt-4.1', 'o4-mini-high'].includes(config.model || 'gpt-4o');
+      // Most GPT models (3.5 and up) provide this capability. Use a regex
+      // match instead of a fixed list so new models are handled automatically.
+      const supportsFunctionCalling = /gpt-(3\.5|4)/.test(config.model || 'gpt-4o');
 
       if (supportsFunctionCalling) {
         AgentLogger.addLog(node, 'Model supports function calling, using direct function calling approach', 'info');
