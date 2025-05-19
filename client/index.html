@@ -26,20 +26,19 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
 <body>
-  <div id="toolbar">
-    <button id="addNodeBtn" type="button">Add Node</button>
-    <button id="addChatNodeBtn" type="button">Add Chat Node</button>
-    <button id="workflowInterfaceBtn" type="button">Workflow Interface</button>
-    <button id="testWorkflowBtn" type="button">Test Workflow</button>
-    <button id="configBtn" type="button">OpenAI Config</button>
-    <button id="mobileMenuBtn" type="button"><i class="fas fa-bars"></i> Menu</button>
-    <div id="mobileMenuDropdown" class="mobile-menu-dropdown" style="display: none;"></div>
+  <nav id="toolbar" class="top-nav">
+    <div class="toolbar-left">
+      <button id="addNodeBtn" class="toolbar-btn" type="button">Add Node</button>
+      <button id="addChatNodeBtn" class="toolbar-btn" type="button">Add Chat Node</button>
+      <button id="workflowInterfaceBtn" class="toolbar-btn" type="button">Workflow Interface</button>
+      <button id="testWorkflowBtn" class="toolbar-btn" type="button">Test Workflow</button>
+      <button id="configBtn" class="toolbar-btn" type="button">OpenAI Config</button>
 
-    <div class="toolbar-dropdown">
-      <button id="workflowsBtn" type="button">Workflows ▾</button>
-      <div id="workflowsDropdown" class="dropdown-content">
-        <div class="dropdown-header">
-          <input type="text" id="workflowSearch" placeholder="Search workflows...">
+      <div class="toolbar-dropdown">
+        <button id="workflowsBtn" type="button">Workflows ▾</button>
+        <div id="workflowsDropdown" class="dropdown-content">
+          <div class="dropdown-header">
+            <input type="text" id="workflowSearch" placeholder="Search workflows...">
         </div>
         <div id="workflowsList" class="dropdown-list">
           <!-- Workflows will be loaded here -->
@@ -49,16 +48,20 @@
           <button id="newWorkflowBtn" class="dropdown-btn" type="button">New Workflow</button>
         </div>
       </div>
+      </div>
     </div>
-
-    <button id="saveWorkflowBtn" type="button">Save Workflow</button>
-    <button id="saveBtn" type="button">Save Canvas</button>
-    <button id="loadBtn" type="button">Load Canvas</button>
-    <button id="exportBtn" type="button">Export</button>
-    <button id="importBtn" type="button">Import</button>
-    <button id="templateGeneratorBtn" type="button" title="Generate Template">Template Generator</button>
-    <button id="helpBtn" type="button" title="Show Help">?</button>
-  </div>
+    <div class="toolbar-right">
+      <button id="saveWorkflowBtn" class="toolbar-btn" type="button">Save Workflow</button>
+      <button id="saveBtn" class="toolbar-btn" type="button">Save Canvas</button>
+      <button id="loadBtn" class="toolbar-btn" type="button">Load Canvas</button>
+      <button id="exportBtn" class="toolbar-btn" type="button">Export</button>
+      <button id="importBtn" class="toolbar-btn" type="button">Import</button>
+      <button id="templateGeneratorBtn" class="toolbar-btn" type="button" title="Generate Template">Template Generator</button>
+      <button id="helpBtn" class="toolbar-btn" type="button" title="Show Help">?</button>
+      <button id="mobileMenuBtn" class="toolbar-btn" type="button"><i class="fas fa-bars"></i> Menu</button>
+      <div id="mobileMenuDropdown" class="mobile-menu-dropdown" style="display: none;"></div>
+    </div>
+  </nav>
 
   <!-- Node Editor Modal -->
   <div id="nodeEditor" class="modal">
