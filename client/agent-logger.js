@@ -41,11 +41,12 @@ const AgentLogger = {
     // Add the log entry to the node's logs
     node.logs.push(logEntry);
 
-    // Also add to the debug manager
+    // Always output to the browser console for easier debugging
+    console.log(`[Agent ${node.id}] [${level.toUpperCase()}] ${message}`);
+
+    // Also add to the debug manager if available
     if (window.DebugManager && typeof DebugManager.addLog === 'function') {
       DebugManager.addLog(`[Agent ${node.id}] ${message}`, level);
-    } else {
-      console.log(`[Agent ${node.id}] [${level.toUpperCase()}] ${message}`);
     }
 
     return logEntry;
@@ -70,12 +71,18 @@ const AgentLogger = {
     // Add the API log entry to the node's API logs
     node.apiLogs.push(apiLogEntry);
 
-    // Also add to the debug manager
+    // Output the API log entry to the console as well
+    const consoleMsg = error ?
+      `[Agent ${node.id}] API call failed: ${error.message || String(error)}` :
+      `[Agent ${node.id}] API call successful`;
+    console.log(consoleMsg);
+
+    // Also add to the debug manager if available
     if (window.DebugManager && typeof DebugManager.addLog === 'function') {
       if (error) {
-        DebugManager.addLog(`[Agent ${node.id}] API call failed: ${error.message || String(error)}`, 'error');
+        DebugManager.addLog(consoleMsg, 'error');
       } else {
-        DebugManager.addLog(`[Agent ${node.id}] API call successful`, 'success');
+        DebugManager.addLog(consoleMsg, 'success');
       }
     }
 
