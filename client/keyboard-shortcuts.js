@@ -1,38 +1,154 @@
 /**
  * Keyboard Shortcuts functionality
  * Provides keyboard shortcuts for common operations
+ * Enhanced with customizable shortcuts
  */
 
 const KeyboardShortcuts = {
   // Properties
-  shortcuts: [
-    { key: 'n', description: 'Add new node', action: () => App.addNode() },
-    { key: 'q', description: 'Add chat node', action: () => App.addChatNode() },
-    { key: 'Delete', description: 'Delete selected node', action: () => App.deleteSelectedNode() },
-    { key: 'Escape', description: 'Cancel connection/Close modal', action: () => App.cancelConnection() },
-    { key: 'g', description: 'Create group', action: () => NodeGroups.startCreatingGroup() },
-    { key: 'e', description: 'Edit selected node', action: () => App.editSelectedNode() },
-    { key: 't', description: 'Test workflow', action: () => WorkflowTest.startSelectingStartNode() },
-    { key: 'x', description: 'Copy selected node', action: () => App.copySelectedNode() },
-    { key: 'v', description: 'Paste node', action: () => App.pasteNode() },
-    { key: 'z', ctrlKey: true, description: 'Undo', action: () => App.undo() },
-    { key: 'y', ctrlKey: true, description: 'Redo', action: () => App.redo() },
-    { key: 's', ctrlKey: true, description: 'Save canvas', action: () => App.handleSave() },
-    { key: 'o', ctrlKey: true, description: 'Load canvas', action: () => App.handleLoad() },
-    { key: 'h', description: 'Show/hide help', action: () => ModalManager.toggleModal('helpModal') },
-    { key: '+', description: 'Zoom in', action: () => App.zoomIn() },
-    { key: '-', description: 'Zoom out', action: () => App.zoomOut() },
-    { key: '0', description: 'Reset zoom', action: () => App.resetZoom() },
-    { key: 'ArrowUp', description: 'Move selected node up', action: () => App.moveSelectedNode(0, -10) },
-    { key: 'ArrowDown', description: 'Move selected node down', action: () => App.moveSelectedNode(0, 10) },
-    { key: 'ArrowLeft', description: 'Move selected node left', action: () => App.moveSelectedNode(-10, 0) },
-    { key: 'ArrowRight', description: 'Move selected node right', action: () => App.moveSelectedNode(10, 0) },
+  actionMap: {
+    addNode: () => App.addNode(),
+    addChatNode: () => App.addChatNode(),
+    deleteNode: () => App.deleteSelectedNode(),
+    cancelConnection: () => App.cancelConnection(),
+    createGroup: () => NodeGroups.startCreatingGroup(),
+    editNode: () => App.editSelectedNode(),
+    testWorkflow: () => WorkflowTest.startSelectingStartNode(),
+    copyNode: () => App.copySelectedNode(),
+    pasteNode: () => App.pasteNode(),
+    undo: () => App.undo(),
+    redo: () => App.redo(),
+    saveCanvas: () => App.handleSave(),
+    loadCanvas: () => App.handleLoad(),
+    showHelp: () => ModalManager.toggleModal('helpModal'),
+    zoomIn: () => App.zoomIn(),
+    zoomOut: () => App.zoomOut(),
+    resetZoom: () => App.resetZoom(),
+    moveNodeUp: () => App.moveSelectedNode(0, -10),
+    moveNodeDown: () => App.moveSelectedNode(0, 10),
+    moveNodeLeft: () => App.moveSelectedNode(-10, 0),
+    moveNodeRight: () => App.moveSelectedNode(10, 0),
+    selectAll: () => App.selectAllNodes(),
+    groupNodes: () => App.groupSelectedNodes(),
+    ungroupNodes: () => App.ungroupSelectedNodes(),
+    togglePanel: () => App.toggleWorkflowPanel(),
+    runWorkflow: () => App.runWorkflow(),
+    saveWorkflow: () => App.saveWorkflow(),
+    newWorkflow: () => App.newWorkflow(),
+    toggleFullscreen: () => App.toggleFullscreen()
+  },
+
+  // Default shortcuts (used if no custom shortcuts are defined)
+  defaultShortcuts: [
+    { action: 'addNode', key: 'n', description: 'Add new node' },
+    { action: 'addChatNode', key: 'c', description: 'Add chat node' },
+    { action: 'deleteNode', key: 'Delete', description: 'Delete selected node' },
+    { action: 'cancelConnection', key: 'Escape', description: 'Cancel connection/Close modal' },
+    { action: 'createGroup', key: 'g', description: 'Create group' },
+    { action: 'editNode', key: 'e', description: 'Edit selected node' },
+    { action: 'testWorkflow', key: 't', description: 'Test workflow' },
+    { action: 'copyNode', key: 'x', description: 'Copy selected node' },
+    { action: 'pasteNode', key: 'v', description: 'Paste node' },
+    { action: 'undo', key: 'ctrl+z', description: 'Undo' },
+    { action: 'redo', key: 'ctrl+y', description: 'Redo' },
+    { action: 'saveCanvas', key: 'ctrl+s', description: 'Save canvas' },
+    { action: 'loadCanvas', key: 'ctrl+o', description: 'Load canvas' },
+    { action: 'showHelp', key: 'h', description: 'Show/hide help' },
+    { action: 'zoomIn', key: '+', description: 'Zoom in' },
+    { action: 'zoomOut', key: '-', description: 'Zoom out' },
+    { action: 'resetZoom', key: '0', description: 'Reset zoom' },
+    { action: 'moveNodeUp', key: 'ArrowUp', description: 'Move selected node up' },
+    { action: 'moveNodeDown', key: 'ArrowDown', description: 'Move selected node down' },
+    { action: 'moveNodeLeft', key: 'ArrowLeft', description: 'Move selected node left' },
+    { action: 'moveNodeRight', key: 'ArrowRight', description: 'Move selected node right' },
+    { action: 'selectAll', key: 'ctrl+a', description: 'Select all nodes' },
+    { action: 'groupNodes', key: 'ctrl+g', description: 'Group selected nodes' },
+    { action: 'ungroupNodes', key: 'ctrl+u', description: 'Ungroup selected nodes' },
+    { action: 'togglePanel', key: 'p', description: 'Toggle workflow panel' },
+    { action: 'runWorkflow', key: 'ctrl+r', description: 'Run workflow' },
+    { action: 'saveWorkflow', key: 'ctrl+shift+s', description: 'Save workflow' },
+    { action: 'newWorkflow', key: 'ctrl+n', description: 'New workflow' },
+    { action: 'toggleFullscreen', key: 'f', description: 'Toggle fullscreen' }
   ],
+
+  // Active shortcuts (will be populated from custom or default shortcuts)
+  shortcuts: [],
 
   // Initialize the keyboard shortcuts
   init() {
+    // Load custom shortcuts if available
+    this.loadShortcuts();
+
     // Set up event listeners
     this.setupEventListeners();
+
+    // Listen for shortcut updates
+    window.addEventListener('shortcutsUpdated', (e) => {
+      this.loadShortcuts();
+    });
+  },
+
+  // Load shortcuts from localStorage or use defaults
+  loadShortcuts() {
+    // Clear existing shortcuts
+    this.shortcuts = [];
+
+    // Check if we have a KeyboardConfig instance
+    if (window.keyboardConfig) {
+      // Convert the keyboard config format to our format
+      for (const [action, shortcutData] of Object.entries(window.keyboardConfig.shortcuts)) {
+        if (this.actionMap[action] && shortcutData.key) {
+          // Parse the key string into our format
+          const shortcut = {
+            action: action,
+            description: shortcutData.description
+          };
+
+          // Parse key combinations
+          if (shortcutData.key.includes('ctrl+')) {
+            shortcut.ctrlKey = true;
+            shortcutData.key = shortcutData.key.replace('ctrl+', '');
+          }
+
+          if (shortcutData.key.includes('shift+')) {
+            shortcut.shiftKey = true;
+            shortcutData.key = shortcutData.key.replace('shift+', '');
+          }
+
+          if (shortcutData.key.includes('alt+')) {
+            shortcut.altKey = true;
+            shortcutData.key = shortcutData.key.replace('alt+', '');
+          }
+
+          shortcut.key = shortcutData.key;
+
+          this.shortcuts.push(shortcut);
+        }
+      }
+    } else {
+      // Use default shortcuts
+      this.defaultShortcuts.forEach(defaultShortcut => {
+        const shortcut = { ...defaultShortcut };
+
+        // Parse key combinations for default shortcuts
+        if (shortcut.key.includes('ctrl+')) {
+          shortcut.ctrlKey = true;
+          shortcut.key = shortcut.key.replace('ctrl+', '');
+        }
+
+        if (shortcut.key.includes('shift+')) {
+          shortcut.shiftKey = true;
+          shortcut.key = shortcut.key.replace('shift+', '');
+        }
+
+        if (shortcut.key.includes('alt+')) {
+          shortcut.altKey = true;
+          shortcut.key = shortcut.key.replace('alt+', '');
+        }
+
+        this.shortcuts.push(shortcut);
+      });
+    }
 
     // Update the help modal with the shortcuts
     this.updateHelpModal();
@@ -62,8 +178,15 @@ const KeyboardShortcuts = {
           // Prevent default browser behavior
           e.preventDefault();
 
-          // Execute the action
-          shortcut.action();
+          // Get the action function
+          const actionFn = this.actionMap[shortcut.action];
+
+          // Execute the action if it exists
+          if (actionFn) {
+            actionFn();
+          } else {
+            console.warn(`Action ${shortcut.action} not found`);
+          }
 
           // Break the loop
           break;
