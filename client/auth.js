@@ -55,24 +55,8 @@ const Auth = {
         return false;
       }
 
-      // If we've already tried auto-login but still don't have credentials,
-      // create mock credentials as a fallback
-      const mockUserProfile = {
-        username: 'testuser',
-        email: 'test@example.com',
-        role: 'user'
-      };
 
-      // Store the mock user profile
-      localStorage.setItem(Config.storageKeys.userProfile, JSON.stringify(mockUserProfile));
-
-      // Create a mock token
-      const mockToken = `docker-test-token-${Date.now()}`;
-      localStorage.setItem(Config.storageKeys.authToken, mockToken);
-
-      return true;
-    }
-
+      return false;
     // Return true if we have both user profile and a token
     return userProfile !== null && (localToken !== null || sessionToken !== null);
   },
