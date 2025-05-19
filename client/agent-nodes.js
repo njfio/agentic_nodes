@@ -3,19 +3,33 @@
  * Implements agentic nodes with logic loops and function calling capabilities
  */
 
+// Immediately expose AgentNodes to the global scope
 const AgentNodes = {
+  // Track initialization state
+  _initialized: false,
+
   // Initialize the Agent Nodes
   init() {
     try {
+      // Prevent multiple initializations
+      if (this._initialized) {
+        console.log('AgentNodes already initialized, skipping');
+        return;
+      }
+
       console.log('AgentNodes.init called');
 
       // Check if MCP tools are available
       if (window.MCPTools) {
         console.log('MCPTools available during AgentNodes initialization');
-        DebugManager.addLog('MCPTools available during AgentNodes initialization', 'info');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('MCPTools available during AgentNodes initialization', 'info');
+        }
       } else {
         console.warn('MCPTools not available during AgentNodes initialization');
-        DebugManager.addLog('MCPTools not available during AgentNodes initialization', 'warning');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('MCPTools not available during AgentNodes initialization', 'warning');
+        }
       }
 
       // Register node types
@@ -25,7 +39,9 @@ const AgentNodes = {
       setTimeout(() => {
         this.addEventListeners();
         console.log('Agent Nodes initialized and toolbar button added');
-        DebugManager.addLog('Agent Nodes initialized successfully', 'success');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Agent Nodes initialized successfully', 'success');
+        }
       }, 100);
 
       // Initialize the agent logs modal
@@ -37,9 +53,19 @@ const AgentNodes = {
         window.AgentNodes = this;
         console.log('AgentNodes exposed to global scope with drawAgentNode method');
       }
+
+      // Mark as initialized
+      this._initialized = true;
+
+      // Notify the initialization system if available
+      if (window.AppInitSystem && AppInitSystem.markReady) {
+        AppInitSystem.markReady('agentNodes');
+      }
     } catch (error) {
       console.error('Error initializing AgentNodes:', error);
-      DebugManager.addLog(`Error initializing AgentNodes: ${error.message}`, 'error');
+      if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+        DebugManager.addLog(`Error initializing AgentNodes: ${error.message}`, 'error');
+      }
     }
   },
 
@@ -2889,19 +2915,27 @@ AgentNodes.updateToolsList = function() {
   }
 };
 
-// Make the AgentNodes object available globally
-document.addEventListener('DOMContentLoaded', function() {
+// Immediately expose AgentNodes to the global scope
+(function() {
   if (typeof window !== 'undefined') {
     window.AgentNodes = AgentNodes;
-    console.log('AgentNodes exposed to global scope');
+    console.log('AgentNodes immediately exposed to global scope');
+  }
+})();
 
-    // Listen for app initialization complete event
-    document.addEventListener('app-initialization-complete', function() {
-      console.log('App initialization complete event received by AgentNodes');
+// Set up event listeners after DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, setting up AgentNodes event listeners');
 
-      // Update the tools list
-      AgentNodes.updateToolsList();
-    });
+  // Listen for app initialization complete event
+  document.addEventListener('app-initialization-complete', function() {
+    console.log('App initialization complete event received by AgentNodes');
+
+    // Update the tools list
+    if (window.AgentNodes && typeof window.AgentNodes.updateToolsList === 'function') {
+      window.AgentNodes.updateToolsList();
+    }
+  });
 
       // Add global click handlers for the agent node buttons
       document.addEventListener('click', (e) => {

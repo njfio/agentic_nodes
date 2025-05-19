@@ -859,13 +859,18 @@
     </div>
   </div>
 
-  <!-- Agent Node System -->
+  <!-- Agent Node System - Load in specific order with proper attributes -->
+  <!-- First load the dependencies -->
   <script src="agent-memory.js"></script>
   <script src="agent-tools.js"></script>
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
-  <script src="mcp-tools.js"></script>
+
+  <!-- Then load agent-nodes.js BEFORE mcp-tools.js to ensure it's available -->
   <script src="agent-nodes.js"></script>
+
+  <!-- Finally load mcp-tools.js -->
+  <script src="mcp-tools.js"></script>
 
   <!-- Global initialization system -->
   <script>
@@ -898,6 +903,18 @@
       finalizeInitialization: function() {
         console.log('Finalizing application initialization');
 
+        // Verify that AgentNodes is available
+        if (!window.AgentNodes) {
+          console.error('AgentNodes not available during finalization');
+          // Try to recover by checking if it's defined in the global scope
+          if (typeof AgentNodes !== 'undefined') {
+            window.AgentNodes = AgentNodes;
+            console.log('Recovered AgentNodes from global scope');
+          }
+        } else {
+          console.log('AgentNodes is available during finalization');
+        }
+
         // Ensure AgentNodes has all the tools from MCPTools
         if (window.AgentNodes && window.MCPTools) {
           console.log('Connecting MCPTools to AgentNodes');
@@ -927,29 +944,19 @@
       init: function() {
         console.log('Initializing application components');
 
-        // Initialize MCP tools
-        if (window.MCPTools && typeof MCPTools.init === 'function') {
-          console.log('Initializing MCPTools');
-          try {
-            MCPTools.init().then(() => {
-              this.markReady('mcpTools');
-            }).catch(error => {
-              console.error('Error initializing MCPTools:', error);
-              // Mark as ready anyway to continue initialization
-              this.markReady('mcpTools');
-            });
-          } catch (error) {
-            console.error('Error calling MCPTools.init():', error);
-            // Mark as ready anyway to continue initialization
-            this.markReady('mcpTools');
+        // Verify that AgentNodes is available
+        if (!window.AgentNodes) {
+          console.error('AgentNodes not available during initialization');
+          // Try to recover by checking if it's defined in the global scope
+          if (typeof AgentNodes !== 'undefined') {
+            window.AgentNodes = AgentNodes;
+            console.log('Recovered AgentNodes from global scope');
           }
         } else {
-          console.warn('MCPTools not available or init method missing');
-          // Mark as ready anyway to continue initialization
-          this.markReady('mcpTools');
+          console.log('AgentNodes is available during initialization');
         }
 
-        // Initialize AgentNodes
+        // Initialize AgentNodes first
         if (window.AgentNodes && typeof AgentNodes.init === 'function') {
           console.log('Initializing AgentNodes');
           try {
@@ -992,11 +999,45 @@
           // Start the retry process
           setTimeout(checkAgentNodes, retryInterval);
         }
+
+        // Initialize MCP tools after AgentNodes
+        if (window.MCPTools && typeof MCPTools.init === 'function') {
+          console.log('Initializing MCPTools');
+          try {
+            MCPTools.init().then(() => {
+              this.markReady('mcpTools');
+            }).catch(error => {
+              console.error('Error initializing MCPTools:', error);
+              // Mark as ready anyway to continue initialization
+              this.markReady('mcpTools');
+            });
+          } catch (error) {
+            console.error('Error calling MCPTools.init():', error);
+            // Mark as ready anyway to continue initialization
+            this.markReady('mcpTools');
+          }
+        } else {
+          console.warn('MCPTools not available or init method missing');
+          // Mark as ready anyway to continue initialization
+          this.markReady('mcpTools');
+        }
       }
     };
 
     // Initialize the system when the DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
+      // Verify that AgentNodes is available
+      if (!window.AgentNodes) {
+        console.error('AgentNodes not available during DOMContentLoaded');
+        // Try to recover by checking if it's defined in the global scope
+        if (typeof AgentNodes !== 'undefined') {
+          window.AgentNodes = AgentNodes;
+          console.log('Recovered AgentNodes from global scope');
+        }
+      } else {
+        console.log('AgentNodes is available during DOMContentLoaded');
+      }
+
       // Wait a short time to ensure all scripts are loaded
       setTimeout(() => {
         window.AppInitSystem.init();
@@ -1007,7 +1048,9 @@
     window.addEventListener('error', function(event) {
       if (event.target && event.target.tagName === 'SCRIPT') {
         console.error('Error loading script:', event.target.src);
-        DebugManager.addLog(`Error loading script: ${event.target.src}`, 'error');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog(`Error loading script: ${event.target.src}`, 'error');
+        }
       }
     }, true);
   </script>
