@@ -1,0 +1,161 @@
+/* Dark Theme CSS */
+:root.dark-theme {
+  --bg-color: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #2d2d2d;
+  --text-color: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --border-color: #444;
+  --accent-color: #7289da;
+  --accent-hover: #5f73bc;
+  --error-color: #f44336;
+  --success-color: #4caf50;
+  --warning-color: #ff9800;
+  --info-color: #2196f3;
+  --node-bg: #2d2d2d;
+  --node-header: #3d3d3d;
+  --node-selected: rgba(114, 137, 218, 0.5);
+  --connection-color: #7289da;
+  --canvas-bg: #1a1a1a;
+  --modal-bg: #2d2d2d;
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --input-bg: #3d3d3d;
+  --input-border: #555;
+  --button-bg: #3d3d3d;
+  --button-hover: #4d4d4d;
+  --scrollbar-track: #2d2d2d;
+  --scrollbar-thumb: #555;
+  --tooltip-bg: #3d3d3d;
+  --tooltip-color: #e0e0e0;
+  --dropdown-bg: #2d2d2d;
+  --dropdown-hover: #3d3d3d;
+  --card-bg: #2d2d2d;
+  --card-border: #444;
+  --sidebar-bg: #1e1e1e;
+  --sidebar-item-hover: #2d2d2d;
+  --code-bg: #2d2d2d;
+  --code-color: #e0e0e0;
+  --shadow-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Dark theme specific overrides */
+:root.dark-theme body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+:root.dark-theme .node {
+  background-color: var(--node-bg);
+  border-color: var(--border-color);
+  box-shadow: 0 2px 8px var(--shadow-color);
+}
+
+:root.dark-theme .node-header {
+  background-color: var(--node-header);
+}
+
+:root.dark-theme .node.selected {
+  box-shadow: 0 0 0 2px var(--node-selected);
+}
+
+:root.dark-theme .connection {
+  stroke: var(--connection-color);
+}
+
+:root.dark-theme .canvas {
+  background-color: var(--canvas-bg);
+}
+
+:root.dark-theme .modal {
+  background-color: var(--modal-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+:root.dark-theme .modal-overlay {
+  background-color: var(--modal-overlay);
+}
+
+:root.dark-theme input, 
+:root.dark-theme textarea, 
+:root.dark-theme select {
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border-color: var(--input-border);
+}
+
+:root.dark-theme button {
+  background-color: var(--button-bg);
+  color: var(--text-color);
+  border-color: var(--border-color);
+}
+
+:root.dark-theme button:hover {
+  background-color: var(--button-hover);
+}
+
+:root.dark-theme ::-webkit-scrollbar-track {
+  background-color: var(--scrollbar-track);
+}
+
+:root.dark-theme ::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+}
+
+:root.dark-theme .tooltip {
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-color);
+}
+
+:root.dark-theme .dropdown-menu {
+  background-color: var(--dropdown-bg);
+  border-color: var(--border-color);
+}
+
+:root.dark-theme .dropdown-item:hover {
+  background-color: var(--dropdown-hover);
+}
+
+:root.dark-theme .card {
+  background-color: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+:root.dark-theme .sidebar {
+  background-color: var(--sidebar-bg);
+}
+
+:root.dark-theme .sidebar-item:hover {
+  background-color: var(--sidebar-item-hover);
+}
+
+:root.dark-theme code, :root.dark-theme pre {
+  background-color: var(--code-bg);
+  color: var(--code-color);
+}
+
+/* Workflow panel dark theme */
+:root.dark-theme .workflow-panel {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+/* Document view dark theme */
+:root.dark-theme .document-view {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+/* Workflow list dark theme */
+:root.dark-theme .workflow-list {
+  background-color: var(--bg-secondary);
+}
+
+:root.dark-theme .workflow-item {
+  background-color: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+:root.dark-theme .workflow-item:hover {
+  background-color: var(--dropdown-hover);
+}

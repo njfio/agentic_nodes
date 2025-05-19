@@ -20,6 +20,8 @@
   <link rel="stylesheet" href="logic-nodes.css" />
   <link rel="stylesheet" href="agent-nodes.css" />
   <link rel="stylesheet" href="auth.css" />
+  <link rel="stylesheet" href="dark-theme.css" />
+  <link rel="stylesheet" href="responsive.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
 <body>
@@ -29,6 +31,8 @@
     <button id="workflowInterfaceBtn" type="button">Workflow Interface</button>
     <button id="testWorkflowBtn" type="button">Test Workflow</button>
     <button id="configBtn" type="button">OpenAI Config</button>
+    <button id="mobileMenuBtn" type="button"><i class="fas fa-bars"></i> Menu</button>
+    <div id="mobileMenuDropdown" class="mobile-menu-dropdown" style="display: none;"></div>
 
     <div class="toolbar-dropdown">
       <button id="workflowsBtn" type="button">Workflows ▾</button>
@@ -860,5 +864,9 @@
   <script src="agent-logger.js"></script>
   <script src="mcp-tools.js"></script>
   <script src="agent-nodes.js"></script>
+  <script src="keyboard-config.js" type="module"></script>
+  <script src="theme-switcher.js" type="module"></script>
+  <script src="mobile-menu.js" type="module"></script>
+  <script src="onboarding-tutorial.js" type="module"></script>
 </body>
 </html>
