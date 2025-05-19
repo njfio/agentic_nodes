@@ -1,0 +1,360 @@
+{
+  "name": "Programmatic Children's Storybook Creation Workflow",
+  "description": "Creates a complete children's storybook with programmatic parallel processing for chapters",
+  "nodes": [
+    {
+      "id": 1,
+      "title": "Story Concept",
+      "x": 100,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "Create a children's story about a friendly dragon named Sparky who learns to overcome his fear of water. The story is set in a magical forest with a large lake in the center. Sparky has bright green scales, small wings, and a friendly smile. The story should teach children about facing their fears.",
+      "inputContent": "Create a children's story about a friendly dragon named Sparky who learns to overcome his fear of water. The story is set in a magical forest with a large lake in the center. Sparky has bright green scales, small wings, and a friendly smile. The story should teach children about facing their fears.",
+      "contentType": "text",
+      "systemPrompt": "You are a children's book author. Create a story concept with a main character, setting, and moral lesson.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": true,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "input"
+    },
+    {
+      "id": 2,
+      "title": "Character Design",
+      "x": 400,
+      "y": 150,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "Create a children's story about a friendly dragon named Sparky who learns to overcome his fear of water. The story is set in a magical forest with a large lake in the center. Sparky has bright green scales, small wings, and a friendly smile. The story should teach children about facing their fears.",
+      "contentType": "text",
+      "systemPrompt": "Create a detailed description of the main character for a children's book illustrator. Include physical appearance, personality traits, and any special features.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 3,
+      "title": "Setting Design",
+      "x": 400,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "Create a children's story about a friendly dragon named Sparky who learns to overcome his fear of water. The story is set in a magical forest with a large lake in the center. Sparky has bright green scales, small wings, and a friendly smile. The story should teach children about facing their fears.",
+      "contentType": "text",
+      "systemPrompt": "Create a detailed description of the story setting for a children's book illustrator. Include key locations, atmosphere, and any special features of the environment.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 4,
+      "title": "Art Style",
+      "x": 400,
+      "y": 450,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "Create a children's story about a friendly dragon named Sparky who learns to overcome his fear of water. The story is set in a magical forest with a large lake in the center. Sparky has bright green scales, small wings, and a friendly smile. The story should teach children about facing their fears.",
+      "contentType": "text",
+      "systemPrompt": "Define an art style for a children's book. Consider color palette, level of detail, artistic influences, and overall mood that would appeal to children aged 4-8.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 5,
+      "title": "Character Image",
+      "x": 700,
+      "y": 150,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "image",
+      "systemPrompt": "Create an illustration of the main character for a children's book based on the description. The image should be colorful, friendly, and appealing to children.",
+      "aiProcessor": "text-to-image",
+      "inputType": "text",
+      "outputType": "image",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 6,
+      "title": "Setting Image",
+      "x": 700,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "image",
+      "systemPrompt": "Create an illustration of the story setting for a children's book based on the description. The image should be colorful, magical, and appealing to children.",
+      "aiProcessor": "text-to-image",
+      "inputType": "text",
+      "outputType": "image",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 7,
+      "title": "Story Outline",
+      "x": 400,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Create a 5-chapter outline for a children's story based on the concept. Each chapter should have a clear beginning, middle, and end, with a logical progression through the overall story arc. Format each chapter with 'Chapter X:' at the beginning of each chapter.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 8,
+      "title": "Visual Elements Collector",
+      "x": 1000,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine the character description, setting description, and art style into a comprehensive visual guide for the storybook. Format this as a clear reference document for illustrators.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n---\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+    {
+      "id": 9,
+      "title": "Chapter Processor",
+      "x": 700,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "This is a programmatic node that will process each chapter separately. For each chapter in the outline:\n1. Extract the chapter content\n2. Write a full chapter based on the outline\n3. Create an illustration prompt\n4. Generate an illustration\n5. Format the chapter with proper layout\n6. Return all chapters as separate items",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "programmatic",
+      "programType": "chapterProcessor",
+      "maxItems": 10,
+      "processInParallel": true,
+      "visualGuideNodeId": 8,
+      "processingSteps": [
+        "write",
+        "createIllustrationPrompt",
+        "generateIllustration",
+        "formatChapter"
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Chapter Illustrator",
+      "x": 1000,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "image",
+      "systemPrompt": "Create an illustration for this chapter of a children's book based on the provided prompt. The image should capture a key moment from the chapter, featuring the main character and setting in the defined art style. Make sure the character looks consistent with the character design.",
+      "aiProcessor": "text-to-image",
+      "inputType": "text",
+      "outputType": "image",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 11,
+      "title": "Chapter Collector",
+      "x": 1300,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine all the processed chapters into a complete book structure. Maintain the order of chapters and ensure proper formatting throughout.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n---\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+    {
+      "id": 12,
+      "title": "Book Compiler",
+      "x": 1600,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Compile all chapters, character image, and setting image into a complete children's book. Add a title page, table of contents, and any other necessary front or back matter. Ensure proper formatting and layout for a children's picture book.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n---\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+    {
+      "id": 13,
+      "title": "Final Book",
+      "x": 1900,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the final book with proper page numbers, consistent styling, and prepare it for publication or sharing.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "output"
+    }
+  ],
+  "connections": [
+    {
+      "fromNodeId": 1,
+      "toNodeId": 2
+    },
+    {
+      "fromNodeId": 1,
+      "toNodeId": 3
+    },
+    {
+      "fromNodeId": 1,
+      "toNodeId": 4
+    },
+    {
+      "fromNodeId": 1,
+      "toNodeId": 7
+    },
+
+    {
+      "fromNodeId": 2,
+      "toNodeId": 5
+    },
+    {
+      "fromNodeId": 2,
+      "toNodeId": 8
+    },
+
+    {
+      "fromNodeId": 3,
+      "toNodeId": 6
+    },
+    {
+      "fromNodeId": 3,
+      "toNodeId": 8
+    },
+
+    {
+      "fromNodeId": 4,
+      "toNodeId": 8
+    },
+
+    {
+      "fromNodeId": 5,
+      "toNodeId": 12
+    },
+    {
+      "fromNodeId": 6,
+      "toNodeId": 12
+    },
+
+    {
+      "fromNodeId": 7,
+      "toNodeId": 9
+    },
+    {
+      "fromNodeId": 8,
+      "toNodeId": 9
+    },
+
+    {
+      "fromNodeId": 9,
+      "toNodeId": 10
+    },
+    {
+      "fromNodeId": 9,
+      "toNodeId": 11
+    },
+
+    {
+      "fromNodeId": 10,
+      "toNodeId": 11
+    },
+
+    {
+      "fromNodeId": 11,
+      "toNodeId": 12
+    },
+
+    {
+      "fromNodeId": 12,
+      "toNodeId": 13
+    }
+  ]
+}

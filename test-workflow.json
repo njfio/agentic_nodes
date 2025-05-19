@@ -1,0 +1,128 @@
+{
+  "name": "Topic Splitter Workflow",
+  "description": "Splits a list of topics, generates content for each, and collects the results",
+  "nodes": [
+    {
+      "id": 1,
+      "title": "Topic Input",
+      "x": 100,
+      "y": 200,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "1. Artificial Intelligence in Healthcare\n2. Renewable Energy Solutions\n3. Space Exploration Advancements",
+      "contentType": "text",
+      "systemPrompt": "You are a topic organizer. The input contains a list of topics.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "input"
+    },
+    {
+      "id": 2,
+      "title": "Topic Splitter",
+      "x": 400,
+      "y": 200,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Split the input into separate topics. Each topic should be on a new line.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "splitter",
+      "splitDelimiter": "\\n",
+      "splitParallel": true,
+      "maxItems": 10
+    },
+    {
+      "id": 3,
+      "title": "Paragraph Generator",
+      "x": 700,
+      "y": 200,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Generate a detailed paragraph about the given topic. Be informative and engaging.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 4,
+      "title": "Content Collector",
+      "x": 1000,
+      "y": 200,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine all the paragraphs into a cohesive document with proper transitions between topics.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "summarize",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": []
+    },
+    {
+      "id": 5,
+      "title": "Final Output",
+      "x": 1300,
+      "y": 200,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the document with proper headings, introduction, and conclusion.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "output"
+    }
+  ],
+  "connections": [
+    {
+      "fromNodeId": 1,
+      "toNodeId": 2
+    },
+    {
+      "fromNodeId": 2,
+      "toNodeId": 3
+    },
+    {
+      "fromNodeId": 3,
+      "toNodeId": 4
+    },
+    {
+      "fromNodeId": 4,
+      "toNodeId": 5
+    }
+  ]
+}

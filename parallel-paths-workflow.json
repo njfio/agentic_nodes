@@ -1,0 +1,347 @@
+{
+  "name": "Parallel Processing Paths Workflow",
+  "description": "Demonstrates true parallel processing paths for split items with cloned nodes",
+  "nodes": [
+    {
+      "id": 1,
+      "title": "Topic Input",
+      "x": 100,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "1. Artificial Intelligence\n2. Renewable Energy\n3. Space Exploration",
+      "inputContent": "1. Artificial Intelligence\n2. Renewable Energy\n3. Space Exploration",
+      "contentType": "text",
+      "systemPrompt": "You are a topic organizer. The input contains a list of topics.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": true,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "input"
+    },
+    {
+      "id": 2,
+      "title": "Topic Splitter",
+      "x": 400,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "Split input into 3 items:\n\n1. 1. Artificial Intelligence\n2. 2. Renewable Energy\n3. 3. Space Exploration",
+      "inputContent": "1. Artificial Intelligence\n2. Renewable Energy\n3. Space Exploration",
+      "contentType": "text",
+      "systemPrompt": "Split the input into separate topics. Each topic should be on a new line.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": true,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "splitter",
+      "splitDelimiter": "\\n",
+      "splitParallel": true,
+      "maxItems": 10,
+      "splitItems": [
+        "1. Artificial Intelligence",
+        "2. Renewable Energy",
+        "3. Space Exploration"
+      ]
+    },
+
+    {
+      "id": 3,
+      "title": "Definition Path",
+      "x": 700,
+      "y": 100,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Define the topic and explain its basic concepts.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 4,
+      "title": "Applications Path",
+      "x": 700,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Describe practical applications of this technology.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 5,
+      "title": "Future Trends Path",
+      "x": 700,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Predict future trends related to this topic in the next 5-10 years.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+
+    {
+      "id": 6,
+      "title": "Definition Enhancer",
+      "x": 1000,
+      "y": 100,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Enhance the definition with more detailed explanations and examples.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 7,
+      "title": "Applications Enhancer",
+      "x": 1000,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Enhance the applications with more specific use cases and success stories.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+    {
+      "id": 8,
+      "title": "Future Trends Enhancer",
+      "x": 1000,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Enhance the future trends with more specific predictions and potential impacts.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default"
+    },
+
+    {
+      "id": 9,
+      "title": "Definition Collector",
+      "x": 1300,
+      "y": 100,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the definition section with proper headings and structure.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+    {
+      "id": 10,
+      "title": "Applications Collector",
+      "x": 1300,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the applications section with proper headings and structure.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+    {
+      "id": 11,
+      "title": "Future Trends Collector",
+      "x": 1300,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the future trends section with proper headings and structure.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+
+    {
+      "id": 12,
+      "title": "Final Collector",
+      "x": 1600,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine all sections into a comprehensive report with proper transitions between topics.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "summarize",
+      "separator": "\n\n---\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": {}
+    },
+
+    {
+      "id": 13,
+      "title": "Final Report",
+      "x": 1900,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the document with proper headings, introduction, and conclusion.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "output"
+    }
+  ],
+  "connections": [
+    {
+      "fromNodeId": 1,
+      "toNodeId": 2
+    },
+
+    {
+      "fromNodeId": 2,
+      "toNodeId": 3
+    },
+    {
+      "fromNodeId": 2,
+      "toNodeId": 4
+    },
+    {
+      "fromNodeId": 2,
+      "toNodeId": 5
+    },
+
+    {
+      "fromNodeId": 3,
+      "toNodeId": 6
+    },
+    {
+      "fromNodeId": 4,
+      "toNodeId": 7
+    },
+    {
+      "fromNodeId": 5,
+      "toNodeId": 8
+    },
+
+    {
+      "fromNodeId": 6,
+      "toNodeId": 9
+    },
+    {
+      "fromNodeId": 7,
+      "toNodeId": 10
+    },
+    {
+      "fromNodeId": 8,
+      "toNodeId": 11
+    },
+
+    {
+      "fromNodeId": 9,
+      "toNodeId": 12
+    },
+    {
+      "fromNodeId": 10,
+      "toNodeId": 12
+    },
+    {
+      "fromNodeId": 11,
+      "toNodeId": 12
+    },
+
+    {
+      "fromNodeId": 12,
+      "toNodeId": 13
+    }
+  ]
+}

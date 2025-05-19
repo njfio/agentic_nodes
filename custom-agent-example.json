@@ -1,0 +1,105 @@
+{
+  "name": "Custom Agent Example",
+  "description": "Demonstrates a custom agent with JavaScript code",
+  "nodes": [
+    {
+      "id": 1,
+      "title": "Input Text",
+      "x": 100,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "This is a sample text that contains entities like Apple Inc., Microsoft, Google, and Amazon. It was written on June 15, 2023 by John Smith who lives in New York City. The text mentions a meeting in San Francisco on July 10, 2023 with the CEO of Tesla.",
+      "inputContent": "This is a sample text that contains entities like Apple Inc., Microsoft, Google, and Amazon. It was written on June 15, 2023 by John Smith who lives in New York City. The text mentions a meeting in San Francisco on July 10, 2023 with the CEO of Tesla.",
+      "contentType": "text",
+      "systemPrompt": "Provide a sample text with various named entities.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": true,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "input"
+    },
+    {
+      "id": 2,
+      "title": "Entity Extraction Agent",
+      "x": 400,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Extract named entities from the input text and categorize them.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "agent",
+      "agentType": "default",
+      "maxIterations": 3,
+      "autoIterate": true
+    },
+    {
+      "id": 3,
+      "title": "Custom Entity Formatter",
+      "x": 700,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the extracted entities into a structured report.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "agent",
+      "agentType": "custom",
+      "maxIterations": 1,
+      "autoIterate": false,
+      "customCode": "// Custom code to format entities into a structured report\ntry {\n  // Parse the input as JSON\n  let entities;\n  try {\n    // Try to parse the input as JSON\n    entities = JSON.parse(input);\n  } catch (e) {\n    // If parsing fails, use the entity extraction tool\n    DebugManager.addLog('Input is not valid JSON, using entity extraction tool', 'info');\n    const extractResult = await AgentTools.executeTool('text-extract-entities', { text: input }, node);\n    entities = JSON.parse(extractResult);\n  }\n  \n  // Format the entities into a structured report\n  let report = '# Entity Analysis Report\\n\\n';\n  \n  // Add timestamp\n  report += `**Generated on:** ${new Date().toLocaleString()}\\n\\n`;\n  \n  // Add summary\n  const totalEntities = Object.values(entities).reduce((sum, arr) => sum + arr.length, 0);\n  report += `## Summary\\n\\n`;\n  report += `This report contains ${totalEntities} entities extracted from the input text.\\n\\n`;\n  \n  // Add sections for each entity type\n  for (const [type, entitiesList] of Object.entries(entities)) {\n    if (entitiesList.length > 0) {\n      report += `## ${type.charAt(0).toUpperCase() + type.slice(1)}\\n\\n`;\n      report += '| Entity | Mentions |\\n';\n      report += '|--------|---------|\\n';\n      \n      entitiesList.forEach(entity => {\n        const entityName = typeof entity === 'string' ? entity : entity.name || entity.value || JSON.stringify(entity);\n        const mentions = typeof entity === 'object' && entity.mentions ? entity.mentions : 1;\n        report += `| ${entityName} | ${mentions} |\\n`;\n      });\n      \n      report += '\\n';\n    }\n  }\n  \n  // Add a visualization hint\n  report += '## Visualization\\n\\n';\n  report += 'Entity distribution by type:\\n\\n';\n  \n  // Create a simple ASCII bar chart\n  const maxBarLength = 30;\n  const maxEntities = Math.max(...Object.values(entities).map(arr => arr.length));\n  \n  for (const [type, entitiesList] of Object.entries(entities)) {\n    if (entitiesList.length > 0) {\n      const barLength = Math.round((entitiesList.length / maxEntities) * maxBarLength);\n      const bar = '█'.repeat(barLength);\n      report += `${type.padEnd(15)}: ${bar} (${entitiesList.length})\\n`;\n    }\n  }\n  \n  // Store the entities in memory for future reference\n  AgentMemory.store(node, 'entities', entities, 'longTerm');\n  \n  return report;\n} catch (error) {\n  return `Error formatting entities: ${error.message}`;\n}"
+    },
+    {
+      "id": 4,
+      "title": "Formatted Report",
+      "x": 1000,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Display the formatted entity report.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "output"
+    }
+  ],
+  "connections": [
+    {
+      "fromNodeId": 1,
+      "toNodeId": 2
+    },
+    {
+      "fromNodeId": 2,
+      "toNodeId": 3
+    },
+    {
+      "fromNodeId": 3,
+      "toNodeId": 4
+    }
+  ]
+}

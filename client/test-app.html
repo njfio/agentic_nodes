@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test App.js</title>
+</head>
+<body>
+  <h1>Testing App.js</h1>
+  <div id="result"></div>
+  
+  <script>
+    // Load app.js dynamically
+    const script = document.createElement('script');
+    script.src = 'app.js?nocache=' + Date.now();
+    script.onload = function() {
+      // Check if App object exists
+      if (typeof App !== 'undefined') {
+        document.getElementById('result').innerHTML = 'App.js loaded successfully! App object exists.';
+        
+        // Check for specific features
+        let features = [];
+        
+        if (App.openPayloadViewer) {
+          features.push('API Payload Viewer');
+        }
+        
+        if (App.offsetX !== undefined && App.offsetY !== undefined && App.scale !== undefined) {
+          features.push('Canvas Panning and Zooming');
+        }
+        
+        if (features.length > 0) {
+          document.getElementById('result').innerHTML += '<br>Features found: ' + features.join(', ');
+        } else {
+          document.getElementById('result').innerHTML += '<br>No specific features found.';
+        }
+      } else {
+        document.getElementById('result').innerHTML = 'App.js loaded but App object not found!';
+      }
+    };
+    script.onerror = function() {
+      document.getElementById('result').innerHTML = 'Failed to load app.js!';
+    };
+    document.head.appendChild(script);
+  </script>
+</body>
+</html>

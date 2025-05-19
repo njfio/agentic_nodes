@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Multimodal AI Agent - Endless Canvas</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="modal-edit.css" />
+  <link rel="stylesheet" href="image-editor.css" />
+  <link rel="stylesheet" href="collaboration.css" />
+  <link rel="stylesheet" href="document-view.css" />
+  <link rel="stylesheet" href="workflow-io.css" />
+  <link rel="stylesheet" href="workflow-panel.css" />
+  <link rel="stylesheet" href="workflow-list.css" />
+  <link rel="stylesheet" href="user-profile.css" />
+  <link rel="stylesheet" href="template-generator.css" />
+  <link rel="stylesheet" href="logic-nodes.css" />
+  <link rel="stylesheet" href="agent-nodes.css" />
+  <link rel="stylesheet" href="auth.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+  <div id="toolbar">
+    <button id="addNodeBtn" type="button">Add Node</button>
+    <button id="addChatNodeBtn" type="button">Add Chat Node</button>
+    <button id="workflowInterfaceBtn" type="button">Workflow Interface</button>
+    <button id="testWorkflowBtn" type="button">Test Workflow</button>
+    <button id="configBtn" type="button">OpenAI Config</button>
+
+    <div class="toolbar-dropdown">
+      <button id="workflowsBtn" type="button">Workflows ▾</button>
+      <div id="workflowsDropdown" class="dropdown-content">
+        <div class="dropdown-header">
+          <input type="text" id="workflowSearch" placeholder="Search workflows...">
+        </div>
+        <div id="workflowsList" class="dropdown-list">
+          <!-- Workflows will be loaded here -->
+          <div class="dropdown-item loading">Loading workflows...</div>
+        </div>
+        <div class="dropdown-footer">
+          <button id="newWorkflowBtn" class="dropdown-btn" type="button">New Workflow</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="saveWorkflowBtn" type="button">Save Workflow</button>
+    <button id="saveBtn" type="button">Save Canvas</button>
+    <button id="loadBtn" type="button">Load Canvas</button>
+    <button id="exportBtn" type="button">Export</button>
+    <button id="importBtn" type="button">Import</button>
+    <button id="templateGeneratorBtn" type="button" title="Generate Template">Template Generator</button>
+    <button id="helpBtn" type="button" title="Show Help">?</button>
+  </div>
+
+  <!-- Node Editor Modal -->
+  <div id="nodeEditor" class="modal">
+    <div class="modal-content">
+      <h2>Node Editor</h2>
+      <form id="nodeEditorForm" onsubmit="event.preventDefault(); return false;" action="javascript:void(0);">
+      <div class="form-group">
+        <label for="nodeTitle">Title:</label>
+        <input type="text" id="nodeTitle">
+      </div>
+      <div class="form-group">
+        <label for="nodeModality">Modality:</label>
+        <select id="nodeModality">
+          <option value="text">Text</option>
+          <option value="image">Image</option>
+          <option value="audio">Audio</option>
+          <option value="video">Video</option>
+          <option value="chat">Chat</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="systemPrompt">System Prompt:</label>
+        <textarea id="systemPrompt" placeholder="Enter instructions for how the AI should process this node's content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+      </div>
+
+      <!-- Content Type Specific Sections -->
+      <div id="textContentSection" class="content-section">
+        <div class="form-group">
+          <label for="nodeContent">Text Content:</label>
+          <textarea id="nodeContent" placeholder="Enter text content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+        </div>
+        <div class="debug-info">
+          <div class="token-counter">
+            <span>Input Tokens: <span id="inputTokenCount">0</span></span>
+            <span>Output Tokens: <span id="outputTokenCount">0</span></span>
+          </div>
+          <div class="processing-time">
+            Processing Time: <span id="processingTime">0ms</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="imageContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Image Content:</label>
+          <div class="image-upload-area">
+            <input type="file" id="imageFile" accept="image/*">
+            <div class="image-preview">
+              <img id="imagePreview" src="" alt="Preview" style="display: none;">
+            </div>
+            <div class="image-controls">
+              <button id="uploadImageBtn" class="secondary-btn" type="button">Upload Image</button>
+              <button id="generateImageBtn" class="secondary-btn" type="button">Generate Image</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="imagePrompt">Image Generation Prompt:</label>
+          <textarea id="imagePrompt" placeholder="Describe the image you want to generate..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+        </div>
+        <div class="debug-info">
+          <div class="image-info">
+            <span>Size: <span id="imageSize">0x0</span></span>
+            <span>Format: <span id="imageFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="audioContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Audio Content:</label>
+          <div class="audio-upload-area">
+            <input type="file" id="audioFile" accept="audio/*">
+            <div class="audio-preview">
+              <audio id="audioPreview" controls style="display: none;"></audio>
+            </div>
+            <div class="audio-controls">
+              <button id="recordAudioBtn" class="secondary-btn" type="button">Record Audio</button>
+              <button id="uploadAudioBtn" class="secondary-btn" type="button">Upload Audio</button>
+            </div>
+          </div>
+        </div>
+        <div class="debug-info">
+          <div class="audio-info">
+            <span>Duration: <span id="audioDuration">0s</span></span>
+            <span>Format: <span id="audioFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="videoContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Video Content:</label>
+          <div class="video-upload-area">
+            <input type="file" id="videoFile" accept="video/*">
+            <div class="video-preview">
+              <video id="videoPreview" controls style="display: none;"></video>
+            </div>
+            <div class="video-controls">
+              <button id="uploadVideoBtn" class="secondary-btn" type="button">Upload Video</button>
+            </div>
+          </div>
+        </div>
+        <div class="debug-info">
+          <div class="video-info">
+            <span>Duration: <span id="videoDuration">0s</span></span>
+            <span>Format: <span id="videoFormat">-</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="chatContentSection" class="content-section" style="display: none;">
+        <div class="form-group">
+          <label>Chat History:</label>
+          <div id="chatHistory" class="chat-history"></div>
+        </div>
+        <div class="form-group">
+          <label for="chatInput">Message:</label>
+          <div class="chat-input-container">
+            <textarea id="chatInput" placeholder="Type your message..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); App.sendChatMessageFromEditor(); return false;}"></textarea>
+            <button id="sendChatBtn" class="primary-btn" type="button" onclick="App.sendChatMessageFromEditor()">Send</button>
+          </div>
+        </div>
+        <div class="debug-info">
+          <div class="chat-info">
+            <span>Messages: <span id="messageCount">0</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="aiProcessor">AI Processor:</label>
+        <select id="aiProcessor">
+          <option value="text-to-text">Text to Text</option>
+          <option value="text-to-image">Text to Image</option>
+          <option value="image-to-text">Image to Text</option>
+          <option value="audio-to-text">Audio to Text</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="autoSizeNode" checked>
+          <label for="autoSizeNode">Auto-size node to fit content</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="waitForAllInputs" checked>
+          <label for="waitForAllInputs">Wait for all inputs before processing</label>
+          <div class="tooltip">When checked, nodes with multiple inputs will wait until all connected nodes have been processed before executing.</div>
+        </div>
+      </div>
+
+      <!-- Logic Node Options Section (will be populated by logic-nodes.js) -->
+      <div id="logicOptionsSection" class="form-group" style="display: none;">
+        <!-- Logic node options will be added here dynamically -->
+      </div>
+
+      <!-- Processing Log Section -->
+      <div class="log-section">
+        <h3>Processing Log</h3>
+        <div id="processingLog" class="log-content"></div>
+      </div>
+
+      <div class="button-group">
+        <button id="executeNode" class="primary-btn" type="button">Execute</button>
+        <button id="viewPayloads" class="secondary-btn" type="button">View API Payloads</button>
+        <button id="saveNode" class="primary-btn" type="button">Save</button>
+        <button id="cancelNode" class="secondary-btn" type="button">Cancel</button>
+      </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- OpenAI Configuration Modal -->
+  <div id="configModal" class="modal">
+    <div class="modal-content">
+      <h2>OpenAI Configuration</h2>
+      <div class="form-group">
+        <label for="apiKey">API Key:</label>
+        <input type="password" id="apiKey" placeholder="sk-...">
+      </div>
+      <div class="form-group">
+        <label for="model">Model:</label>
+        <select id="model">
+          <option value="gpt-4o">GPT-4o</option>
+          <option value="gpt-4.1">GPT-4.1</option>
+          <option value="o4-mini-high">o4-mini-high</option>
+          <option value="gpt-4">GPT-4</option>
+          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          <!-- GPT-4o is now used for both text and vision tasks -->
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="temperature">Temperature:</label>
+        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+        <span id="temperatureValue">0.7</span>
+      </div>
+      <div class="form-group">
+        <label for="maxTokens">Max Tokens:</label>
+        <input type="number" id="maxTokens" value="2000" min="1" max="8192">
+      </div>
+      <div class="form-group">
+        <label for="timeout">API Timeout (seconds):</label>
+        <input type="number" id="timeout" value="300" min="30" max="1800" step="30">
+        <div class="tooltip">Longer timeouts are useful for complex requests and image generation. For image generation, the actual timeout will be doubled.</div>
+      </div>
+
+      <!-- API Test Section -->
+      <div class="test-section">
+        <h3>API Test</h3>
+        <div class="form-group">
+          <textarea id="testPrompt" placeholder="Enter a test prompt..."></textarea>
+        </div>
+        <button id="testAPI" class="secondary-btn" type="button">Test API</button>
+        <div id="testResult" class="test-result"></div>
+      </div>
+
+      <!-- Usage Statistics -->
+      <div class="usage-stats">
+        <h3>Usage Statistics</h3>
+        <div class="stats-grid">
+          <div>Total Requests: <span id="totalRequests">0</span></div>
+          <div>Total Tokens: <span id="totalTokens">0</span></div>
+          <div>Average Response Time: <span id="avgResponseTime">0ms</span></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="saveConfig" class="primary-btn" type="button">Save Configuration</button>
+        <button id="cancelConfig" class="secondary-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save/Load Modal -->
+  <div id="saveLoadModal" class="modal">
+    <div class="modal-content">
+      <h2>Save/Load Canvas</h2>
+      <div class="form-group">
+        <label for="canvasData">Canvas Data:</label>
+        <textarea id="canvasData" placeholder="Paste saved canvas data here to load..."></textarea>
+      </div>
+
+      <!-- Canvas Statistics -->
+      <div class="canvas-stats">
+        <h3>Canvas Statistics</h3>
+        <div class="stats-grid">
+          <div>Nodes: <span id="nodeCount">0</span></div>
+          <div>Connections: <span id="connectionCount">0</span></div>
+          <div>Processing Chains: <span id="chainCount">0</span></div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="copyCanvas" class="primary-btn" type="button">Copy to Clipboard</button>
+        <button id="loadCanvas" class="primary-btn" type="button">Load Data</button>
+        <button id="exportJSON" class="secondary-btn" type="button">Export JSON</button>
+        <button id="cancelSaveLoad" class="secondary-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Workflow Modal -->
+  <div id="saveWorkflowModal" class="modal">
+    <div class="modal-content">
+      <h2>Save Workflow</h2>
+      <div class="form-group">
+        <label for="workflowName">Workflow Name:</label>
+        <input type="text" id="workflowName" placeholder="Enter a name for your workflow">
+      </div>
+      <div class="form-group">
+        <label for="workflowDescription">Description:</label>
+        <textarea id="workflowDescription" placeholder="Enter a description for your workflow"></textarea>
+      </div>
+      <div class="button-group">
+        <button id="confirmSaveWorkflow" class="primary-btn" type="button">Save</button>
+        <button id="cancelSaveWorkflow" class="secondary-btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <h2>Help & Shortcuts</h2>
+      <div class="help-section">
+        <h3>Keyboard Shortcuts</h3>
+        <ul>
+          <li><kbd>N</kbd> - Add new node</li>
+          <li><kbd>C</kbd> - Add chat node</li>
+          <li><kbd>X</kbd> - Copy selected node</li>
+          <li><kbd>V</kbd> - Paste node</li>
+          <li><kbd>E</kbd> - Edit selected node</li>
+          <li><kbd>Delete</kbd> - Delete selected node</li>
+          <li><kbd>Esc</kbd> - Cancel connection/Close modal</li>
+          <li><kbd>Ctrl/Cmd + S</kbd> - Save canvas</li>
+          <li><kbd>Ctrl/Cmd + O</kbd> - Load canvas</li>
+          <li><kbd>+/-</kbd> - Zoom in/out</li>
+          <li><kbd>0</kbd> - Reset zoom</li>
+          <li><kbd>H</kbd> - Show/hide this help</li>
+          <li><kbd>Arrow keys</kbd> - Move selected node</li>
+        </ul>
+      </div>
+      <div class="help-section">
+        <h3>Node Operations</h3>
+        <ul>
+          <li>Double-click a node to edit its properties</li>
+          <li>Drag from right circle to left circle to connect nodes</li>
+          <li>Click and drag empty space to pan the canvas</li>
+          <li>Click and drag a node to move it</li>
+        </ul>
+      </div>
+      <div class="help-section">
+        <h3>Debug Information</h3>
+        <ul>
+          <li>Processing logs available in node editor</li>
+          <li>Token usage tracked in OpenAI config</li>
+          <li>Canvas statistics in Save/Load dialog</li>
+          <li>API test functionality in config</li>
+        </ul>
+      </div>
+      <div class="button-group">
+        <button id="closeHelp" class="secondary-btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="canvasContainer">
+    <canvas id="canvas"></canvas>
+
+    <!-- Mini-map for navigation -->
+    <div id="miniMap" class="mini-map">
+      <div class="mini-map-header">
+        <span>Mini-map</span>
+        <button id="toggleMiniMap" class="mini-map-toggle" type="button">-</button>
+      </div>
+      <canvas id="miniMapCanvas"></canvas>
+      <div class="mini-map-viewport"></div>
+      <div class="mini-map-controls">
+        <button id="zoomInBtn" class="mini-map-btn" title="Zoom In">+</button>
+        <button id="zoomOutBtn" class="mini-map-btn" title="Zoom Out">-</button>
+        <button id="resetZoomBtn" class="mini-map-btn" title="Reset Zoom">1:1</button>
+        <button id="fitAllNodesBtn" class="mini-map-btn" title="Fit All Nodes">⊡</button>
+        <button id="autoArrangeBtn" class="mini-map-btn" title="Auto Arrange">⊞</button>
+        <button id="horizontalLayoutBtn" class="mini-map-btn" title="Horizontal Layout">⇄</button>
+        <button id="verticalLayoutBtn" class="mini-map-btn" title="Vertical Layout">⇅</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Payload Viewer Modal -->
+  <div id="payloadViewerModal" class="modal">
+    <div class="modal-content">
+      <h2>API Payloads</h2>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="requestTab">Request</button>
+        <button class="tab-btn" data-tab="responseTab">Response</button>
+      </div>
+      <div class="tab-content">
+        <div id="requestTab" class="tab-pane active">
+          <div class="payload-info">
+            <div>Timestamp: <span id="requestTimestamp">-</span></div>
+          </div>
+          <pre id="requestPayload" class="payload-content">No request payload available</pre>
+        </div>
+        <div id="responseTab" class="tab-pane">
+          <div class="payload-info">
+            <div>Timestamp: <span id="responseTimestamp">-</span></div>
+          </div>
+          <pre id="responsePayload" class="payload-content">No response payload available</pre>
+        </div>
+      </div>
+      <div class="button-group">
+        <button id="copyPayload" class="secondary-btn" type="button">Copy to Clipboard</button>
+        <button id="closePayloadViewer" class="secondary-btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Panel -->
+  <div id="debugPanel" class="debug-panel">
+    <div class="debug-header">
+      <h3>Debug Panel</h3>
+      <button id="toggleDebug" class="secondary-btn" type="button">Toggle</button>
+    </div>
+    <div class="debug-content">
+      <div class="debug-section">
+        <h4>Performance</h4>
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Active Nodes: <span id="activeNodes">0</span></div>
+        <div>Processing: <span id="processingNodes">0</span></div>
+      </div>
+      <div class="debug-section">
+        <h4>API Status</h4>
+        <div>Last Request: <span id="lastRequestTime">-</span></div>
+        <div>Queue Size: <span id="requestQueue">0</span></div>
+      </div>
+      <div class="debug-section">
+        <h4>Recent Logs</h4>
+        <div id="recentLogs" class="recent-logs"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workflow Panel -->
+  <div id="workflowPanel" class="workflow-panel">
+    <!-- Resize Handle -->
+    <div id="workflowPanelResizeHandle" class="workflow-panel-resize-handle"></div>
+
+    <div class="workflow-panel-header">
+      <h3>Workflow Chat</h3>
+      <button id="toggleWorkflowPanel" class="workflow-panel-toggle" type="button">-</button>
+    </div>
+    <div class="workflow-panel-content">
+      <div id="workflowIOStatus" class="workflow-io-status">
+        <div class="status-item">
+          <span class="status-label">Input Node:</span>
+          <span id="inputNodeStatus" class="status-value not-set">Not Set</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Output Node:</span>
+          <span id="outputNodeStatus" class="status-value not-set">Not Set</span>
+        </div>
+        <div class="status-item">
+          <button id="refreshWorkflowNodesBtn" class="btn btn-sm btn-info" title="Refresh node detection">
+            <i class="fas fa-sync-alt"></i> Refresh Nodes
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat Messages Area -->
+      <div id="chatMessages" class="chat-messages">
+        <!-- Messages will be added here dynamically -->
+        <div class="chat-message assistant-message">
+          <div class="message-content">Welcome! I'm your workflow assistant. Set up your input and output nodes, then send me a message to process through the workflow.</div>
+        </div>
+      </div>
+
+      <!-- Chat Options -->
+      <div class="chat-options">
+        <label>
+          <input type="checkbox" id="clearOutputOnRun" checked>
+          Clear previous output before running
+        </label>
+        <label>
+          <input type="checkbox" id="showAllNodeOutputs">
+          Show all node outputs in chat
+        </label>
+      </div>
+
+      <!-- Chat Input Area -->
+      <div class="chat-input-container">
+        <textarea id="workflowChatInput" class="chat-input" placeholder="Type your message here..." rows="1"></textarea>
+        <button id="runWorkflowBtn" class="chat-send-button" type="button" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Docker Environment Detection -->
+  <script>
+    // Check if we're in a Docker environment
+    const isDockerEnv = window.location.hostname === 'localhost' &&
+                        (window.location.port === '8732' || window.location.port === '8731');
+
+    // Check if we already have a user profile and auth token
+    const hasUserProfile = localStorage.getItem('userProfile') !== null;
+    const hasAuthToken = localStorage.getItem('authToken') !== null;
+
+    // Check if we're in the middle of auto-login to prevent loops
+    const autoLoginAttempted = sessionStorage.getItem('dockerAutoLoginAttempted') === 'true';
+
+    // If in Docker and not already logged in and haven't attempted auto-login yet
+    if (isDockerEnv && (!hasUserProfile || !hasAuthToken) && !autoLoginAttempted) {
+      // Set flag to prevent infinite loops
+      sessionStorage.setItem('dockerAutoLoginAttempted', 'true');
+
+      // Show loading indicator while we check
+      document.body.innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+          <h2>Docker Environment Detected</h2>
+          <p>Initializing application...</p>
+          <div class="spinner" style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite;"></div>
+        </div>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      `;
+
+      // Attempt auto-login with the correct API URL
+      fetch('http://localhost:8732/api/docker/auto-login')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Auto-login failed');
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Store the auth data
+          localStorage.setItem('userProfile', JSON.stringify(data.user));
+          localStorage.setItem('authToken', data.token);
+          localStorage.setItem('dockerAutoLogin', 'true');
+
+          // Clear the attempt flag since we succeeded
+          sessionStorage.removeItem('dockerAutoLoginAttempted');
+
+          // Reload the page to show the app
+          window.location.href = 'index.html?dockerLogin=success&t=' + Date.now();
+        })
+        .catch(error => {
+          console.error('Docker auto-login error:', error);
+          // Clear the attempt flag since we failed
+          sessionStorage.removeItem('dockerAutoLoginAttempted');
+          // Redirect to login page if auto-login fails
+          window.location.href = 'login.html?dockerLogin=failed&t=' + Date.now();
+        });
+    } else if (isDockerEnv && autoLoginAttempted) {
+      // If we've already attempted auto-login but still don't have credentials,
+      // clear the flag and redirect to login page to prevent loops
+      sessionStorage.removeItem('dockerAutoLoginAttempted');
+      if (!hasUserProfile || !hasAuthToken) {
+        window.location.href = 'login.html?dockerLogin=retry&t=' + Date.now();
+      }
+    }
+  </script>
+
+  <!-- Core Configuration and Services -->
+  <script src="config.js"></script>
+  <script src="api-service.js"></script>
+  <script src="data-migration.js"></script>
+  <script src="image-storage.js"></script>
+
+  <!-- Template Generator Modal -->
+  <div id="templateGeneratorModal" class="modal">
+    <div class="modal-content">
+      <h2>Template Generator</h2>
+      <div class="form-group">
+        <label for="templateDescription">Describe the workflow you want to create:</label>
+        <textarea id="templateDescription" placeholder="Describe your workflow in natural language. For example: 'A workflow that takes an image, analyzes it for objects, and generates a description.'" rows="5"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Sample Templates:</label>
+        <div class="sample-templates">
+          <button class="sample-template-btn" data-template="image-analysis">Image Analysis</button>
+          <button class="sample-template-btn" data-template="text-summarization">Text Summarization</button>
+          <button class="sample-template-btn" data-template="chat-bot">Chat Bot</button>
+          <button class="sample-template-btn" data-template="content-generator">Content Generator</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="generatedTemplate">Generated Template:</label>
+        <div class="template-output-container">
+          <pre id="generatedTemplate" class="template-output">Your generated template will appear here...</pre>
+          <div class="template-loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Generating template...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-group">
+        <button id="generateTemplateBtn" class="primary-btn" type="button">Generate Template</button>
+        <button id="copyTemplateBtn" class="secondary-btn" type="button">Copy to Clipboard</button>
+        <button id="saveTemplateBtn" class="secondary-btn" type="button">Save as File</button>
+        <button id="loadTemplateBtn" class="secondary-btn" type="button">Load to Canvas</button>
+        <button id="closeTemplateGenerator" class="secondary-btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Scripts -->
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+  <script src="modal-edit.js"></script>
+  <script src="mini-map.js"></script>
+  <script src="workflow-test.js"></script>
+  <script src="node-groups.js"></script>
+  <script src="image-editor.js"></script>
+  <script src="image-paste.js"></script>
+  <script src="keyboard-shortcuts.js"></script>
+  <script src="collaboration.js"></script>
+  <script src="document-view.js"></script>
+  <script src="workflow-io.js"></script>
+  <script src="workflow-panel.js"></script>
+  <script src="workflow-list.js"></script>
+  <script src="user-profile.js"></script>
+  <script src="template-generator.js"></script>
+  <script src="logic-nodes.js"></script>
+
+  <!-- Agent Node Editor Modal -->
+  <div id="agentNodeEditor" class="modal">
+    <div class="modal-content" style="max-width: 700px; background-color: #1e1e1e; border: 2px solid #9c27b0;">
+      <h2 style="color: #9c27b0; border-bottom: 1px solid #9c27b0; padding-bottom: 10px;">
+        <span style="margin-right: 10px;">🤖</span>Agent Node Editor
+      </h2>
+      <form id="agentNodeEditorForm" onsubmit="event.preventDefault(); return false;" action="javascript:void(0);">
+        <div class="form-group">
+          <label for="agentNodeTitle">Title:</label>
+          <input type="text" id="agentNodeTitle" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label for="agentType">Agent Type:</label>
+          <select id="agentType" class="form-control">
+            <option value="default">Default Agent</option>
+            <option value="custom">Custom Agent</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="agentSystemPrompt">System Prompt:</label>
+          <textarea id="agentSystemPrompt" class="form-control" rows="5" placeholder="Enter instructions for how the agent should process content..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); return false;}"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="maxIterations">Maximum Iterations:</label>
+          <input type="number" id="maxIterations" class="form-control" min="1" max="20" value="5">
+        </div>
+
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="autoIterate" checked>
+            <label for="autoIterate">Auto-iterate</label>
+            <div class="tooltip">When checked, the agent will automatically continue processing until it reaches the maximum iterations or completes its task.</div>
+          </div>
+        </div>
+
+        <!-- MCP Tools Section -->
+        <div class="form-group">
+          <h3 style="color: #bb86fc; margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 5px;">MCP Tools Integration</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="useMCPTools" checked>
+            <label for="useMCPTools">Use MCP Tools</label>
+            <div class="tooltip">When checked, the agent will have access to Model Context Protocol (MCP) tools like Perplexity search, Context7 documentation, and memory tools.</div>
+          </div>
+
+          <div id="mcpToolsSection" style="margin-top: 10px; padding: 10px; background-color: #2a2a2a; border-radius: 5px;">
+            <div id="mcpToolsList" style="margin-bottom: 10px;">
+              <p style="color: #aaa; font-style: italic;">Available MCP tools will be shown here when loaded.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reflection Section -->
+        <div class="form-group">
+          <h3 style="color: #bb86fc; margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 5px;">Reflection Capabilities</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="enableReflection" checked>
+            <label for="enableReflection">Enable Reflection</label>
+            <div class="tooltip">When checked, the agent will periodically reflect on its actions and improve its approach.</div>
+          </div>
+
+          <div id="reflectionSection" style="margin-top: 10px; padding: 10px; background-color: #2a2a2a; border-radius: 5px;">
+            <div class="form-group">
+              <label for="reflectionFrequency">Reflection Frequency:</label>
+              <select id="reflectionFrequency" class="form-control">
+                <option value="1">Every iteration</option>
+                <option value="2" selected>Every 2 iterations</option>
+                <option value="3">Every 3 iterations</option>
+                <option value="5">Every 5 iterations</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="reflectionPrompt">Reflection Prompt:</label>
+              <textarea id="reflectionPrompt" class="form-control" rows="3" placeholder="Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?">Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Workflow Integration Section -->
+        <div class="form-group">
+          <h3 style="color: #bb86fc; margin-top: 20px; border-bottom: 1px solid #444; padding-bottom: 5px;">Workflow Integration</h3>
+          <div class="checkbox-group">
+            <input type="checkbox" id="canBeWorkflowNode" checked>
+            <label for="canBeWorkflowNode">Can be Input/Output Node</label>
+            <div class="tooltip">When checked, this agent node can be selected as an input or output node in workflows.</div>
+          </div>
+
+          <div id="workflowNodeRoleSection" style="margin-top: 10px; padding: 10px; background-color: #2a2a2a; border-radius: 5px;">
+            <div class="form-group">
+              <label>Node Role:</label>
+              <div class="radio-group-container">
+                <div class="radio-group">
+                  <input type="radio" id="agentNodeRoleNone" name="agentNodeRole" value="none" checked>
+                  <label for="agentNodeRoleNone">None</label>
+                </div>
+                <div class="radio-group">
+                  <input type="radio" id="agentNodeRoleInput" name="agentNodeRole" value="input">
+                  <label for="agentNodeRoleInput">Input Node</label>
+                </div>
+                <div class="radio-group">
+                  <input type="radio" id="agentNodeRoleOutput" name="agentNodeRole" value="output">
+                  <label for="agentNodeRoleOutput">Output Node</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="customCodeSection" class="form-group" style="display: none; background-color: #2a2a2a; padding: 15px; border-radius: 5px; margin-top: 15px;">
+          <label for="customCode">Custom Code:</label>
+          <textarea id="customCode" class="form-control code-editor" rows="10" style="font-family: monospace;" placeholder="// Custom JavaScript code&#10;// Available variables: input, node, App, DebugManager, ApiService, AgentMemory, AgentTools, MCPTools, reflectionResult&#10;// Return the processed result&#10;return input;"></textarea>
+        </div>
+
+        <!-- Agent Logs and API Payloads Buttons -->
+        <div class="form-group" style="margin-top: 20px;">
+          <div style="display: flex; gap: 10px;">
+            <button id="viewAgentLogs" class="secondary-btn" style="flex: 1;" type="button">
+              <i class="fas fa-list"></i> View Agent Logs
+            </button>
+            <button id="viewApiPayloads" class="secondary-btn" style="flex: 1;" type="button">
+              <i class="fas fa-exchange-alt"></i> View API Payloads
+            </button>
+            <button id="captureApiPayloads" class="secondary-btn" style="flex: 1;" type="button">
+              <i class="fas fa-camera"></i> Generate Test API Logs
+            </button>
+          </div>
+        </div>
+
+        <div class="button-group" style="margin-top: 20px; text-align: right;">
+          <button id="saveAgentNode" class="primary-btn" type="button" style="background-color: #9c27b0;">Save</button>
+          <button id="cancelAgentNode" class="secondary-btn" type="button">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Agent Logs Modal -->
+  <div id="agentLogsModal" class="modal">
+    <div class="modal-content" style="max-width: 800px; background-color: #1e1e1e; border: 2px solid #9c27b0;">
+      <h2 style="color: #9c27b0; border-bottom: 1px solid #9c27b0; padding-bottom: 10px;">
+        <span style="margin-right: 10px;">📋</span>Agent Logs
+      </h2>
+
+      <div class="tabs">
+        <button class="tab-button active" data-tab="activityLog">Activity Log</button>
+        <button class="tab-button" data-tab="apiLog">API Log</button>
+      </div>
+
+      <div class="tab-content">
+        <div id="activityLog" class="tab-pane active">
+          <pre id="activityLogContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+        <div id="apiLog" class="tab-pane" style="display: none;">
+          <pre id="apiLogContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <div class="button-group" style="margin-top: 20px; text-align: right;">
+        <button id="clearLogs" class="secondary-btn" type="button">Clear Logs</button>
+        <button id="copyLogs" class="secondary-btn" type="button">Copy Logs</button>
+        <button id="closeAgentLogs" class="primary-btn" type="button" style="background-color: #9c27b0;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Payloads Modal -->
+  <div id="apiPayloadsModal" class="modal">
+    <div class="modal-content" style="max-width: 800px; background-color: #1e1e1e; border: 2px solid #9c27b0;">
+      <h2 style="color: #9c27b0; border-bottom: 1px solid #9c27b0; padding-bottom: 10px;">
+        <span style="margin-right: 10px;">🔄</span>API Payloads
+      </h2>
+
+      <div class="tabs">
+        <button class="tab-button active" data-tab="requestPayload">Request Payload</button>
+        <button class="tab-button" data-tab="responsePayload">Response Payload</button>
+      </div>
+
+      <div class="tab-content">
+        <div id="requestPayload" class="tab-pane active">
+          <pre id="requestPayloadContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+        <div id="responsePayload" class="tab-pane" style="display: none;">
+          <pre id="responsePayloadContent" class="log-content" style="height: 400px; overflow-y: auto; background-color: #2a2a2a; padding: 10px; border-radius: 5px; color: #ddd; font-family: monospace; white-space: pre-wrap;"></pre>
+        </div>
+      </div>
+
+      <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <button id="prevApiLog" class="secondary-btn" type="button">← Previous</button>
+          <span id="apiLogCounter" style="margin: 0 10px; color: #aaa;">Log 0 of 0</span>
+          <button id="nextApiLog" class="secondary-btn" type="button">Next →</button>
+        </div>
+        <div class="button-group">
+          <button id="copyPayload" class="secondary-btn" type="button">Copy Payload</button>
+          <button id="closeApiPayloads" class="primary-btn" type="button" style="background-color: #9c27b0;">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent Node System -->
+  <script src="agent-memory.js"></script>
+  <script src="agent-tools.js"></script>
+  <script src="agent-planner.js"></script>
+  <script src="agent-logger.js"></script>
+  <script src="mcp-tools.js"></script>
+  <script src="agent-nodes.js"></script>
+</body>
+</html>

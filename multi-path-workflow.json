@@ -1,0 +1,356 @@
+{
+  "name": "Multi-Path Processing Workflow",
+  "description": "Demonstrates true parallel processing paths for split items",
+  "nodes": [
+    {
+      "id": 1,
+      "title": "Topic Input",
+      "x": 100,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "1. Artificial Intelligence\n2. Renewable Energy\n3. Space Exploration",
+      "inputContent": "1. Artificial Intelligence\n2. Renewable Energy\n3. Space Exploration",
+      "contentType": "text",
+      "systemPrompt": "You are a topic organizer. The input contains a list of topics.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": true,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "input"
+    },
+    {
+      "id": 2,
+      "title": "Topic Splitter",
+      "x": 400,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "Split input into 3 items:\n\n1. 1. Artificial Intelligence\n2. 2. Renewable Energy\n3. 3. Space Exploration",
+      "inputContent": "1. Artificial Intelligence\n2. Renewable Energy\n3. Space Exploration",
+      "contentType": "text",
+      "systemPrompt": "Split the input into separate topics. Each topic should be on a new line.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": true,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "splitter",
+      "splitDelimiter": "\\n",
+      "splitParallel": true,
+      "maxItems": 10,
+      "splitItems": [
+        "1. Artificial Intelligence",
+        "2. Renewable Energy",
+        "3. Space Exploration"
+      ]
+    },
+    
+    {
+      "id": 3,
+      "title": "AI Path - Definition",
+      "x": 700,
+      "y": 100,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "ITEM 1 OF 3:\n\n1. Artificial Intelligence",
+      "contentType": "text",
+      "systemPrompt": "Define the topic and explain its basic concepts.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "splitPathId": "split_2_0"
+    },
+    {
+      "id": 4,
+      "title": "AI Path - Applications",
+      "x": 1000,
+      "y": 100,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Describe practical applications of this technology.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "splitPathId": "split_2_0"
+    },
+    {
+      "id": 5,
+      "title": "AI Path - Collector",
+      "x": 1300,
+      "y": 100,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine the definition and applications into a comprehensive overview.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": [],
+      "splitPathId": "split_2_0"
+    },
+    
+    {
+      "id": 6,
+      "title": "Energy Path - Definition",
+      "x": 700,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "ITEM 2 OF 3:\n\n2. Renewable Energy",
+      "contentType": "text",
+      "systemPrompt": "Define the topic and explain its basic concepts.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "splitPathId": "split_2_1"
+    },
+    {
+      "id": 7,
+      "title": "Energy Path - Applications",
+      "x": 1000,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Describe practical applications of this technology.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "splitPathId": "split_2_1"
+    },
+    {
+      "id": 8,
+      "title": "Energy Path - Collector",
+      "x": 1300,
+      "y": 350,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine the definition and applications into a comprehensive overview.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": [],
+      "splitPathId": "split_2_1"
+    },
+    
+    {
+      "id": 9,
+      "title": "Space Path - Definition",
+      "x": 700,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "ITEM 3 OF 3:\n\n3. Space Exploration",
+      "contentType": "text",
+      "systemPrompt": "Define the topic and explain its basic concepts.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "splitPathId": "split_2_2"
+    },
+    {
+      "id": 10,
+      "title": "Space Path - Applications",
+      "x": 1000,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Describe practical applications of this technology.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "splitPathId": "split_2_2"
+    },
+    {
+      "id": 11,
+      "title": "Space Path - Collector",
+      "x": 1300,
+      "y": 600,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine the definition and applications into a comprehensive overview.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "concatenate",
+      "separator": "\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": [],
+      "splitPathId": "split_2_2"
+    },
+    
+    {
+      "id": 12,
+      "title": "Final Collector",
+      "x": 1600,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Combine all topic overviews into a comprehensive document with proper transitions between topics.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "collector",
+      "combineMethod": "summarize",
+      "separator": "\n\n---\n\n",
+      "waitForAllInputs": true,
+      "collectedItems": []
+    },
+    
+    {
+      "id": 13,
+      "title": "Final Output",
+      "x": 1900,
+      "y": 300,
+      "width": 240,
+      "height": 200,
+      "content": "",
+      "inputContent": "",
+      "contentType": "text",
+      "systemPrompt": "Format the document with proper headings, introduction, and conclusion.",
+      "aiProcessor": "text-to-text",
+      "inputType": "text",
+      "outputType": "text",
+      "hasBeenProcessed": false,
+      "autoSize": true,
+      "expanded": true,
+      "nodeType": "default",
+      "workflowRole": "output"
+    }
+  ],
+  "connections": [
+    {
+      "fromNodeId": 1,
+      "toNodeId": 2
+    },
+    
+    {
+      "fromNodeId": 2,
+      "toNodeId": 3
+    },
+    {
+      "fromNodeId": 3,
+      "toNodeId": 4
+    },
+    {
+      "fromNodeId": 4,
+      "toNodeId": 5
+    },
+    
+    {
+      "fromNodeId": 2,
+      "toNodeId": 6
+    },
+    {
+      "fromNodeId": 6,
+      "toNodeId": 7
+    },
+    {
+      "fromNodeId": 7,
+      "toNodeId": 8
+    },
+    
+    {
+      "fromNodeId": 2,
+      "toNodeId": 9
+    },
+    {
+      "fromNodeId": 9,
+      "toNodeId": 10
+    },
+    {
+      "fromNodeId": 10,
+      "toNodeId": 11
+    },
+    
+    {
+      "fromNodeId": 5,
+      "toNodeId": 12
+    },
+    {
+      "fromNodeId": 8,
+      "toNodeId": 12
+    },
+    {
+      "fromNodeId": 11,
+      "toNodeId": 12
+    },
+    
+    {
+      "fromNodeId": 12,
+      "toNodeId": 13
+    }
+  ]
+}

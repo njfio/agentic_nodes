@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Force Refresh</title>
+  <script>
+    // Clear browser cache and storage
+    function clearCache() {
+      // Clear localStorage
+      localStorage.clear();
+      
+      // Clear sessionStorage
+      sessionStorage.clear();
+      
+      // Clear cache using cache API if available
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (let name of names) caches.delete(name);
+        });
+      }
+      
+      // Force reload the page with cache bypass
+      window.location.href = '/index.html?nocache=' + Date.now();
+    }
+    
+    // Run the clear cache function when the page loads
+    window.onload = clearCache;
+  </script>
+</head>
+<body>
+  <h1>Refreshing application...</h1>
+  <p>If you are not redirected automatically, <a href="javascript:clearCache()">click here</a>.</p>
+</body>
+</html>
