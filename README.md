@@ -96,4 +96,4 @@ This is a known good commit with:
 
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
