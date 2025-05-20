@@ -418,7 +418,26 @@ const AgentTools = {
 
   // Get all available tools
   getAllTools() {
-    return this.tools;
+    console.log(`AgentTools.getAllTools called, returning ${this.tools.length} tools`);
+
+    // Log the tool IDs for debugging
+    const toolIds = this.tools.map(tool => tool.id);
+    console.log('Available tools:', toolIds.join(', '));
+
+    // Check if tools are properly formatted for OpenAI function calling
+    const validTools = this.tools.filter(tool => {
+      if (!tool.id || !tool.name || !tool.description || !tool.category || !tool.execute) {
+        console.warn(`Tool missing required properties: ${tool.id || 'unknown'}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validTools.length !== this.tools.length) {
+      console.warn(`Filtered out ${this.tools.length - validTools.length} invalid tools`);
+    }
+
+    return validTools;
   },
 
   // Get tools by category
@@ -433,19 +452,69 @@ const AgentTools = {
 
   // Execute a tool
   async executeTool(toolId, params, node) {
+    console.log(`Executing tool ${toolId} with params:`, params);
+
+    // First check if this is an MCP tool
+    if (toolId.includes('perplexity') || toolId.includes('mcp-')) {
+      console.log(`Detected MCP tool: ${toolId}`);
+
+      try {
+        // Call the MCP API endpoint
+        console.log(`Calling MCP API for tool ${toolId}`);
+        const response = await fetch('/api/mcp/execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            tool: toolId,
+            params: params
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || `HTTP error ${response.status}`;
+          console.error(`MCP API request failed: ${errorMessage}`);
+          DebugManager.addLog(`MCP API request failed: ${errorMessage}`, 'error');
+          throw new Error(`MCP API request failed: ${errorMessage}`);
+        }
+
+        const data = await response.json();
+        console.log(`MCP tool ${toolId} executed successfully`);
+        DebugManager.addLog(`MCP tool ${toolId} executed successfully`, 'success');
+
+        // Store the chat ID for future use if this is a chat tool
+        if (node && toolId.includes('chat') && data.chat_id) {
+          node.chatId = data.chat_id;
+          console.log(`Stored chat ID: ${data.chat_id}`);
+        }
+
+        return data.result;
+      } catch (error) {
+        console.error(`Error executing MCP tool ${toolId}:`, error);
+        DebugManager.addLog(`Error executing MCP tool ${toolId}: ${error.message}`, 'error');
+        throw error;
+      }
+    }
+
+    // If not an MCP tool, try to find it in our local tools
     const tool = this.getToolById(toolId);
     if (!tool) {
+      console.error(`Tool with ID ${toolId} not found`);
+      DebugManager.addLog(`Tool with ID ${toolId} not found`, 'error');
       throw new Error(`Tool with ID ${toolId} not found`);
     }
 
     try {
       // Output the parameters to the console for easier debugging
-      console.debug(`Executing tool ${tool.id} with params:`, params);
+      console.debug(`Executing local tool ${tool.id} with params:`, params);
       DebugManager.addLog(`Executing tool "${tool.name}" (ID: ${tool.id})`, 'info');
       const result = await tool.execute(params, node);
       DebugManager.addLog(`Tool "${tool.name}" executed successfully`, 'success');
       return result;
     } catch (error) {
+      console.error(`Error executing tool "${tool.name}":`, error);
       DebugManager.addLog(`Error executing tool "${tool.name}": ${error.message}`, 'error');
       throw error;
     }

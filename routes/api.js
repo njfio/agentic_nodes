@@ -179,6 +179,17 @@ router.post('/openai/chat', async (req, res) => {
       }
     } else {
       console.log('[API] Request does not include any tools');
+
+      // Check if this is an agent node request by examining the messages
+      if (req.body.messages && req.body.messages.length > 0) {
+        const systemMessage = req.body.messages.find(m => m.role === 'system');
+        if (systemMessage && systemMessage.content &&
+            (systemMessage.content.includes('agent') ||
+             systemMessage.content.includes('IMPORTANT INSTRUCTIONS FOR TOOL USAGE'))) {
+          console.log('[API] This appears to be an agent node request but no tools were included');
+          console.log('[API] Check that AgentTools.getAllTools() is returning tools correctly');
+        }
+      }
     }
 
     // Check if OpenAI API key is set
