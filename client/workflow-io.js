@@ -161,12 +161,34 @@ const WorkflowIO = {
     if (role === 'input') {
       // If there was a previous input node, remove its role
       if (this.inputNode && this.inputNode !== node) {
-        this.inputNode.workflowRole = 'none';
-        this.inputNode._workflowRole = 'none'; // Set both properties
-        if (this.inputNode.element) {
-          this.inputNode.element.setAttribute('data-workflow-role', 'none');
+        // Store a reference to the previous input node
+        const previousInputNode = this.inputNode;
+
+        // Set its role to none
+        previousInputNode.workflowRole = 'none';
+        previousInputNode._workflowRole = 'none'; // Set both properties
+
+        if (previousInputNode.element) {
+          previousInputNode.element.setAttribute('data-workflow-role', 'none');
         }
-        DebugManager.addLog(`Node ${this.inputNode.id} is no longer the input node`, 'info');
+
+        // Update the radio buttons in the node editor if it's open and editing this node
+        if (window.App && App.editingNode === previousInputNode) {
+          const nodeRoleNone = document.getElementById('nodeRoleNone');
+          if (nodeRoleNone) {
+            nodeRoleNone.checked = true;
+          }
+        }
+
+        // Update the radio buttons in the agent node editor if it's open and editing this node
+        if (window.AgentNodes && AgentNodes.editingNode === previousInputNode) {
+          const agentNodeRoleNone = document.getElementById('agentNodeRoleNone');
+          if (agentNodeRoleNone) {
+            agentNodeRoleNone.checked = true;
+          }
+        }
+
+        DebugManager.addLog(`Node ${previousInputNode.id} is no longer the input node`, 'info');
       }
 
       this.inputNode = node;
@@ -174,12 +196,34 @@ const WorkflowIO = {
     } else if (role === 'output') {
       // If there was a previous output node, remove its role
       if (this.outputNode && this.outputNode !== node) {
-        this.outputNode.workflowRole = 'none';
-        this.outputNode._workflowRole = 'none'; // Set both properties
-        if (this.outputNode.element) {
-          this.outputNode.element.setAttribute('data-workflow-role', 'none');
+        // Store a reference to the previous output node
+        const previousOutputNode = this.outputNode;
+
+        // Set its role to none
+        previousOutputNode.workflowRole = 'none';
+        previousOutputNode._workflowRole = 'none'; // Set both properties
+
+        if (previousOutputNode.element) {
+          previousOutputNode.element.setAttribute('data-workflow-role', 'none');
         }
-        DebugManager.addLog(`Node ${this.outputNode.id} is no longer the output node`, 'info');
+
+        // Update the radio buttons in the node editor if it's open and editing this node
+        if (window.App && App.editingNode === previousOutputNode) {
+          const nodeRoleNone = document.getElementById('nodeRoleNone');
+          if (nodeRoleNone) {
+            nodeRoleNone.checked = true;
+          }
+        }
+
+        // Update the radio buttons in the agent node editor if it's open and editing this node
+        if (window.AgentNodes && AgentNodes.editingNode === previousOutputNode) {
+          const agentNodeRoleNone = document.getElementById('agentNodeRoleNone');
+          if (agentNodeRoleNone) {
+            agentNodeRoleNone.checked = true;
+          }
+        }
+
+        DebugManager.addLog(`Node ${previousOutputNode.id} is no longer the output node`, 'info');
       }
 
       this.outputNode = node;
