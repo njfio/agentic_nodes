@@ -82,7 +82,30 @@
 
                   // Try to use AgentProcessor directly
                   if (window.AgentProcessor && typeof AgentProcessor.createAgentNode === 'function') {
-                    return AgentProcessor.createAgentNode();
+                    try {
+                      const node = AgentProcessor.createAgentNode();
+
+                      // Check if the node was created successfully
+                      if (node) {
+                        console.log('Successfully created node using AgentProcessor:', node);
+
+                        // Add the node to our nodes array
+                        if (Array.isArray(this.nodes)) {
+                          this.nodes.push(node);
+                        }
+
+                        // Set as selected node
+                        this.selectedNode = node;
+
+                        return node;
+                      } else {
+                        console.error('AgentProcessor.createAgentNode() returned undefined');
+                        throw new Error('Failed to create node: AgentProcessor returned undefined');
+                      }
+                    } catch (error) {
+                      console.error('Error in AgentProcessor.createAgentNode():', error);
+                      throw error;
+                    }
                   }
 
                   throw new Error('Cannot create node: App object not properly initialized');
@@ -204,17 +227,26 @@
               const node = App.addNode('agent');
               console.log('Created agent node:', node);
 
-              // Log success message
-              if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
-                DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
-              }
+              // Check if the node was created successfully
+              if (node) {
+                // Log success message
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog(`Created agent node with ID: ${node.id || 'unknown'}`, 'success');
+                }
 
-              // Force a redraw of the canvas
-              if (window.App && typeof App.draw === 'function') {
-                App.draw();
-              }
+                // Force a redraw of the canvas
+                if (window.App && typeof App.draw === 'function') {
+                  App.draw();
+                }
 
-              return true;
+                return true;
+              } else {
+                console.error('App.addNode returned undefined');
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog('App.addNode returned undefined', 'error');
+                }
+                return false;
+              }
             } catch (error) {
               console.error('Error creating agent node:', error);
               if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
@@ -270,14 +302,33 @@
                 console.log('Attempting to create agent node directly via AgentProcessor');
                 try {
                   const node = AgentProcessor.createAgentNode();
-                  console.log('Created agent node directly:', node);
-                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
-                    DebugManager.addLog(`Created agent node directly with ID: ${node.id}`, 'success');
-                  }
 
-                  // Force a redraw of the canvas
-                  if (window.App && typeof App.draw === 'function') {
-                    App.draw();
+                  // Check if the node was created successfully
+                  if (node) {
+                    console.log('Created agent node directly:', node);
+
+                    // Log success message with safe access to node.id
+                    if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                      DebugManager.addLog(`Created agent node directly with ID: ${node.id || 'unknown'}`, 'success');
+                    }
+
+                    // Add the node to App.nodes if possible
+                    if (window.App && Array.isArray(window.App.nodes)) {
+                      window.App.nodes.push(node);
+
+                      // Set as selected node
+                      window.App.selectedNode = node;
+                    }
+
+                    // Force a redraw of the canvas
+                    if (window.App && typeof App.draw === 'function') {
+                      App.draw();
+                    }
+                  } else {
+                    console.error('AgentProcessor.createAgentNode() returned undefined');
+                    if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                      DebugManager.addLog('AgentProcessor.createAgentNode() returned undefined', 'error');
+                    }
                   }
                 } catch (error) {
                   console.error('Error creating agent node directly:', error);
@@ -332,17 +383,26 @@
                 const node = App.addNode('agent');
                 console.log('Created agent node via keyboard shortcut:', node);
 
-                // Log success message
-                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
-                  DebugManager.addLog(`Created agent node with ID: ${node.id} via keyboard shortcut`, 'success');
-                }
+                // Check if the node was created successfully
+                if (node) {
+                  // Log success message with safe access to node.id
+                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                    DebugManager.addLog(`Created agent node with ID: ${node.id || 'unknown'} via keyboard shortcut`, 'success');
+                  }
 
-                // Force a redraw of the canvas
-                if (window.App && typeof App.draw === 'function') {
-                  App.draw();
-                }
+                  // Force a redraw of the canvas
+                  if (window.App && typeof App.draw === 'function') {
+                    App.draw();
+                  }
 
-                return true;
+                  return true;
+                } else {
+                  console.error('App.addNode returned undefined for keyboard shortcut');
+                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                    DebugManager.addLog('App.addNode returned undefined for keyboard shortcut', 'error');
+                  }
+                  return false;
+                }
               } catch (error) {
                 console.error('Error creating agent node via keyboard shortcut:', error);
                 if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
