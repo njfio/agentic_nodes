@@ -2694,13 +2694,17 @@ class Node {
 
   // Get text lines for a given string and max width
   getTextLines(ctx, text, maxWidth) {
-    // Check if text is a string before trying to split it
-    if (typeof text !== 'string') {
+    // Check if text is null, undefined, or not a string
+    if (text === null || text === undefined || typeof text !== 'string') {
       // Return a single line with a placeholder for non-string content
+      console.warn(`getTextLines called with ${text === null ? 'null' : text === undefined ? 'undefined' : typeof text} text`);
       return ['[Non-text content]'];
     }
 
-    const words = text.split(' ');
+    // Ensure text is a string (defensive programming)
+    const textStr = String(text);
+
+    const words = textStr.split(' ');
     const lines = [];
     let currentLine = '';
 
