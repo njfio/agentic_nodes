@@ -475,7 +475,35 @@ const MCPTools = {
 
   // Get all available MCP tools
   getAllTools() {
-    return this.tools;
+    console.log(`MCPTools.getAllTools called, returning ${this.tools.length} tools`);
+
+    // Check if tools are properly formatted
+    const formattedTools = this.tools.map(tool => {
+      // Ensure the tool has all required properties
+      if (!tool.id || !tool.name || !tool.description || !tool.category) {
+        console.warn(`MCP tool missing required properties: ${tool.id || 'unknown'}`);
+        return null;
+      }
+
+      // Create an execute function for this tool if it doesn't have one
+      if (!tool.execute) {
+        tool.execute = async (params, node) => {
+          return await this.executeMCPTool(tool.id, params, node);
+        };
+      }
+
+      return tool;
+    }).filter(Boolean);
+
+    if (formattedTools.length !== this.tools.length) {
+      console.warn(`Filtered out ${this.tools.length - formattedTools.length} invalid MCP tools`);
+    }
+
+    // Log the tool IDs for debugging
+    const toolIds = formattedTools.map(tool => tool.id);
+    console.log('Available MCP tools:', toolIds.join(', '));
+
+    return formattedTools;
   },
 
   // Get MCP tools by category
@@ -494,6 +522,19 @@ document.addEventListener('DOMContentLoaded', function() {
   if (typeof window !== 'undefined') {
     window.MCPTools = MCPTools;
     console.log('MCPTools exposed to global scope');
+
+    // Initialize MCP tools immediately
+    MCPTools.init().then(() => {
+      console.log('MCPTools initialized on page load');
+
+      // Register with AgentTools if available
+      if (window.AgentTools) {
+        MCPTools.registerWithAgentTools();
+        console.log('MCPTools registered with AgentTools on page load');
+      }
+    }).catch(error => {
+      console.error('Error initializing MCPTools on page load:', error);
+    });
 
     // Listen for app initialization complete event
     document.addEventListener('app-initialization-complete', function() {

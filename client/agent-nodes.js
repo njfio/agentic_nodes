@@ -925,7 +925,16 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         AgentLogger.addLog(node, 'Model supports function calling, using direct function calling approach', 'info');
 
         // Get available tools for function calling
+        console.log('Getting tools for agent node');
         const allTools = AgentTools.getAllTools();
+        console.log(`Got ${allTools ? allTools.length : 0} tools from AgentTools.getAllTools()`);
+
+        // Debug log the tools
+        if (allTools && allTools.length > 0) {
+          console.log('Tool IDs:', allTools.map(t => t.id).join(', '));
+        } else {
+          console.warn('No tools returned from AgentTools.getAllTools()');
+        }
 
         // Log the available tools
         AgentLogger.addLog(node, `Found ${allTools.length} available tools`, 'info');
@@ -1062,6 +1071,47 @@ Your primary value comes from using tools effectively to solve problems. Users e
         node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
 
         // Make the API request
+        // Double-check that tools are included in the payload
+        if (!requestPayload.tools || requestPayload.tools.length === 0) {
+          console.warn('No tools in request payload, attempting to add them');
+
+          // Try to get tools again
+          const fallbackTools = AgentTools.getAllTools();
+          if (fallbackTools && fallbackTools.length > 0) {
+            console.log(`Adding ${fallbackTools.length} tools to request payload`);
+
+            // Map tools to the format expected by OpenAI API
+            const formattedTools = fallbackTools.map(tool => ({
+              type: "function",
+              function: {
+                name: tool.id,
+                description: tool.description,
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The query or input for the tool"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            }));
+
+            // Add tools to the payload
+            requestPayload.tools = formattedTools;
+            requestPayload.tool_choice = "auto";
+
+            console.log(`Added ${formattedTools.length} tools to request payload`);
+          } else {
+            console.error('Failed to get tools, proceeding without tools');
+          }
+        }
+
+        // Log the final payload
+        console.log(`Sending request with ${requestPayload.tools ? requestPayload.tools.length : 0} tools`);
+
         const response = await fetch('/api/openai/chat', {
           method: 'POST',
           headers: {
@@ -1165,23 +1215,25 @@ Your primary value comes from using tools effectively to solve problems. Users e
           // Make a final API request to get the final response
           AgentLogger.addLog(node, 'Sending final request to OpenAI API', 'info');
 
-          // Store the request payload for logging
-          node.lastRequestPayload = {
+          // Create the final request payload with tools
+          const finalRequestPayload = {
             model: config.model || 'gpt-4o',
-            messages
+            messages,
+            tools: requestPayload.tools, // Include the same tools as the original request
+            tool_choice: "auto"
           };
 
-          console.debug('OpenAI final request payload:', { model: config.model || 'gpt-4o', messages });
+          // Store the request payload for logging
+          node.lastRequestPayload = finalRequestPayload;
+
+          console.debug('OpenAI final request payload:', finalRequestPayload);
           const finalResponse = await fetch('/api/openai/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'x-openai-api-key': config.apiKey
             },
-            body: JSON.stringify({
-              model: config.model || 'gpt-4o',
-              messages
-            })
+            body: JSON.stringify(finalRequestPayload)
           });
 
           if (!finalResponse.ok) {
