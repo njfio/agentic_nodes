@@ -11,8 +11,22 @@
     init: function() {
       console.log('Initializing AgentProcessor');
 
-      // Update the tools list
-      this.updateToolsList();
+      // Initialize MCP tools if available
+      if (window.MCPTools && typeof MCPTools.init === 'function' && !MCPTools.initialized) {
+        console.log('Initializing MCP tools from AgentProcessor');
+        MCPTools.init().then(() => {
+          console.log('MCP tools initialized from AgentProcessor');
+          // Update the tools list after MCP tools are initialized
+          this.updateToolsList();
+        }).catch(error => {
+          console.error('Error initializing MCP tools:', error);
+          // Update the tools list anyway
+          this.updateToolsList();
+        });
+      } else {
+        // Update the tools list
+        this.updateToolsList();
+      }
 
       console.log('AgentProcessor initialized');
     },
@@ -446,12 +460,28 @@
 
         node.apiLogs.push(apiLog);
 
+        // Get the OpenAI API key if available
+        let headers = {
+          'Content-Type': 'application/json'
+        };
+
+        // Add OpenAI API key if available
+        if (window.ApiService && ApiService.openai && typeof ApiService.openai.getApiKey === 'function') {
+          const apiKey = ApiService.openai.getApiKey();
+          if (apiKey) {
+            headers['x-openai-api-key'] = apiKey;
+            console.log('Using OpenAI API key from ApiService');
+          } else {
+            console.warn('No OpenAI API key found in ApiService');
+          }
+        } else {
+          console.warn('ApiService.openai.getApiKey not available');
+        }
+
         // Make the API request
         const response = await fetch(apiEndpoint, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: headers,
           body: JSON.stringify(payload)
         });
 
@@ -832,7 +862,7 @@ After using tools, synthesize the information to provide a complete and accurate
             } else if (window.MCPTools && typeof MCPTools.getToolById === 'function') {
               const mcpTool = MCPTools.getToolById(functionName);
               if (mcpTool) {
-                toolResult = await MCPTools.executeMCPTool(functionName, functionArgs, node);
+                toolResult = await MCPTools.executeMCPTool(mcpTool.id, functionArgs, node);
               } else {
                 toolResult = `Error: Tool ${functionName} not found`;
               }
@@ -842,6 +872,8 @@ After using tools, synthesize the information to provide a complete and accurate
           } else {
             toolResult = `Error: AgentTools not available`;
           }
+
+          console.log(`Tool ${functionName} execution result:`, toolResult);
 
           // Add the tool result to the messages
           updatedMessages.push({
@@ -888,18 +920,32 @@ After using tools, synthesize the information to provide a complete and accurate
         DebugManager.addLog(`Making follow-up API call with ${updatedMessages.length} messages`, 'info');
       }
 
+      // Get the OpenAI API key if available
+      let headers = {
+        'Content-Type': 'application/json'
+      };
+
+      // Add OpenAI API key if available
+      if (window.ApiService && ApiService.openai && typeof ApiService.openai.getApiKey === 'function') {
+        const apiKey = ApiService.openai.getApiKey();
+        if (apiKey) {
+          headers['x-openai-api-key'] = apiKey;
+          console.log('Using OpenAI API key from ApiService for follow-up API call');
+        }
+      }
+
+      const followUpPayload = {
+        model: 'gpt-4o',
+        messages: updatedMessages,
+        tools: data.tools, // Reuse the same tools
+        temperature: 0.7,
+        max_tokens: 2000
+      };
+
       const followUpResponse = await fetch('/api/openai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: updatedMessages,
-          tools: data.tools, // Reuse the same tools
-          temperature: 0.7,
-          max_tokens: 2000
-        })
+        headers: headers,
+        body: JSON.stringify(followUpPayload)
       });
 
       if (!followUpResponse.ok) {
@@ -915,10 +961,7 @@ After using tools, synthesize the information to provide a complete and accurate
 
       node.apiLogs.push({
         timestamp: new Date().toISOString(),
-        request: {
-          messages: updatedMessages,
-          tools: data.tools
-        },
+        request: followUpPayload,
         response: followUpData
       });
 

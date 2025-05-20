@@ -7,6 +7,7 @@ const MCPTools = {
   // Available MCP servers and tools
   servers: {},
   tools: [],
+  initialized: false,
 
   // Initialize MCP tools
   async init() {
@@ -28,6 +29,9 @@ const MCPTools = {
       DebugManager.addLog(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`, 'success');
       console.log(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`);
 
+      // Set the initialized flag
+      this.initialized = true;
+
       // Notify the initialization system if available
       if (window.AppInitSystem && AppInitSystem.markReady) {
         AppInitSystem.markReady('mcpTools');
@@ -40,6 +44,9 @@ const MCPTools = {
 
       // Use fallback configuration
       this.useFallbackConfig();
+
+      // Set the initialized flag even if there was an error
+      this.initialized = true;
 
       // Notify the initialization system even if there was an error
       if (window.AppInitSystem && AppInitSystem.markReady) {
@@ -191,6 +198,9 @@ const MCPTools = {
       console.warn('AgentTools not available, cannot register fallback MCP tools');
       DebugManager.addLog('AgentTools not available, cannot register fallback MCP tools', 'warning');
     }
+
+    // Set the initialized flag
+    this.initialized = true;
   },
 
   // Get tools from a server
