@@ -24,7 +24,8 @@
         const retryInterval = 200; // ms
 
         const retryInit = () => {
-          if (window.App) {
+          // Check if App object is available now
+          if (window.App && typeof window.App === 'object') {
             console.log('App object now available, continuing AgentUI initialization');
             if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
               DebugManager.addLog('App object now available, continuing AgentUI initialization', 'success');
@@ -35,11 +36,65 @@
           } else if (retryCount < maxRetries) {
             retryCount++;
             console.log(`Retry ${retryCount}/${maxRetries} waiting for App object`);
+
+            // Try to find the App object in different ways
+            if (typeof window.App === 'undefined') {
+              console.log('App object is completely undefined');
+            } else if (window.App === null) {
+              console.log('App object is null');
+            } else if (typeof window.App !== 'object') {
+              console.log(`App object is not an object, it's a ${typeof window.App}`);
+            } else {
+              console.log('App object exists but may not be fully initialized');
+
+              // Check if it has the required methods
+              if (typeof window.App.addNode !== 'function') {
+                console.log('App.addNode is not a function');
+              }
+
+              if (typeof window.App.draw !== 'function') {
+                console.log('App.draw is not a function');
+              }
+
+              if (!Array.isArray(window.App.nodes)) {
+                console.log('App.nodes is not an array');
+              }
+            }
+
+            // Schedule another retry
             setTimeout(retryInit, retryInterval);
           } else {
             console.error('Failed to find App object after multiple retries');
             if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
               DebugManager.addLog('Failed to find App object after multiple retries, UI may not function correctly', 'error');
+            }
+
+            // Create a fallback App object if it doesn't exist
+            if (typeof window.App === 'undefined' || window.App === null) {
+              console.log('Creating fallback App object');
+              window.App = {
+                nodes: [],
+                addNode: function(type) {
+                  console.warn('Using fallback App.addNode method');
+                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                    DebugManager.addLog('Using fallback App.addNode method', 'warning');
+                  }
+
+                  // Try to use AgentProcessor directly
+                  if (window.AgentProcessor && typeof AgentProcessor.createAgentNode === 'function') {
+                    return AgentProcessor.createAgentNode();
+                  }
+
+                  throw new Error('Cannot create node: App object not properly initialized');
+                },
+                draw: function() {
+                  console.warn('Using fallback App.draw method');
+                }
+              };
+
+              if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                DebugManager.addLog('Created fallback App object', 'warning');
+              }
             }
 
             // Continue with initialization anyway
@@ -60,9 +115,16 @@
       // Add event listeners
       this.addEventListeners();
 
-      // Initialize modals
-      this.initAgentLogsModal();
-      this.initApiPayloadsModal();
+      // Initialize modals - use AgentModals if available
+      if (window.AgentModals) {
+        console.log('Using AgentModals for modal initialization');
+        // No need to initialize modals here, they're already initialized by AgentModals
+      } else {
+        console.warn('AgentModals not available, some features may not work correctly');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('AgentModals not available, some features may not work correctly', 'warning');
+        }
+      }
 
       console.log('AgentUI initialized');
       if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
@@ -385,19 +447,94 @@
           return;
         }
 
-        // Update the logs display
-        window.AgentNodes.updateAgentLogsDisplay();
+        // Use AgentModals if available
+        if (window.AgentModals && typeof AgentModals.updateAgentLogsDisplay === 'function') {
+          // Update the logs display using AgentModals
+          AgentModals.updateAgentLogsDisplay();
+        } else if (window.AgentNodes && typeof AgentNodes.updateAgentLogsDisplay === 'function') {
+          // Fallback to AgentNodes
+          window.AgentNodes.updateAgentLogsDisplay();
+        } else {
+          console.warn('Neither AgentModals nor AgentNodes has updateAgentLogsDisplay method');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('Cannot update agent logs display - missing required methods', 'warning');
+          }
+        }
 
         // Show the modal
         const agentLogsModal = document.getElementById('agentLogsModal');
         if (agentLogsModal) {
           agentLogsModal.style.display = 'block';
+        } else {
+          console.error('Agent logs modal element not found in the DOM');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('Agent logs modal element not found in the DOM', 'error');
+          }
+
+          // Try to create the modal if it doesn't exist
+          this.createAgentLogsModal();
         }
       } catch (error) {
         console.error('Error showing agent logs:', error);
         if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
           DebugManager.addLog(`Error showing agent logs: ${error.message}`, 'error');
         }
+      }
+    },
+
+    // Create agent logs modal if it doesn't exist
+    createAgentLogsModal: function() {
+      if (document.getElementById('agentLogsModal')) return;
+
+      console.log('Creating agent logs modal');
+
+      // Create the modal container
+      const modal = document.createElement('div');
+      modal.id = 'agentLogsModal';
+      modal.className = 'modal';
+      modal.style.display = 'none';
+
+      // Create the modal content
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Agent Logs</h2>
+            <button id="closeAgentLogs" class="close-button">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="tab-container">
+              <div class="tab-buttons">
+                <button class="tab-button active" data-tab="activityLogTab">Activity Log</button>
+                <button class="tab-button" data-tab="apiLogTab">API Log</button>
+              </div>
+              <div class="tab-content">
+                <div id="activityLogTab" class="tab-pane active">
+                  <pre id="activityLogContent">No activity logs available.</pre>
+                </div>
+                <div id="apiLogTab" class="tab-pane" style="display: none;">
+                  <pre id="apiLogContent">No API logs available.</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="clearLogs" class="button">Clear Logs</button>
+            <button id="copyLogs" class="button">Copy Logs</button>
+          </div>
+        </div>
+      `;
+
+      // Add the modal to the document
+      document.body.appendChild(modal);
+
+      // Initialize the modal
+      if (window.AgentModals && typeof AgentModals.initAgentLogsModal === 'function') {
+        AgentModals.initAgentLogsModal();
+      }
+
+      console.log('Agent logs modal created');
+      if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+        DebugManager.addLog('Agent logs modal created', 'success');
       }
     },
 
@@ -417,19 +554,98 @@
           return;
         }
 
-        // Update the payloads display
-        window.AgentNodes.updatePayloadsDisplay();
+        // Use AgentModals if available
+        if (window.AgentModals && typeof AgentModals.updatePayloadsDisplay === 'function') {
+          // Update the payloads display using AgentModals
+          AgentModals.updatePayloadsDisplay();
+        } else if (window.AgentNodes && typeof AgentNodes.updatePayloadsDisplay === 'function') {
+          // Fallback to AgentNodes
+          window.AgentNodes.updatePayloadsDisplay();
+        } else {
+          console.warn('Neither AgentModals nor AgentNodes has updatePayloadsDisplay method');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('Cannot update API payloads display - missing required methods', 'warning');
+          }
+        }
 
         // Show the modal
         const apiPayloadsModal = document.getElementById('apiPayloadsModal');
         if (apiPayloadsModal) {
           apiPayloadsModal.style.display = 'block';
+        } else {
+          console.error('API payloads modal element not found in the DOM');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('API payloads modal element not found in the DOM', 'error');
+          }
+
+          // Try to create the modal if it doesn't exist
+          this.createApiPayloadsModal();
         }
       } catch (error) {
         console.error('Error showing API payloads:', error);
         if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
           DebugManager.addLog(`Error showing API payloads: ${error.message}`, 'error');
         }
+      }
+    },
+
+    // Create API payloads modal if it doesn't exist
+    createApiPayloadsModal: function() {
+      if (document.getElementById('apiPayloadsModal')) return;
+
+      console.log('Creating API payloads modal');
+
+      // Create the modal container
+      const modal = document.createElement('div');
+      modal.id = 'apiPayloadsModal';
+      modal.className = 'modal';
+      modal.style.display = 'none';
+
+      // Create the modal content
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>API Payloads</h2>
+            <button id="closeApiPayloads" class="close-button">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="tab-container">
+              <div class="tab-buttons">
+                <button class="tab-button active" data-tab="requestPayloadTab">Request</button>
+                <button class="tab-button" data-tab="responsePayloadTab">Response</button>
+              </div>
+              <div class="tab-content">
+                <div id="requestPayloadTab" class="tab-pane active">
+                  <pre id="requestPayloadContent">No request payload available.</pre>
+                </div>
+                <div id="responsePayloadTab" class="tab-pane" style="display: none;">
+                  <pre id="responsePayloadContent">No response payload available.</pre>
+                </div>
+              </div>
+            </div>
+            <div class="api-log-navigation">
+              <button id="prevApiLog" class="button" disabled>&lt; Previous</button>
+              <span id="apiLogCounter">No API logs available</span>
+              <button id="nextApiLog" class="button" disabled>Next &gt;</button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="copyPayload" class="button">Copy Payload</button>
+          </div>
+        </div>
+      `;
+
+      // Add the modal to the document
+      document.body.appendChild(modal);
+
+      // Initialize the modal
+      if (window.AgentModals && typeof AgentModals.initApiPayloadsModal === 'function') {
+        AgentModals.initApiPayloadsModal();
+      }
+
+      console.log('API payloads modal created');
+      if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+        DebugManager.addLog('API payloads modal created', 'success');
       }
     },
 
