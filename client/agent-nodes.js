@@ -163,104 +163,129 @@
         };
 
         // Extend the Node's draw method to handle agent node styling
-        const originalNodeDraw = Node.prototype.draw;
+        // Store the original draw method if it hasn't been overridden yet
+        if (!Node.prototype._originalDraw) {
+          Node.prototype._originalDraw = Node.prototype.draw;
+        }
+
+        // Override the draw method only once
         Node.prototype.draw = function(ctx) {
+          // Check if we're already in an agent node drawing context to prevent infinite loops
+          if (this._isDrawingAgent) {
+            // Call the original draw method to avoid infinite recursion
+            if (Node.prototype._originalDraw) {
+              Node.prototype._originalDraw.call(this, ctx);
+            }
+            return;
+          }
+
           // Store the original node type for debugging
           const nodeType = this.nodeType || this._nodeType;
 
           // Force the node type to be set correctly if it's an agent node
-          // This is a workaround for cases where the nodeType property might not be set correctly
           if (this.isAgentNode === true && this.nodeType !== 'agent') {
             this.nodeType = 'agent';
             this._nodeType = 'agent';
-            DebugManager.addLog(`Fixed node type for agent node ${this.id}`, 'info');
+            // Removed excessive logging
           }
 
-          // Check if this is an agent node and apply styling before calling original draw
+          // Check if this is an agent node and apply styling
           if (this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true) {
-            // Override the node background with agent-specific styling
-            // Use purple gradient for agent nodes
-            const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
-            gradient.addColorStop(0, '#9c27b0');  // Purple top
-            gradient.addColorStop(1, '#7b1fa2');  // Darker purple bottom
+            // Set flag to prevent infinite recursion
+            this._isDrawingAgent = true;
 
-            // Save the original styles
-            const originalFill = ctx.fillStyle;
-            const originalStroke = ctx.strokeStyle;
-            const originalLineWidth = ctx.lineWidth;
+            try {
+              // Override the node background with agent-specific styling
+              // Use purple gradient for agent nodes
+              const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+              gradient.addColorStop(0, '#9c27b0');  // Purple top
+              gradient.addColorStop(1, '#7b1fa2');  // Darker purple bottom
 
-            // Apply the gradient to the node
-            ctx.fillStyle = this.selected ? '#4a90e2' :
-                           this.processing ? '#d4af37' :
-                           this.error ? '#e74c3c' : gradient;
+              // Save the original styles
+              const originalFill = ctx.fillStyle;
+              const originalStroke = ctx.strokeStyle;
+              const originalLineWidth = ctx.lineWidth;
 
-            ctx.strokeStyle = '#ff00ff'; // Bright purple border for agent nodes
-            ctx.lineWidth = 2; // Thicker border
+              // Apply the gradient to the node
+              ctx.fillStyle = this.selected ? '#4a90e2' :
+                             this.processing ? '#d4af37' :
+                             this.error ? '#e74c3c' : gradient;
 
-            // Draw the node background and border
-            ctx.beginPath();
-            ctx.roundRect(this.x, this.y, this.width, this.height, 5);
-            ctx.fill();
-            ctx.stroke();
+              ctx.strokeStyle = '#ff00ff'; // Bright purple border for agent nodes
+              ctx.lineWidth = 2; // Thicker border
 
-            // Draw the node title
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(this.title, this.x + this.width / 2, this.y + 20);
-
-            // Add agent icon
-            // Draw agent badge in the top-right corner
-            const badgeX = this.x + this.width - 20;
-            const badgeY = this.y + 20;
-            const badgeRadius = 12;
-
-            // Draw the badge circle
-            ctx.fillStyle = '#9c27b0'; // Purple for agent nodes
-            ctx.beginPath();
-            ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Draw the badge icon (robot emoji)
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🤖', badgeX, badgeY);
-
-            // Draw iteration count if iterating
-            if (this.isIterating) {
-              const iterX = this.x + this.width - 20;
-              const iterY = this.y + this.height - 20;
-
-              // Draw iteration badge
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+              // Draw the node background and border
               ctx.beginPath();
-              ctx.arc(iterX, iterY, 15, 0, Math.PI * 2);
+              ctx.roundRect(this.x, this.y, this.width, this.height, 5);
+              ctx.fill();
+              ctx.stroke();
+
+              // Draw the node title
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 14px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText(this.title, this.x + this.width / 2, this.y + 20);
+
+              // Add agent icon
+              // Draw agent badge in the top-right corner
+              const badgeX = this.x + this.width - 20;
+              const badgeY = this.y + 20;
+              const badgeRadius = 12;
+
+              // Draw the badge circle
+              ctx.fillStyle = '#9c27b0'; // Purple for agent nodes
+              ctx.beginPath();
+              ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
               ctx.fill();
 
-              // Draw iteration text
+              // Draw the badge icon (robot emoji)
               ctx.fillStyle = '#fff';
-              ctx.font = 'bold 12px Arial';
+              ctx.font = 'bold 14px Arial';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
-              ctx.fillText(`${this.currentIteration}/${this.maxIterations}`, iterX, iterY);
+              ctx.fillText('🤖', badgeX, badgeY);
+
+              // Draw iteration count if iterating
+              if (this.isIterating) {
+                const iterX = this.x + this.width - 20;
+                const iterY = this.y + this.height - 20;
+
+                // Draw iteration badge
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.beginPath();
+                ctx.arc(iterX, iterY, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw iteration text
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.currentIteration}/${this.maxIterations}`, iterX, iterY);
+              }
+
+              // Draw input and output areas
+              if (typeof this.drawInputOutputAreas === 'function') {
+                this.drawInputOutputAreas(ctx);
+              }
+
+              // Restore the original styles
+              ctx.fillStyle = originalFill;
+              ctx.strokeStyle = originalStroke;
+              ctx.lineWidth = originalLineWidth;
+            } finally {
+              // Always clear the flag to prevent issues with future draws
+              this._isDrawingAgent = false;
             }
-
-            // Draw input and output areas
-            this.drawInputOutputAreas(ctx);
-
-            // Restore the original styles
-            ctx.fillStyle = originalFill;
-            ctx.strokeStyle = originalStroke;
-            ctx.lineWidth = originalLineWidth;
 
             // Skip the original draw method for agent nodes
             return;
           }
 
           // Call the original draw method for non-agent nodes
-          originalNodeDraw.call(this, ctx);
+          if (Node.prototype._originalDraw) {
+            Node.prototype._originalDraw.call(this, ctx);
+          }
         };
 
         // Helper method to draw input and output areas for agent nodes
