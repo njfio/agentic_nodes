@@ -1753,25 +1753,39 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       });
     }
 
+    // Set up Can Be Workflow Node checkbox handler
+    const canBeWorkflowNodeCheckbox = document.getElementById('canBeWorkflowNode');
+    if (canBeWorkflowNodeCheckbox) {
+      // Remove any existing event listeners by cloning and replacing
+      const newCanBeWorkflowNodeCheckbox = canBeWorkflowNodeCheckbox.cloneNode(true);
+      canBeWorkflowNodeCheckbox.parentNode.replaceChild(newCanBeWorkflowNodeCheckbox, canBeWorkflowNodeCheckbox);
 
-          // If unchecked, reset the role to 'none'
-          if (!newCanBeWorkflowNodeCheckbox.checked) {
-            const nodeRoleNone = document.getElementById('agentNodeRoleNone');
-            if (nodeRoleNone) {
-              nodeRoleNone.checked = true;
-            }
+      // Add the event listener
+      newCanBeWorkflowNodeCheckbox.addEventListener('change', (e) => {
+        // Show/hide the workflow node role section based on the checkbox state
+        const workflowNodeRoleSection = document.getElementById('workflowNodeRoleSection');
+        if (workflowNodeRoleSection) {
+          workflowNodeRoleSection.style.display = newCanBeWorkflowNodeCheckbox.checked ? 'block' : 'none';
+          DebugManager.addLog(`Workflow node role section ${newCanBeWorkflowNodeCheckbox.checked ? 'shown' : 'hidden'}`, 'info');
+        }
 
-            // If we have a node being edited, update its role
-            if (this.editingNode) {
-              // Use the WorkflowIO object to set the role if available
-              if (window.WorkflowIO && typeof WorkflowIO.setNodeRole === 'function') {
-                WorkflowIO.setNodeRole(this.editingNode, 'none');
-                DebugManager.addLog('Reset node role to none (can\'t be workflow node)', 'info');
-              } else {
-                // Fallback if WorkflowIO is not available
-                this.editingNode.workflowRole = 'none';
-                DebugManager.addLog('Reset node role to none (fallback method)', 'warning');
-              }
+        // If unchecked, reset the role to 'none'
+        if (!newCanBeWorkflowNodeCheckbox.checked) {
+          const nodeRoleNone = document.getElementById('agentNodeRoleNone');
+          if (nodeRoleNone) {
+            nodeRoleNone.checked = true;
+          }
+
+          // If we have a node being edited, update its role
+          if (this.editingNode) {
+            // Use the WorkflowIO object to set the role if available
+            if (window.WorkflowIO && typeof WorkflowIO.setNodeRole === 'function') {
+              WorkflowIO.setNodeRole(this.editingNode, 'none');
+              DebugManager.addLog('Reset node role to none (can\'t be workflow node)', 'info');
+            } else {
+              // Fallback if WorkflowIO is not available
+              this.editingNode.workflowRole = 'none';
+              DebugManager.addLog('Reset node role to none (fallback method)', 'warning');
             }
           }
         }
@@ -2973,74 +2987,99 @@ AgentNodes.updateToolsList = function() {
 
   console.log('AgentNodes implementation applied to global object');
 
+  // Add a direct method to add the agent node button to the toolbar
+  window.AgentNodes.addAgentNodeButton = function() {
+    console.log('Adding agent node button directly');
+    const toolbar = document.getElementById('toolbar');
+    if (!toolbar) {
+      console.error('Toolbar not found, cannot add agent node button');
+      return;
+    }
+
+    // Check if the button already exists
+    const existingButton = document.getElementById('addAgentNodeBtn');
+    if (existingButton) {
+      console.log('Agent node button already exists');
+      return;
+    }
+
+    // Add Agent Node button
+    const agentBtn = document.createElement('button');
+    agentBtn.id = 'addAgentNodeBtn';
+    agentBtn.type = 'button';
+    agentBtn.textContent = 'Add Agent Node';
+    agentBtn.title = 'Add a node with agentic capabilities';
+
+    // Add a distinctive style to make it stand out
+    agentBtn.style.backgroundColor = '#9c27b0';
+    agentBtn.style.color = 'white';
+    agentBtn.style.fontWeight = 'bold';
+    agentBtn.style.border = '2px solid #ff00ff';
+    agentBtn.style.boxShadow = '0 0 5px #9c27b0';
+    agentBtn.style.position = 'relative';
+
+    // Add robot emoji to the button
+    const robotSpan = document.createElement('span');
+    robotSpan.textContent = ' 🤖';
+    robotSpan.style.fontSize = '16px';
+    agentBtn.appendChild(robotSpan);
+
+    // Add click event listener
+    agentBtn.addEventListener('click', () => {
+      console.log('Add Agent Node button clicked');
+      if (window.App && typeof App.addNode === 'function') {
+        console.log('Calling App.addNode with agent type');
+        try {
+          const node = App.addNode('agent');
+          console.log('Created agent node:', node);
+
+          // Log success message
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
+          }
+
+          // Force a redraw of the canvas
+          if (window.App && typeof App.draw === 'function') {
+            App.draw();
+          }
+        } catch (error) {
+          console.error('Error creating agent node:', error);
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Error creating agent node: ${error.message}`, 'error');
+          }
+        }
+      } else {
+        console.error('App.addNode not available');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('App.addNode not available, cannot create agent node', 'error');
+        }
+      }
+    });
+
+    // Insert the button after the Add Node button
+    const addNodeBtn = document.getElementById('addNodeBtn');
+    if (addNodeBtn && addNodeBtn.parentNode) {
+      console.log('Inserting agent node button after Add Node button');
+      addNodeBtn.parentNode.insertBefore(agentBtn, addNodeBtn.nextSibling);
+    } else {
+      console.log('Add Node button not found, appending agent node button to toolbar');
+      toolbar.appendChild(agentBtn);
+    }
+
+    console.log('Agent node button added to toolbar');
+
+    // Log success message to debug panel
+    if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+      DebugManager.addLog('Agent Node button added to toolbar', 'success');
+    }
+  };
+
   // Force initialization of AgentNodes
   setTimeout(() => {
     if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
       console.log('Forcing AgentNodes initialization');
       window.AgentNodes.init();
     }
-
-    // Add a direct method to add the agent node button to the toolbar
-    window.AgentNodes.addAgentNodeButton = function() {
-      console.log('Adding agent node button directly');
-      const toolbar = document.getElementById('toolbar');
-      if (!toolbar) {
-        console.error('Toolbar not found, cannot add agent node button');
-        return;
-      }
-
-      // Check if the button already exists
-      const existingButton = document.getElementById('addAgentNodeBtn');
-      if (existingButton) {
-        console.log('Agent node button already exists');
-        return;
-      }
-
-      // Add Agent Node button
-      const agentBtn = document.createElement('button');
-      agentBtn.id = 'addAgentNodeBtn';
-      agentBtn.type = 'button';
-      agentBtn.textContent = 'Add Agent Node';
-      agentBtn.title = 'Add a node with agentic capabilities';
-
-      // Add a distinctive style to make it stand out
-      agentBtn.style.backgroundColor = '#9c27b0';
-      agentBtn.style.color = 'white';
-      agentBtn.style.fontWeight = 'bold';
-      agentBtn.style.border = '2px solid #ff00ff';
-      agentBtn.style.boxShadow = '0 0 5px #9c27b0';
-      agentBtn.style.position = 'relative';
-
-      // Add robot emoji to the button
-      const robotSpan = document.createElement('span');
-      robotSpan.textContent = ' 🤖';
-      robotSpan.style.fontSize = '16px';
-      agentBtn.appendChild(robotSpan);
-
-      // Add click event listener
-      agentBtn.addEventListener('click', () => {
-        console.log('Add Agent Node button clicked');
-        if (window.App && typeof App.addNode === 'function') {
-          console.log('Calling App.addNode with agent type');
-          const node = App.addNode('agent');
-          console.log('Created agent node:', node);
-        } else {
-          console.error('App.addNode not available');
-        }
-      });
-
-      // Insert the button after the Add Node button
-      const addNodeBtn = document.getElementById('addNodeBtn');
-      if (addNodeBtn && addNodeBtn.parentNode) {
-        console.log('Inserting agent node button after Add Node button');
-        addNodeBtn.parentNode.insertBefore(agentBtn, addNodeBtn.nextSibling);
-      } else {
-        console.log('Add Node button not found, appending agent node button to toolbar');
-        toolbar.appendChild(agentBtn);
-      }
-
-      console.log('Agent node button added to toolbar');
-    };
 
     // Call the method to add the button
     setTimeout(() => {
@@ -3060,6 +3099,14 @@ AgentNodes.updateToolsList = function() {
       window.AgentNodes.init();
     }
 
+    // Ensure the agent node button is added to the toolbar
+    if (window.AgentNodes && typeof window.AgentNodes.addAgentNodeButton === 'function') {
+      console.log('Adding agent node button from DOMContentLoaded event');
+      setTimeout(() => {
+        window.AgentNodes.addAgentNodeButton();
+      }, 500); // Add a slight delay to ensure the toolbar is ready
+    }
+
     // Listen for app initialization complete event
     document.addEventListener('app-initialization-complete', function() {
       console.log('App initialization complete event received by AgentNodes');
@@ -3073,6 +3120,12 @@ AgentNodes.updateToolsList = function() {
       if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
         console.log('Initializing AgentNodes after app initialization');
         window.AgentNodes.init();
+      }
+
+      // Ensure the agent node button is added to the toolbar
+      if (window.AgentNodes && typeof window.AgentNodes.addAgentNodeButton === 'function') {
+        console.log('Adding agent node button after app initialization');
+        window.AgentNodes.addAgentNodeButton();
       }
     });
   });

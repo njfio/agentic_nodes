@@ -355,8 +355,7 @@ const AgentTools = {
           throw error;
         }
       }
-    }
-  },
+    },
     // OpenAI Browser Search tool
     {
       id: 'browser.search',
