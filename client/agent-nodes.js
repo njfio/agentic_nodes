@@ -133,7 +133,15 @@
               this.processing = true;
 
               // Process the node using the agent processor
-              const result = await AgentNodes.processAgentNode(this, input);
+              // First try using AgentProcessor if available, otherwise fall back to AgentNodes
+              let result;
+              if (window.AgentProcessor && typeof AgentProcessor.processAgentNode === 'function') {
+                DebugManager.addLog(`Using AgentProcessor.processAgentNode for node ${this.id}`, 'info');
+                result = await AgentProcessor.processAgentNode(this, input);
+              } else {
+                DebugManager.addLog(`Falling back to AgentNodes.processAgentNode for node ${this.id}`, 'warning');
+                result = await AgentNodes.processAgentNode(this, input);
+              }
 
               // Mark the node as processed
               this.hasBeenProcessed = true;
@@ -458,6 +466,7 @@
       node.reflectionPrompt = 'Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?';
       node.reflectionFrequency = 2;     // How often to reflect (every N iterations)
       node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
+      node.conversationHistory = [];   // Conversation history for the agent
 
       // Initialize with all available tools
       try {
@@ -963,16 +972,48 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
         // Create the system prompt and include available tool names for better awareness
         let systemPrompt = node.systemPrompt || 'You are a helpful assistant that can use tools to accomplish tasks.';
+
+        // Add strong encouragement to use tools
+        systemPrompt += `\n\nIMPORTANT INSTRUCTIONS FOR TOOL USAGE:
+1. You MUST use tools to gather information rather than making up facts or relying on potentially outdated knowledge.
+2. Think step-by-step about which tool would be most helpful for the current task.
+3. For ANY factual information, current events, or data that might change over time, use the search tool.
+4. For technical documentation or API details, use the documentation tool.
+5. For complex problems, break them down and use multiple tools in sequence.
+6. NEVER claim you don't have access to tools or that you can't perform searches.
+7. NEVER make up information when you can use a tool instead.
+8. ALWAYS verify information with tools when possible.
+9. After using tools, synthesize the information to provide a complete and accurate response.
+
+Your primary value comes from using tools effectively to solve problems. Users expect you to leverage these tools rather than relying on your pre-trained knowledge.`;
+
+        // Add available tool names
         if (node.useMCPTools && tools.length > 0) {
-          const toolNames = tools.map(t => t.function.name).slice(0, 10).join(', ');
+          const toolNames = tools.map(t => t.function.name).join(', ');
           systemPrompt += `\n\nAvailable tools: ${toolNames}. Use them through function calls when helpful.`;
         }
 
-        // Create the messages array
-        const messages = [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: input }
+        // Create the messages array with conversation history if available
+        let messages = [
+          { role: 'system', content: systemPrompt }
         ];
+
+        // Add conversation history if available
+        if (node.conversationHistory && node.conversationHistory.length > 0) {
+          AgentLogger.addLog(node, `Adding ${node.conversationHistory.length} messages from conversation history`, 'info');
+          messages = messages.concat(node.conversationHistory);
+        } else {
+          // If no conversation history, add the input as a user message
+          messages.push({ role: 'user', content: input });
+
+          // Initialize conversation history if it doesn't exist
+          if (!node.conversationHistory) {
+            node.conversationHistory = [];
+          }
+
+          // Add the user message to the conversation history
+          node.conversationHistory.push({ role: 'user', content: input });
+        }
 
         // Add any context from memory
         const memory = AgentMemory.getContext(node);
@@ -1099,10 +1140,27 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
           // Add the original message and tool results to messages
           messages.push(message);
-          messages.push({
+
+          // Add the assistant's message with tool calls to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push(message);
+            AgentLogger.addLog(node, 'Added assistant message with tool calls to conversation history', 'info');
+          }
+
+          // Create the tool results message
+          const toolResultsMessage = {
             role: 'user',
             content: `Here are the results of the tool calls:\n\n${resultsSummary}\n\nPlease provide a final response based on these results.`
-          });
+          };
+
+          // Add the tool results to messages
+          messages.push(toolResultsMessage);
+
+          // Add the tool results to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push(toolResultsMessage);
+            AgentLogger.addLog(node, 'Added tool results to conversation history', 'info');
+          }
 
           // Make a final API request to get the final response
           AgentLogger.addLog(node, 'Sending final request to OpenAI API', 'info');
@@ -1145,6 +1203,12 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
           // Add the final response to memory
           AgentMemory.addToContext(node, finalMessage.content);
 
+          // Add the assistant's response to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push({ role: 'assistant', content: finalMessage.content });
+            AgentLogger.addLog(node, 'Added assistant response to conversation history', 'info');
+          }
+
           AgentLogger.addLog(node, 'Function calling completed successfully', 'success');
 
           return finalMessage.content;
@@ -1154,6 +1218,12 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
           // Add the response to memory
           AgentMemory.addToContext(node, message.content);
+
+          // Add the assistant's response to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push({ role: 'assistant', content: message.content });
+            AgentLogger.addLog(node, 'Added assistant response to conversation history', 'info');
+          }
 
           // Ensure API payloads are logged
           if (node.lastRequestPayload || node.lastResponsePayload) {
