@@ -580,6 +580,66 @@
     // Log the start of processing
     AgentLogger.addLog(node, `Processing Agent Node "${node.title}" (ID: ${node.id})`, 'info');
 
+    // IMPORTANT: Check if tools are available
+    console.log('CHECKING TOOLS AVAILABILITY:');
+
+    // Check AgentTools
+    if (window.AgentTools) {
+      console.log('AgentTools is available');
+      const agentTools = AgentTools.getAllTools();
+      console.log(`AgentTools.getAllTools() returned ${agentTools ? agentTools.length : 0} tools`);
+
+      if (agentTools && agentTools.length > 0) {
+        console.log('Tool IDs:', agentTools.map(t => t.id).join(', '));
+        node.tools = [...agentTools];
+        AgentLogger.addLog(node, `Loaded ${agentTools.length} tools from AgentTools`, 'info');
+      } else {
+        console.error('AgentTools.getAllTools() returned no tools');
+        AgentLogger.addLog(node, 'No tools available from AgentTools', 'warning');
+      }
+    } else {
+      console.error('AgentTools is NOT available');
+      AgentLogger.addLog(node, 'AgentTools is not available', 'error');
+    }
+
+    // Check MCPTools
+    if (window.MCPTools) {
+      console.log('MCPTools is available');
+      const mcpTools = MCPTools.getAllTools();
+      console.log(`MCPTools.getAllTools() returned ${mcpTools ? mcpTools.length : 0} tools`);
+
+      if (mcpTools && mcpTools.length > 0) {
+        console.log('MCP Tool IDs:', mcpTools.map(t => t.id).join(', '));
+        // Add MCP tools to the node's tools
+        if (!node.tools) node.tools = [];
+        node.tools = [...node.tools, ...mcpTools];
+        AgentLogger.addLog(node, `Added ${mcpTools.length} tools from MCPTools`, 'info');
+      } else {
+        console.error('MCPTools.getAllTools() returned no tools');
+        AgentLogger.addLog(node, 'No tools available from MCPTools', 'warning');
+      }
+    } else {
+      console.error('MCPTools is NOT available');
+      AgentLogger.addLog(node, 'MCPTools is not available', 'error');
+    }
+
+    // Force initialize tools if needed
+    if (window.AgentTools && (!window.AgentTools.tools || window.AgentTools.tools.length === 0)) {
+      console.log('Forcing initialization of AgentTools');
+      if (typeof window.AgentTools.initializeTools === 'function') {
+        window.AgentTools.initializeTools();
+        AgentLogger.addLog(node, 'Forced initialization of AgentTools', 'info');
+      }
+    }
+
+    if (window.MCPTools && (!window.MCPTools.tools || window.MCPTools.tools.length === 0)) {
+      console.log('Forcing initialization of MCPTools');
+      if (typeof window.MCPTools.init === 'function') {
+        await window.MCPTools.init();
+        AgentLogger.addLog(node, 'Forced initialization of MCPTools', 'info');
+      }
+    }
+
     try {
       // Initialize API payload storage if not already present
       if (!node.lastRequestPayload) node.lastRequestPayload = {};
@@ -1060,14 +1120,6 @@ Your primary value comes from using tools effectively to solve problems. Users e
 
         // Choose whether to force a search tool based on the input
         const toolChoice = "auto";
-        // Store the request payload for logging
-        node.lastRequestPayload = {
-          model: config.model || 'gpt-4o',
-          messages,
-          tools,
-          tool_choice: toolChoice
-        };
-
         // Create the request payload
         const requestPayload = {
           model: config.model || 'gpt-4o',
@@ -1075,6 +1127,51 @@ Your primary value comes from using tools effectively to solve problems. Users e
           tools,
           tool_choice: toolChoice
         };
+
+        // Store the request payload for logging
+        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
+
+        // CRITICAL: Ensure tools are included in the request payload
+        if (!requestPayload.tools || requestPayload.tools.length === 0) {
+          console.error('NO TOOLS IN REQUEST PAYLOAD - ATTEMPTING TO FIX');
+          AgentLogger.addLog(node, 'No tools in request payload - attempting to fix', 'error');
+
+          // Try to get tools directly from AgentTools
+          if (window.AgentTools) {
+            const directTools = AgentTools.getAllTools();
+            if (directTools && directTools.length > 0) {
+              console.log(`Adding ${directTools.length} tools directly from AgentTools`);
+
+              // Map tools to the format expected by OpenAI API
+              const formattedTools = directTools.map(tool => {
+                return {
+                  type: "function",
+                  function: {
+                    name: tool.id,
+                    description: tool.description || 'No description available',
+                    parameters: {
+                      type: "object",
+                      properties: {
+                        query: {
+                          type: "string",
+                          description: "The query or input for the tool"
+                        }
+                      },
+                      required: ["query"]
+                    }
+                  }
+                };
+              });
+
+              // Add tools to the payload
+              requestPayload.tools = formattedTools;
+              requestPayload.tool_choice = "auto";
+
+              console.log(`Added ${formattedTools.length} tools directly to request payload`);
+              AgentLogger.addLog(node, `Added ${formattedTools.length} tools directly to request payload`, 'info');
+            }
+          }
+        }
 
         // Log the full request payload for debugging
         AgentLogger.addLog(node, `Sending request with ${messages.length} messages and ${tools.length} tools`, 'info');
