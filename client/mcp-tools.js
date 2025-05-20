@@ -477,6 +477,35 @@ const MCPTools = {
   getAllTools() {
     console.log(`MCPTools.getAllTools called, returning ${this.tools.length} tools`);
 
+    // Log detailed information about each tool
+    console.log('MCP TOOLS DETAILED INFO:');
+    this.tools.forEach((tool, index) => {
+      console.log(`MCP Tool ${index + 1}/${this.tools.length}:`);
+      console.log('  ID:', tool.id);
+      console.log('  Name:', tool.name);
+      console.log('  Description:', tool.description);
+      console.log('  Category:', tool.category);
+      console.log('  Server:', tool.server);
+      console.log('  Method:', tool.method);
+      console.log('  Has execute function:', !!tool.execute);
+      console.log('  Auto approve:', !!tool.autoApprove);
+
+      // Check if the tool has all required properties
+      const hasAllProps = tool.id && tool.name && tool.description && tool.category && tool.server && tool.method;
+      console.log('  Has all required properties:', hasAllProps);
+
+      if (!hasAllProps) {
+        console.log('  Missing properties:', [
+          !tool.id ? 'id' : null,
+          !tool.name ? 'name' : null,
+          !tool.description ? 'description' : null,
+          !tool.category ? 'category' : null,
+          !tool.server ? 'server' : null,
+          !tool.method ? 'method' : null
+        ].filter(Boolean).join(', '));
+      }
+    });
+
     // Check if tools are properly formatted
     const formattedTools = this.tools.map(tool => {
       // Ensure the tool has all required properties
@@ -502,6 +531,14 @@ const MCPTools = {
     // Log the tool IDs for debugging
     const toolIds = formattedTools.map(tool => tool.id);
     console.log('Available MCP tools:', toolIds.join(', '));
+
+    // Log the formatted tools in detail
+    console.log('FORMATTED MCP TOOLS:');
+    console.log(JSON.stringify(formattedTools, (key, value) => {
+      // Skip the execute function in the output
+      if (key === 'execute') return '[Function]';
+      return value;
+    }, 2));
 
     return formattedTools;
   },

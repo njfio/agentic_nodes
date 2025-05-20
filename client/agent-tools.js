@@ -424,6 +424,31 @@ const AgentTools = {
     const toolIds = this.tools.map(tool => tool.id);
     console.log('Available tools:', toolIds.join(', '));
 
+    // Log detailed information about each tool
+    console.log('AGENT TOOLS DETAILED INFO:');
+    this.tools.forEach((tool, index) => {
+      console.log(`Tool ${index + 1}/${this.tools.length}:`);
+      console.log('  ID:', tool.id);
+      console.log('  Name:', tool.name);
+      console.log('  Description:', tool.description);
+      console.log('  Category:', tool.category);
+      console.log('  Has execute function:', !!tool.execute);
+
+      // Check if the tool has all required properties
+      const hasAllProps = tool.id && tool.name && tool.description && tool.category && tool.execute;
+      console.log('  Has all required properties:', hasAllProps);
+
+      if (!hasAllProps) {
+        console.log('  Missing properties:', [
+          !tool.id ? 'id' : null,
+          !tool.name ? 'name' : null,
+          !tool.description ? 'description' : null,
+          !tool.category ? 'category' : null,
+          !tool.execute ? 'execute' : null
+        ].filter(Boolean).join(', '));
+      }
+    });
+
     // Check if tools are properly formatted for OpenAI function calling
     const validTools = this.tools.filter(tool => {
       if (!tool.id || !tool.name || !tool.description || !tool.category || !tool.execute) {

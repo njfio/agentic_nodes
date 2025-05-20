@@ -929,9 +929,28 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         const allTools = AgentTools.getAllTools();
         console.log(`Got ${allTools ? allTools.length : 0} tools from AgentTools.getAllTools()`);
 
-        // Debug log the tools
+        // Debug log the tools in detail
         if (allTools && allTools.length > 0) {
           console.log('Tool IDs:', allTools.map(t => t.id).join(', '));
+
+          // Log detailed information about each tool
+          console.log('DETAILED TOOL INFO:');
+          allTools.forEach((tool, index) => {
+            console.log(`Tool ${index + 1}/${allTools.length}:`);
+            console.log('  ID:', tool.id);
+            console.log('  Name:', tool.name);
+            console.log('  Description:', tool.description);
+            console.log('  Category:', tool.category);
+            console.log('  Has execute function:', !!tool.execute);
+            console.log('  Is MCP tool:', !!tool.mcpTool);
+
+            // Check if the tool has valid parameters
+            const params = this.getToolParameters(tool);
+            console.log('  Has parameters:', !!params && Object.keys(params).length > 0);
+            if (params) {
+              console.log('  Parameter keys:', Object.keys(params).join(', '));
+            }
+          });
         } else {
           console.warn('No tools returned from AgentTools.getAllTools()');
         }
@@ -1109,8 +1128,21 @@ Your primary value comes from using tools effectively to solve problems. Users e
           }
         }
 
-        // Log the final payload
+        // Log the final payload in detail
         console.log(`Sending request with ${requestPayload.tools ? requestPayload.tools.length : 0} tools`);
+        console.log('FULL REQUEST PAYLOAD:');
+        console.log(JSON.stringify(requestPayload, null, 2));
+
+        // Log the tools specifically
+        if (requestPayload.tools && requestPayload.tools.length > 0) {
+          console.log('TOOLS IN REQUEST:');
+          requestPayload.tools.forEach((tool, index) => {
+            console.log(`Tool ${index + 1}/${requestPayload.tools.length}:`);
+            console.log(JSON.stringify(tool, null, 2));
+          });
+        } else {
+          console.warn('NO TOOLS IN REQUEST PAYLOAD');
+        }
 
         const response = await fetch('/api/openai/chat', {
           method: 'POST',
@@ -1127,6 +1159,10 @@ Your primary value comes from using tools effectively to solve problems. Users e
         }
 
         const data = await response.json();
+
+        // Log the response in detail
+        console.log('FULL RESPONSE PAYLOAD:');
+        console.log(JSON.stringify(data, null, 2));
 
         // Store the response payload for logging
         node.lastResponsePayload = data;
@@ -1226,7 +1262,20 @@ Your primary value comes from using tools effectively to solve problems. Users e
           // Store the request payload for logging
           node.lastRequestPayload = finalRequestPayload;
 
-          console.debug('OpenAI final request payload:', finalRequestPayload);
+          console.log('FINAL REQUEST PAYLOAD:');
+          console.log(JSON.stringify(finalRequestPayload, null, 2));
+
+          // Log the tools specifically in the final request
+          if (finalRequestPayload.tools && finalRequestPayload.tools.length > 0) {
+            console.log('TOOLS IN FINAL REQUEST:');
+            finalRequestPayload.tools.forEach((tool, index) => {
+              console.log(`Tool ${index + 1}/${finalRequestPayload.tools.length}:`);
+              console.log(JSON.stringify(tool, null, 2));
+            });
+          } else {
+            console.warn('NO TOOLS IN FINAL REQUEST PAYLOAD');
+          }
+
           const finalResponse = await fetch('/api/openai/chat', {
             method: 'POST',
             headers: {
@@ -1242,6 +1291,10 @@ Your primary value comes from using tools effectively to solve problems. Users e
           }
 
           const finalData = await finalResponse.json();
+
+          // Log the final response in detail
+          console.log('FINAL RESPONSE PAYLOAD:');
+          console.log(JSON.stringify(finalData, null, 2));
 
           // Store the response payload for logging
           node.lastResponsePayload = finalData;
