@@ -935,6 +935,14 @@
             AgentNodes.updateToolsList();
             console.log('Updated AgentNodes tools list');
           }
+
+          // Add the agent node button to the toolbar
+          if (window.AgentNodes.addAgentNodeButton) {
+            console.log('Adding agent node button from finalizeInitialization');
+            setTimeout(() => {
+              window.AgentNodes.addAgentNodeButton();
+            }, 500);
+          }
         }
 
         // Dispatch a custom event to notify the application that initialization is complete

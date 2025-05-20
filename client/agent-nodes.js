@@ -87,6 +87,8 @@
   registerNodeTypes() {
     // Add the agent node type to the App object if it exists
     if (window.App) {
+      console.log('Registering agent node type with App');
+
       // Store the original addNode method
       const originalAddNode = App.addNode;
 
@@ -95,6 +97,7 @@
         console.log('App.addNode called with nodeType:', nodeType);
 
         if (nodeType === 'agent') {
+          console.log('Creating agent node');
           const agentNode = AgentNodes.createAgentNode();
           console.log('Created agent node with nodeType:', agentNode.nodeType);
           return agentNode;
@@ -103,6 +106,9 @@
         // Call the original method for other node types
         return originalAddNode.call(App, nodeType);
       };
+
+      // Log the registered node types
+      console.log('Agent node type registered with App');
 
       // Add the nodeType property to the Node class if it doesn't exist
       if (!Node.prototype.hasOwnProperty('nodeType')) {
@@ -305,15 +311,22 @@
 
   // Add event listeners
   addEventListeners() {
+    console.log('Adding event listeners for AgentNodes');
+
     // Add buttons to the toolbar
     const toolbar = document.getElementById('toolbar');
     if (toolbar) {
+      console.log('Found toolbar, adding agent node button');
+
       // Check if the button already exists
       const existingButton = document.getElementById('addAgentNodeBtn');
       if (existingButton) {
         // Remove the existing button to avoid duplicates
         existingButton.remove();
-        DebugManager.addLog('Removed existing Agent Node button to avoid duplicates', 'info');
+        console.log('Removed existing Agent Node button to avoid duplicates');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Removed existing Agent Node button to avoid duplicates', 'info');
+        }
       }
 
       // Add Agent Node button
@@ -339,19 +352,43 @@
 
       // Remove any existing event listeners by using a new function
       agentBtn.addEventListener('click', () => {
-        DebugManager.addLog('Add Agent Node button clicked', 'info');
-        // Call our createAgentNode method directly instead of going through App.addNode
-        const node = AgentNodes.createAgentNode();
-        DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
+        console.log('Add Agent Node button clicked');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Add Agent Node button clicked', 'info');
+        }
+
+        // Call App.addNode with 'agent' type
+        if (window.App && typeof App.addNode === 'function') {
+          console.log('Calling App.addNode with agent type');
+          const node = App.addNode('agent');
+          console.log('Created agent node:', node);
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
+          }
+        } else {
+          // Fallback to direct creation
+          console.log('App.addNode not available, creating agent node directly');
+          const node = AgentNodes.createAgentNode();
+          console.log('Created agent node directly:', node);
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Created agent node directly with ID: ${node.id}`, 'success');
+          }
+        }
       });
 
       // Insert the button after the Add Node button
       const addNodeBtn = document.getElementById('addNodeBtn');
       if (addNodeBtn && addNodeBtn.parentNode) {
+        console.log('Inserting agent node button after Add Node button');
         addNodeBtn.parentNode.insertBefore(agentBtn, addNodeBtn.nextSibling);
       } else {
+        console.log('Add Node button not found, appending agent node button to toolbar');
         toolbar.appendChild(agentBtn);
       }
+
+      console.log('Agent node button added to toolbar');
+    } else {
+      console.error('Toolbar not found, cannot add agent node button');
     }
 
     // Add keyboard shortcuts
@@ -2936,9 +2973,92 @@ AgentNodes.updateToolsList = function() {
 
   console.log('AgentNodes implementation applied to global object');
 
+  // Force initialization of AgentNodes
+  setTimeout(() => {
+    if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+      console.log('Forcing AgentNodes initialization');
+      window.AgentNodes.init();
+    }
+
+    // Add a direct method to add the agent node button to the toolbar
+    window.AgentNodes.addAgentNodeButton = function() {
+      console.log('Adding agent node button directly');
+      const toolbar = document.getElementById('toolbar');
+      if (!toolbar) {
+        console.error('Toolbar not found, cannot add agent node button');
+        return;
+      }
+
+      // Check if the button already exists
+      const existingButton = document.getElementById('addAgentNodeBtn');
+      if (existingButton) {
+        console.log('Agent node button already exists');
+        return;
+      }
+
+      // Add Agent Node button
+      const agentBtn = document.createElement('button');
+      agentBtn.id = 'addAgentNodeBtn';
+      agentBtn.type = 'button';
+      agentBtn.textContent = 'Add Agent Node';
+      agentBtn.title = 'Add a node with agentic capabilities';
+
+      // Add a distinctive style to make it stand out
+      agentBtn.style.backgroundColor = '#9c27b0';
+      agentBtn.style.color = 'white';
+      agentBtn.style.fontWeight = 'bold';
+      agentBtn.style.border = '2px solid #ff00ff';
+      agentBtn.style.boxShadow = '0 0 5px #9c27b0';
+      agentBtn.style.position = 'relative';
+
+      // Add robot emoji to the button
+      const robotSpan = document.createElement('span');
+      robotSpan.textContent = ' 🤖';
+      robotSpan.style.fontSize = '16px';
+      agentBtn.appendChild(robotSpan);
+
+      // Add click event listener
+      agentBtn.addEventListener('click', () => {
+        console.log('Add Agent Node button clicked');
+        if (window.App && typeof App.addNode === 'function') {
+          console.log('Calling App.addNode with agent type');
+          const node = App.addNode('agent');
+          console.log('Created agent node:', node);
+        } else {
+          console.error('App.addNode not available');
+        }
+      });
+
+      // Insert the button after the Add Node button
+      const addNodeBtn = document.getElementById('addNodeBtn');
+      if (addNodeBtn && addNodeBtn.parentNode) {
+        console.log('Inserting agent node button after Add Node button');
+        addNodeBtn.parentNode.insertBefore(agentBtn, addNodeBtn.nextSibling);
+      } else {
+        console.log('Add Node button not found, appending agent node button to toolbar');
+        toolbar.appendChild(agentBtn);
+      }
+
+      console.log('Agent node button added to toolbar');
+    };
+
+    // Call the method to add the button
+    setTimeout(() => {
+      if (window.AgentNodes && typeof window.AgentNodes.addAgentNodeButton === 'function') {
+        window.AgentNodes.addAgentNodeButton();
+      }
+    }, 1000);
+  }, 100);
+
   // Set up event listeners after DOM is loaded
   document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, setting up AgentNodes event listeners');
+
+    // Force initialization of AgentNodes again after DOM is loaded
+    if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+      console.log('Initializing AgentNodes from DOMContentLoaded event');
+      window.AgentNodes.init();
+    }
 
     // Listen for app initialization complete event
     document.addEventListener('app-initialization-complete', function() {
@@ -2948,13 +3068,13 @@ AgentNodes.updateToolsList = function() {
       if (window.AgentNodes && typeof window.AgentNodes.updateToolsList === 'function') {
         window.AgentNodes.updateToolsList();
       }
-    });
 
-    // Initialize AgentNodes if not already initialized
-    if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
-      console.log('Initializing AgentNodes from DOMContentLoaded event');
-      window.AgentNodes.init();
-    }
+      // Force initialization of AgentNodes again after app initialization
+      if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+        console.log('Initializing AgentNodes after app initialization');
+        window.AgentNodes.init();
+      }
+    });
   });
 })();
 

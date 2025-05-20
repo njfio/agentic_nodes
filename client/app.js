@@ -7715,6 +7715,12 @@ document.addEventListener('DOMContentLoaded', () => {
           console.log('AgentNodes is ready from ready() promise');
           DebugManager.addLog('AgentNodes is ready from ready() promise', 'success');
 
+          // Add the agent node button to the toolbar
+          if (typeof window.AgentNodes.addAgentNodeButton === 'function') {
+            console.log('Adding agent node button from app.js');
+            window.AgentNodes.addAgentNodeButton();
+          }
+
           // Notify the app that AgentNodes is ready
           if (window.AppInitSystem && AppInitSystem.markReady) {
             AppInitSystem.markReady('agentNodes');
