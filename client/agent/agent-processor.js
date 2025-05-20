@@ -129,15 +129,34 @@
         node.workflowRole = 'none';       // Default role is none
         node._workflowRole = 'none';      // Set both properties to ensure compatibility
 
-        // Add the node to the canvas
-        window.App.nodes.push(node);
+        // Add the node to the canvas if App is available
+        if (window.App && Array.isArray(window.App.nodes)) {
+          // Check if the node is already in the array
+          const nodeExists = window.App.nodes.some(n => n.id === node.id);
 
-        // Select the new node
-        window.App.nodes.forEach(n => n.selected = false);
-        node.selected = true;
-        window.App.selectedNode = node; // Set the selectedNode property
-        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
-          DebugManager.addLog(`Selected node: ${node.id} (agent node)`, 'info');
+          if (!nodeExists) {
+            console.log(`Adding agent node ${node.id} to App.nodes array from AgentProcessor`);
+            window.App.nodes.push(node);
+
+            // Select the new node
+            window.App.nodes.forEach(n => n.selected = false);
+            node.selected = true;
+            window.App.selectedNode = node; // Set the selectedNode property
+
+            if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+              DebugManager.addLog(`Selected node: ${node.id} (agent node)`, 'info');
+            }
+
+            // Force a redraw of the canvas
+            if (typeof window.App.draw === 'function') {
+              console.log('Forcing canvas redraw from AgentProcessor');
+              window.App.draw();
+            }
+          } else {
+            console.log(`Node ${node.id} already exists in App.nodes array`);
+          }
+        } else {
+          console.warn('App.nodes array not available in AgentProcessor, node will not be rendered on canvas');
         }
 
         // Log the creation with detailed information
@@ -230,6 +249,32 @@
       // Initialize the logger for this node
       if (window.AgentLogger && typeof AgentLogger.initNodeLogger === 'function') {
         AgentLogger.initNodeLogger(node);
+      }
+
+      // Add the node to the App.nodes array if available
+      if (window.App && Array.isArray(window.App.nodes)) {
+        // Check if the node is already in the array
+        const nodeExists = window.App.nodes.some(n => n.id === node.id);
+
+        if (!nodeExists) {
+          console.log(`Adding standalone agent node ${node.id} to App.nodes array`);
+          window.App.nodes.push(node);
+
+          // Select the new node
+          window.App.nodes.forEach(n => n.selected = false);
+          node.selected = true;
+          window.App.selectedNode = node;
+
+          // Force a redraw of the canvas
+          if (typeof window.App.draw === 'function') {
+            console.log('Forcing canvas redraw for standalone agent node');
+            window.App.draw();
+          }
+        } else {
+          console.log(`Node ${node.id} already exists in App.nodes array`);
+        }
+      } else {
+        console.warn('App.nodes array not available, standalone node will not be rendered on canvas');
       }
 
       console.log('Created standalone agent node:', node);
