@@ -344,20 +344,33 @@ const MCPTools = {
 
       // Add Perplexity API key if this is a Perplexity tool
       if (tool.server.includes('perplexity')) {
-        // Try to get the Perplexity API key from localStorage
-        const perplexityConfig = JSON.parse(localStorage.getItem('perplexity_config') || '{}');
-        if (perplexityConfig.apiKey) {
-          env.PERPLEXITY_API_KEY = perplexityConfig.apiKey;
-        } else {
-          // Check if we have a default API key in the .env file
+        try {
+          // Try to get the Perplexity API key from localStorage
+          const perplexityConfig = JSON.parse(localStorage.getItem('perplexity_config') || '{}');
+          if (perplexityConfig.apiKey) {
+            env.PERPLEXITY_API_KEY = perplexityConfig.apiKey;
+          } else {
+            // Check if we have a default API key in the .env file
+            const defaultKey = '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';
+            env.PERPLEXITY_API_KEY = defaultKey;
+
+            // Log a warning
+            if (node && window.AgentLogger) {
+              AgentLogger.addLog(node, 'Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            } else {
+              DebugManager.addLog('Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            }
+          }
+        } catch (error) {
+          console.error('Error accessing localStorage for Perplexity API key:', error);
+          // Use default key as fallback
           const defaultKey = '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';
           env.PERPLEXITY_API_KEY = defaultKey;
 
-          // Log a warning
           if (node && window.AgentLogger) {
-            AgentLogger.addLog(node, 'Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            AgentLogger.addLog(node, `Error accessing localStorage: ${error.message}. Using default Perplexity API key.`, 'warning');
           } else {
-            DebugManager.addLog('Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            DebugManager.addLog(`Error accessing localStorage: ${error.message}. Using default Perplexity API key.`, 'warning');
           }
         }
       }
@@ -373,8 +386,13 @@ const MCPTools = {
 
       // Store the request payload in the node for logging
       if (node) {
-        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
-        node.lastRequestTime = new Date().toISOString();
+        try {
+          node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
+          node.lastRequestTime = new Date().toISOString();
+        } catch (error) {
+          console.error('Error storing request payload in node:', error);
+          // Continue execution even if we can't store the payload
+        }
       }
 
       // Call the MCP API
@@ -395,24 +413,34 @@ const MCPTools = {
 
       // Store the response payload in the node for logging
       if (node) {
-        node.lastResponsePayload = JSON.parse(JSON.stringify(data));
-        node.lastResponseTime = new Date().toISOString();
+        try {
+          node.lastResponsePayload = JSON.parse(JSON.stringify(data));
+          node.lastResponseTime = new Date().toISOString();
 
-        // Log the API call if we have a logger
-        if (window.AgentLogger) {
-          AgentLogger.addApiLog(node, requestPayload, data);
+          // Log the API call if we have a logger
+          if (window.AgentLogger) {
+            AgentLogger.addApiLog(node, requestPayload, data);
+          }
+        } catch (error) {
+          console.error('Error storing response payload in node:', error);
+          // Continue execution even if we can't store the payload
         }
       }
 
       // Store the result in the node's memory
       if (node && node.memory) {
-        AgentMemory.store(node, `mcp_result_${tool.id}`, data.result);
-        AgentMemory.addToHistory(node, {
-          tool: tool.id,
-          params,
-          server: tool.server,
-          method: tool.method
-        }, data.result);
+        try {
+          AgentMemory.store(node, `mcp_result_${tool.id}`, data.result);
+          AgentMemory.addToHistory(node, {
+            tool: tool.id,
+            params,
+            server: tool.server,
+            method: tool.method
+          }, data.result);
+        } catch (error) {
+          console.error('Error storing result in node memory:', error);
+          // Continue execution even if we can't store the result
+        }
       }
 
       // Log the success
