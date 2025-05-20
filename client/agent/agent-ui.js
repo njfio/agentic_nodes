@@ -220,7 +220,43 @@
 
         // Function to create an agent node
         const createAgentNode = () => {
-          // Call App.addNode with 'agent' type
+          // Try using AgentIntegration first if available
+          if (window.AgentIntegration && typeof AgentIntegration.createAgentNode === 'function') {
+            console.log('Creating agent node via AgentIntegration');
+            try {
+              const node = AgentIntegration.createAgentNode();
+              console.log('Created agent node via AgentIntegration:', node);
+
+              // Check if the node was created successfully
+              if (node) {
+                // Log success message
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog(`Created agent node with ID: ${node.id || 'unknown'}`, 'success');
+                }
+
+                // Force a redraw of the canvas
+                if (window.App && typeof App.draw === 'function') {
+                  App.draw();
+                }
+
+                return true;
+              } else {
+                console.error('AgentIntegration.createAgentNode returned undefined');
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog('AgentIntegration.createAgentNode returned undefined', 'error');
+                }
+                // Fall through to try App.addNode
+              }
+            } catch (error) {
+              console.error('Error creating agent node via AgentIntegration:', error);
+              if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                DebugManager.addLog(`Error creating agent node via AgentIntegration: ${error.message}`, 'error');
+              }
+              // Fall through to try App.addNode
+            }
+          }
+
+          // Fall back to App.addNode
           if (window.App && typeof App.addNode === 'function') {
             console.log('Calling App.addNode with agent type');
             try {
@@ -297,7 +333,54 @@
                 DebugManager.addLog('Failed to create agent node after multiple retries. Please try again later.', 'error');
               }
 
-              // Try to use the fallback method if available
+              // Try to use the fallback methods
+              // First try AgentIntegration
+              if (window.AgentIntegration && typeof AgentIntegration.createAgentNode === 'function') {
+                console.log('Attempting to create agent node via AgentIntegration (fallback)');
+                try {
+                  const node = AgentIntegration.createAgentNode();
+
+                  // Check if the node was created successfully
+                  if (node) {
+                    console.log('Created agent node via AgentIntegration (fallback):', node);
+
+                    // Log success message with safe access to node.id
+                    if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                      DebugManager.addLog(`Created agent node via AgentIntegration with ID: ${node.id || 'unknown'} (fallback)`, 'success');
+                    }
+
+                    // Add the node to App.nodes if possible
+                    if (window.App && Array.isArray(window.App.nodes)) {
+                      window.App.nodes.push(node);
+
+                      // Set as selected node
+                      window.App.selectedNode = node;
+                    }
+
+                    // Force a redraw of the canvas
+                    if (window.App && typeof App.draw === 'function') {
+                      App.draw();
+                    }
+
+                    // Success, no need to try other methods
+                    return;
+                  } else {
+                    console.error('AgentIntegration.createAgentNode() returned undefined (fallback)');
+                    if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                      DebugManager.addLog('AgentIntegration.createAgentNode() returned undefined (fallback)', 'error');
+                    }
+                    // Fall through to try AgentProcessor
+                  }
+                } catch (error) {
+                  console.error('Error creating agent node via AgentIntegration (fallback):', error);
+                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                    DebugManager.addLog(`Error creating agent node via AgentIntegration (fallback): ${error.message}`, 'error');
+                  }
+                  // Fall through to try AgentProcessor
+                }
+              }
+
+              // Then try AgentProcessor directly
               if (window.AgentProcessor && typeof AgentProcessor.createAgentNode === 'function') {
                 console.log('Attempting to create agent node directly via AgentProcessor');
                 try {
@@ -377,6 +460,43 @@
 
           // Function to create an agent node
           const createAgentNode = () => {
+            // Try using AgentIntegration first if available
+            if (window.AgentIntegration && typeof AgentIntegration.createAgentNode === 'function') {
+              console.log('Creating agent node via AgentIntegration (keyboard shortcut)');
+              try {
+                const node = AgentIntegration.createAgentNode();
+                console.log('Created agent node via AgentIntegration (keyboard shortcut):', node);
+
+                // Check if the node was created successfully
+                if (node) {
+                  // Log success message
+                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                    DebugManager.addLog(`Created agent node with ID: ${node.id || 'unknown'} via keyboard shortcut`, 'success');
+                  }
+
+                  // Force a redraw of the canvas
+                  if (window.App && typeof App.draw === 'function') {
+                    App.draw();
+                  }
+
+                  return true;
+                } else {
+                  console.error('AgentIntegration.createAgentNode returned undefined (keyboard shortcut)');
+                  if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                    DebugManager.addLog('AgentIntegration.createAgentNode returned undefined (keyboard shortcut)', 'error');
+                  }
+                  // Fall through to try App.addNode
+                }
+              } catch (error) {
+                console.error('Error creating agent node via AgentIntegration (keyboard shortcut):', error);
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog(`Error creating agent node via AgentIntegration (keyboard shortcut): ${error.message}`, 'error');
+                }
+                // Fall through to try App.addNode
+              }
+            }
+
+            // Fall back to App.addNode
             if (window.App && typeof App.addNode === 'function') {
               console.log('Creating agent node via keyboard shortcut');
               try {
