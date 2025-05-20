@@ -662,11 +662,21 @@ const WorkflowIO = {
 
       // Set the input node's content
       console.log("Setting input node content");
+
+      // Ensure message is not null or undefined
+      if (message === null || message === undefined) {
+        message = ""; // Set to empty string if null or undefined
+        console.warn("Message was null or undefined, setting to empty string");
+      }
+
       this.inputNode.content = message;
       this.inputNode.inputContent = message;
 
-      // Process the input node
-      DebugManager.addLog(`Processing message: ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`, 'info');
+      // Process the input node - safely access substring
+      const messagePreview = typeof message === 'string' ?
+        `${message.substring(0, 50)}${message.length > 50 ? '...' : ''}` :
+        'non-string message';
+      DebugManager.addLog(`Processing message: ${messagePreview}`, 'info');
 
       // Mark the input node as processed with the user's message
       this.inputNode.hasBeenProcessed = true;
