@@ -6392,12 +6392,31 @@ const App = {
 
   // Process a chain of nodes starting from the given node
   async processNodeChain(startNode) {
-    if (!startNode) return;
+    if (!startNode) {
+      DebugManager.addLog('Cannot process node chain: startNode is null or undefined', 'error');
+      return;
+    }
 
-    // Process the start node first
-    await this.processNodeAndConnections(startNode, startNode.content);
+    // Ensure startNode.content is not null or undefined
+    const content = startNode.content === null || startNode.content === undefined ?
+      (startNode.inputContent || "") : startNode.content;
 
-    DebugManager.addLog('Node chain processing completed', 'success');
+    // Log the content being used
+    DebugManager.addLog(`Processing node chain starting with node "${startNode.title}" (ID: ${startNode.id})`, 'info');
+    DebugManager.addLog(`Using content: ${typeof content === 'string' ?
+      (content.substring(0, 30) + (content.length > 30 ? '...' : '')) :
+      'non-string content'}`, 'info');
+
+    try {
+      // Process the start node first
+      await this.processNodeAndConnections(startNode, content);
+      DebugManager.addLog('Node chain processing completed', 'success');
+    } catch (error) {
+      DebugManager.addLog(`Error in node chain processing: ${error.message}`, 'error');
+      console.error('Node chain processing error:', error);
+      // Re-throw the error to be handled by the caller
+      throw error;
+    }
   },
 
   // Process a node and all its connected nodes

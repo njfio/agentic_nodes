@@ -684,11 +684,27 @@ const WorkflowIO = {
       // Process the node chain starting from the input node
       console.log("Calling processNodeChain");
       try {
+        // Ensure the input node has valid content before processing
+        if (this.inputNode.content === null || this.inputNode.content === undefined) {
+          console.warn("Input node content is null or undefined, setting to empty string");
+          this.inputNode.content = "";
+        }
+
+        // Process the node chain with the input node's content
         await App.processNodeChain(this.inputNode);
         console.log("processNodeChain completed");
       } catch (chainError) {
         console.error("Error in processNodeChain:", chainError);
-        throw chainError;
+        // Add more detailed error logging
+        console.error("Error details:", chainError.stack);
+
+        // Show error in workflow panel
+        if (typeof WorkflowPanel !== 'undefined') {
+          WorkflowPanel.addMessage(`Error processing workflow: ${chainError.message}`, 'assistant');
+        }
+
+        // Don't throw the error, just log it and continue
+        DebugManager.addLog(`Error in workflow processing: ${chainError.message}`, 'error');
       }
 
       // Add a longer delay to ensure all processing is complete
