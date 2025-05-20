@@ -1143,11 +1143,52 @@ Your primary value comes from using tools effectively to solve problems. Users e
         const requestPayload = {
           model: config.model || 'gpt-4o',
           messages,
-          tools,
+          tools: tools.length > 0 ? tools : [
+            {
+              type: "function",
+              function: {
+                name: "search",
+                description: "Search the web for information",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The search query"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            },
+            {
+              type: "function",
+              function: {
+                name: "get_current_weather",
+                description: "Get the current weather for a location",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    location: {
+                      type: "string",
+                      description: "The location to get weather for"
+                    }
+                  },
+                  required: ["location"]
+                }
+              }
+            }
+          ],
           tool_choice: toolChoice,
           temperature: 0.7,
           max_tokens: 2000
         };
+
+        // Log the tools being included
+        console.log(`Including ${requestPayload.tools.length} tools in request payload`);
+        requestPayload.tools.forEach((tool, index) => {
+          console.log(`Tool ${index + 1}: ${tool.function.name}`);
+        });
 
         // CRITICAL: Ensure tools are properly formatted and included
         if (!requestPayload.tools || requestPayload.tools.length === 0) {
@@ -1432,8 +1473,45 @@ Your primary value comes from using tools effectively to solve problems. Users e
           const finalRequestPayload = {
             model: config.model || 'gpt-4o',
             messages,
-            tools: requestPayload.tools, // Include the same tools as the original request
-            tool_choice: "auto"
+            tools: requestPayload.tools && requestPayload.tools.length > 0 ? requestPayload.tools : [
+              {
+                type: "function",
+                function: {
+                  name: "search",
+                  description: "Search the web for information",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      query: {
+                        type: "string",
+                        description: "The search query"
+                      }
+                    },
+                    required: ["query"]
+                  }
+                }
+              },
+              {
+                type: "function",
+                function: {
+                  name: "get_current_weather",
+                  description: "Get the current weather for a location",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      location: {
+                        type: "string",
+                        description: "The location to get weather for"
+                      }
+                    },
+                    required: ["location"]
+                  }
+                }
+              }
+            ],
+            tool_choice: "auto",
+            temperature: 0.7,
+            max_tokens: 2000
           };
 
           // Store the request payload for logging

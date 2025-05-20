@@ -148,6 +148,56 @@ router.post('/openai/chat', async (req, res) => {
     console.log('[API] FULL REQUEST PAYLOAD:');
     console.log(JSON.stringify(req.body, null, 2));
 
+    // Ensure the request has a tools array
+    if (!req.body.tools || !Array.isArray(req.body.tools) || req.body.tools.length === 0) {
+      console.log('[API] No tools in request payload, adding default tools');
+
+      // Add default tools
+      req.body.tools = [
+        {
+          type: "function",
+          function: {
+            name: "search",
+            description: "Search the web for information",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "The search query"
+                }
+              },
+              required: ["query"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_current_weather",
+            description: "Get the current weather for a location",
+            parameters: {
+              type: "object",
+              properties: {
+                location: {
+                  type: "string",
+                  description: "The location to get weather for"
+                }
+              },
+              required: ["location"]
+            }
+          }
+        }
+      ];
+
+      // Set tool_choice to auto
+      req.body.tool_choice = 'auto';
+
+      console.log('[API] Added default tools to request payload');
+      console.log('[API] UPDATED REQUEST PAYLOAD:');
+      console.log(JSON.stringify(req.body, null, 2));
+    }
+
     if (req.body.tools && req.body.tools.length > 0) {
       console.log(`[API] Request includes ${req.body.tools.length} tools`);
       console.log(`[API] Tool names: ${req.body.tools.map(t => t.function?.name).filter(Boolean).join(', ')}`);
