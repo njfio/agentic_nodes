@@ -1032,7 +1032,26 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
           // Validate parameters
           if (!properties || Object.keys(properties).length === 0) {
-            AgentLogger.addLog(node, `Tool ${tool.id} has no parameters, adding empty object`, 'warning');
+            AgentLogger.addLog(node, `Tool ${tool.id} has no parameters, adding default parameters`, 'warning');
+
+            // Add default parameters for tools without parameters
+            return {
+              type: "function",
+              function: {
+                name: tool.id,
+                description: tool.description,
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The query or input for the tool"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            };
           }
 
           return {
@@ -1125,53 +1144,61 @@ Your primary value comes from using tools effectively to solve problems. Users e
           model: config.model || 'gpt-4o',
           messages,
           tools,
-          tool_choice: toolChoice
+          tool_choice: toolChoice,
+          temperature: 0.7,
+          max_tokens: 2000
         };
 
-        // Store the request payload for logging
-        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
-
-        // CRITICAL: Ensure tools are included in the request payload
+        // CRITICAL: Ensure tools are properly formatted and included
         if (!requestPayload.tools || requestPayload.tools.length === 0) {
           console.error('NO TOOLS IN REQUEST PAYLOAD - ATTEMPTING TO FIX');
           AgentLogger.addLog(node, 'No tools in request payload - attempting to fix', 'error');
 
-          // Try to get tools directly from AgentTools
-          if (window.AgentTools) {
-            const directTools = AgentTools.getAllTools();
-            if (directTools && directTools.length > 0) {
-              console.log(`Adding ${directTools.length} tools directly from AgentTools`);
-
-              // Map tools to the format expected by OpenAI API
-              const formattedTools = directTools.map(tool => {
-                return {
-                  type: "function",
-                  function: {
-                    name: tool.id,
-                    description: tool.description || 'No description available',
-                    parameters: {
-                      type: "object",
-                      properties: {
-                        query: {
-                          type: "string",
-                          description: "The query or input for the tool"
-                        }
-                      },
-                      required: ["query"]
+          // Create default tools if none are available
+          requestPayload.tools = [
+            {
+              type: "function",
+              function: {
+                name: "search",
+                description: "Search the web for information",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The search query"
                     }
-                  }
-                };
-              });
-
-              // Add tools to the payload
-              requestPayload.tools = formattedTools;
-              requestPayload.tool_choice = "auto";
-
-              console.log(`Added ${formattedTools.length} tools directly to request payload`);
-              AgentLogger.addLog(node, `Added ${formattedTools.length} tools directly to request payload`, 'info');
+                  },
+                  required: ["query"]
+                }
+              }
+            },
+            {
+              type: "function",
+              function: {
+                name: "get_current_weather",
+                description: "Get the current weather for a location",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    location: {
+                      type: "string",
+                      description: "The location to get weather for"
+                    }
+                  },
+                  required: ["location"]
+                }
+              }
             }
-          }
+          ];
+
+          requestPayload.tool_choice = "auto";
+          console.log('Added default tools to request payload');
+          AgentLogger.addLog(node, 'Added default tools to request payload', 'info');
         }
+
+        // Store the request payload for logging
+        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
 
         // Log the full request payload for debugging
         AgentLogger.addLog(node, `Sending request with ${messages.length} messages and ${tools.length} tools`, 'info');

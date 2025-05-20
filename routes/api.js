@@ -201,6 +201,48 @@ router.post('/openai/chat', async (req, res) => {
               systemMessage.content.includes('IMPORTANT INSTRUCTIONS FOR TOOL USAGE')) {
             console.log('[API] This appears to be an agent node request but no tools were included');
             console.log('[API] Check that AgentTools.getAllTools() is returning tools correctly');
+
+            // Add default tools for agent node requests
+            console.log('[API] Adding default tools for agent node request');
+            req.body.tools = [
+              {
+                type: "function",
+                function: {
+                  name: "search",
+                  description: "Search the web for information",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      query: {
+                        type: "string",
+                        description: "The search query"
+                      }
+                    },
+                    required: ["query"]
+                  }
+                }
+              },
+              {
+                type: "function",
+                function: {
+                  name: "get_current_weather",
+                  description: "Get the current weather for a location",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      location: {
+                        type: "string",
+                        description: "The location to get weather for"
+                      }
+                    },
+                    required: ["location"]
+                  }
+                }
+              }
+            ];
+
+            req.body.tool_choice = 'auto';
+            console.log('[API] Added default tools to request');
           }
         }
       }
