@@ -2770,13 +2770,15 @@ AgentNodes.createPayloadsModal = function() {
       responsePayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
     }
   }
-};
+},
 
 // Alias for updatePayloadsDisplay for backward compatibility
-AgentNodes.updateApiPayloadsDisplay = AgentNodes.updatePayloadsDisplay;
+updateApiPayloadsDisplay: function() {
+  return this.updatePayloadsDisplay();
+},
 
 // Update the agent logs display
-AgentNodes.updateAgentLogsDisplay = function() {
+updateAgentLogsDisplay: function() {
   if (!this.editingNode) return;
 
   // Get the log content elements
@@ -2798,10 +2800,10 @@ AgentNodes.updateAgentLogsDisplay = function() {
     // Update the API log content
     apiLogContent.textContent = formattedApiLogs || 'No API logs available.';
   }
-};
+},
 
 // Initialize the agent logs modal
-AgentNodes.initAgentLogsModal = function() {
+initAgentLogsModal: function() {
   // Get the agent logs modal elements
   const agentLogsModal = document.getElementById('agentLogsModal');
   const closeAgentLogsBtn = document.getElementById('closeAgentLogs');
@@ -2885,10 +2887,10 @@ AgentNodes.initAgentLogsModal = function() {
 
   // Initialize API Payloads Modal
   this.initApiPayloadsModal();
-};
+},
 
 // Initialize the API Payloads modal
-AgentNodes.initApiPayloadsModal = function() {
+initApiPayloadsModal: function() {
   // Get the API payloads modal elements
   const apiPayloadsModal = document.getElementById('apiPayloadsModal');
   const closeApiPayloadsBtn = document.getElementById('closeApiPayloads');
@@ -2952,10 +2954,10 @@ AgentNodes.initApiPayloadsModal = function() {
       }
     });
   }
-};
+},
 
 // Add a method to update the tools list
-AgentNodes.updateToolsList = function() {
+updateToolsList: function() {
   try {
     console.log('Updating AgentNodes tools list');
 
@@ -2978,7 +2980,8 @@ AgentNodes.updateToolsList = function() {
     console.error('Error updating tools list:', error);
     return [];
   }
-};
+}
+  };  // End of AgentNodesImpl object
 
   // Apply the implementation to the global AgentNodes object
   Object.keys(AgentNodesImpl).forEach(key => {
