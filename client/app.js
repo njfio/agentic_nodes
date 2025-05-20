@@ -7693,90 +7693,81 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       document.head.appendChild(script);
     } else {
-      console.log('AgentNodes script already exists in the DOM, waiting for it to initialize');
+      console.log('AgentNodes script already exists in the DOM, waiting for it to be ready');
 
       // Verify that AgentNodes is available
       if (!window.AgentNodes) {
         console.error('AgentNodes not available in app.js');
-        // Try to recover by checking if it's defined in the global scope
-        if (typeof AgentNodes !== 'undefined') {
-          window.AgentNodes = AgentNodes;
-          console.log('Recovered AgentNodes from global scope in app.js');
-        }
+        // Create a fallback object
+        window.AgentNodes = {
+          ready: function() {
+            return Promise.resolve();
+          }
+        };
+        console.log('Created fallback AgentNodes object in app.js');
       } else {
         console.log('AgentNodes is available in app.js');
       }
 
-      // Listen for app initialization complete event
-      document.addEventListener('app-initialization-complete', function() {
-        console.log('App initialization complete event received by App');
+      // Use the AgentNodes.ready() promise to wait for initialization
+      if (window.AgentNodes && typeof window.AgentNodes.ready === 'function') {
+        window.AgentNodes.ready().then(() => {
+          console.log('AgentNodes is ready from ready() promise');
+          DebugManager.addLog('AgentNodes is ready from ready() promise', 'success');
 
-        // Check if AgentNodes is available
-        if (window.AgentNodes) {
-          console.log('AgentNodes is available after app initialization');
-          DebugManager.addLog('AgentNodes is available after app initialization', 'success');
-        } else {
-          console.error('AgentNodes is not available after app initialization');
-          DebugManager.addLog('AgentNodes is not available after app initialization', 'error');
-
-          // Try to recover by checking if it's defined in the global scope
-          if (typeof AgentNodes !== 'undefined') {
-            window.AgentNodes = AgentNodes;
-            console.log('Recovered AgentNodes from global scope after app initialization');
-            DebugManager.addLog('Recovered AgentNodes from global scope after app initialization', 'success');
+          // Notify the app that AgentNodes is ready
+          if (window.AppInitSystem && AppInitSystem.markReady) {
+            AppInitSystem.markReady('agentNodes');
           }
-        }
-      });
+        }).catch(error => {
+          console.error('Error waiting for AgentNodes to be ready:', error);
+          DebugManager.addLog(`Error waiting for AgentNodes to be ready: ${error.message}`, 'error');
+        });
+      } else {
+        console.warn('AgentNodes.ready() function not available');
+        DebugManager.addLog('AgentNodes.ready() function not available', 'warning');
 
-      // Set up a retry mechanism as a fallback
-      let retryCount = 0;
-      const maxRetries = 15;
-      const retryInterval = 200; // ms
+        // Listen for app initialization complete event as fallback
+        document.addEventListener('app-initialization-complete', function() {
+          console.log('App initialization complete event received by App');
 
-      const checkAgentNodes = () => {
-        // Check if AgentNodes is available
-        if (window.AgentNodes) {
-          console.log('AgentNodes module found');
-          DebugManager.addLog('AgentNodes module found', 'success');
-
-          // Initialize it if it hasn't been initialized yet
-          if (typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
-            console.log('Initializing AgentNodes from app.js');
-            try {
-              window.AgentNodes.init();
-              window.AgentNodes._initialized = true;
-              DebugManager.addLog('AgentNodes initialized from app.js', 'success');
-            } catch (error) {
-              console.error('Error initializing AgentNodes from app.js:', error);
-              DebugManager.addLog(`Error initializing AgentNodes from app.js: ${error.message}`, 'error');
-            }
-          }
-        } else if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes to initialize`);
-
-          // Try to recover by checking if it's defined in the global scope
-          if (typeof AgentNodes !== 'undefined') {
-            window.AgentNodes = AgentNodes;
-            console.log('Recovered AgentNodes from global scope during retry');
-            DebugManager.addLog('Recovered AgentNodes from global scope during retry', 'success');
+          // Check if AgentNodes is available
+          if (window.AgentNodes) {
+            console.log('AgentNodes is available after app initialization');
+            DebugManager.addLog('AgentNodes is available after app initialization', 'success');
           } else {
+            console.error('AgentNodes is not available after app initialization');
+            DebugManager.addLog('AgentNodes is not available after app initialization', 'error');
+          }
+        });
+
+        // Set up a minimal retry mechanism as a last resort
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retryInterval = 200; // ms
+
+        const checkAgentNodes = () => {
+          if (window.AgentNodes) {
+            console.log('AgentNodes found after retry');
+            DebugManager.addLog('AgentNodes found after retry', 'success');
+
+            // Notify the app that AgentNodes is ready
+            if (window.AppInitSystem && AppInitSystem.markReady) {
+              AppInitSystem.markReady('agentNodes');
+            }
+          } else if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes`);
             setTimeout(checkAgentNodes, retryInterval);
+          } else {
+            console.error('Failed to find AgentNodes after retries');
+            DebugManager.addLog('Failed to find AgentNodes after retries', 'error');
           }
-        } else {
-          console.error('Failed to initialize AgentNodes after multiple retries');
-          DebugManager.addLog('Failed to initialize AgentNodes after multiple retries', 'error');
+        };
 
-          // Try to force initialization through the AppInitSystem
-          if (window.AppInitSystem) {
-            console.log('Attempting to force initialization through AppInitSystem');
-            AppInitSystem.init();
-          }
-        }
-      };
-
-      // Start the retry process immediately
-      checkAgentNodes();
+        // Start the retry process
+        setTimeout(checkAgentNodes, 500);
+      }
     }
   }, 1000); // Wait 1 second to ensure all scripts are loaded
 });

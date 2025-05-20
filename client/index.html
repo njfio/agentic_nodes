@@ -860,13 +860,16 @@
   </div>
 
   <!-- Agent Node System - Load in specific order with proper attributes -->
-  <!-- First load the dependencies -->
+  <!-- First load the AgentNodes initialization script to ensure it's available globally -->
+  <script src="agent-nodes-init.js"></script>
+
+  <!-- Then load the dependencies -->
   <script src="agent-memory.js"></script>
   <script src="agent-tools.js"></script>
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
 
-  <!-- Then load agent-nodes.js BEFORE mcp-tools.js to ensure it's available -->
+  <!-- Then load agent-nodes.js BEFORE mcp-tools.js -->
   <script src="agent-nodes.js"></script>
 
   <!-- Finally load mcp-tools.js -->

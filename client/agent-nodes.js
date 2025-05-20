@@ -3,8 +3,17 @@
  * Implements agentic nodes with logic loops and function calling capabilities
  */
 
-// Immediately expose AgentNodes to the global scope
-const AgentNodes = {
+// Use the pre-initialized AgentNodes object from agent-nodes-init.js
+(function() {
+  // Verify that the AgentNodes object exists
+  if (!window.AgentNodes) {
+    console.error('AgentNodes object not found in global scope');
+    // Create a fallback object
+    window.AgentNodes = {};
+  }
+
+  // Extend the pre-initialized AgentNodes object with the full implementation
+  const AgentNodesImpl = {
   // Track initialization state
   _initialized: false,
 
@@ -47,13 +56,6 @@ const AgentNodes = {
       // Initialize the agent logs modal
       this.initAgentLogsModal();
 
-      // Explicitly expose the drawAgentNode method to the global scope
-      if (typeof window !== 'undefined') {
-        // Make sure the AgentNodes object is available globally
-        window.AgentNodes = this;
-        console.log('AgentNodes exposed to global scope with drawAgentNode method');
-      }
-
       // Mark as initialized
       this._initialized = true;
 
@@ -61,10 +63,22 @@ const AgentNodes = {
       if (window.AppInitSystem && AppInitSystem.markReady) {
         AppInitSystem.markReady('agentNodes');
       }
+
+      // Mark as ready using the readiness promise
+      if (typeof this.markReady === 'function') {
+        this.markReady();
+        console.log('AgentNodes marked as ready');
+      }
     } catch (error) {
       console.error('Error initializing AgentNodes:', error);
       if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
         DebugManager.addLog(`Error initializing AgentNodes: ${error.message}`, 'error');
+      }
+
+      // Mark as ready even if there was an error, to unblock dependent code
+      if (typeof this.markReady === 'function') {
+        this.markReady();
+        console.log('AgentNodes marked as ready despite initialization error');
       }
     }
   },
@@ -2915,27 +2929,34 @@ AgentNodes.updateToolsList = function() {
   }
 };
 
-// Immediately expose AgentNodes to the global scope
-(function() {
-  if (typeof window !== 'undefined') {
-    window.AgentNodes = AgentNodes;
-    console.log('AgentNodes immediately exposed to global scope');
-  }
-})();
+  // Apply the implementation to the global AgentNodes object
+  Object.keys(AgentNodesImpl).forEach(key => {
+    window.AgentNodes[key] = AgentNodesImpl[key];
+  });
 
-// Set up event listeners after DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM loaded, setting up AgentNodes event listeners');
+  console.log('AgentNodes implementation applied to global object');
 
-  // Listen for app initialization complete event
-  document.addEventListener('app-initialization-complete', function() {
-    console.log('App initialization complete event received by AgentNodes');
+  // Set up event listeners after DOM is loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up AgentNodes event listeners');
 
-    // Update the tools list
-    if (window.AgentNodes && typeof window.AgentNodes.updateToolsList === 'function') {
-      window.AgentNodes.updateToolsList();
+    // Listen for app initialization complete event
+    document.addEventListener('app-initialization-complete', function() {
+      console.log('App initialization complete event received by AgentNodes');
+
+      // Update the tools list
+      if (window.AgentNodes && typeof window.AgentNodes.updateToolsList === 'function') {
+        window.AgentNodes.updateToolsList();
+      }
+    });
+
+    // Initialize AgentNodes if not already initialized
+    if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+      console.log('Initializing AgentNodes from DOMContentLoaded event');
+      window.AgentNodes.init();
     }
   });
+})();
 
       // Add global click handlers for the agent node buttons
       document.addEventListener('click', (e) => {
