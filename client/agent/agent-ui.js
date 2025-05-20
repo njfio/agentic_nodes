@@ -7,6 +7,9 @@
 (function() {
   // Create the AgentUI object
   const AgentUI = {
+    // Track initialization state
+    initialized: false,
+
     // Initialize the UI
     init: function() {
       console.log('Initializing AgentUI');
@@ -148,6 +151,9 @@
           DebugManager.addLog('AgentModals not available, some features may not work correctly', 'warning');
         }
       }
+
+      // Mark as initialized
+      this.initialized = true;
 
       console.log('AgentUI initialized');
       if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
@@ -858,5 +864,24 @@
   document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing AgentUI');
     AgentUI.init();
+  });
+
+  // Listen for app-available event
+  document.addEventListener('app-available', function() {
+    console.log('app-available event received by AgentUI');
+
+    // Check if App is now available
+    if (window.App && typeof window.App === 'object') {
+      console.log('App object is now available in AgentUI');
+
+      // Initialize or continue initialization
+      if (!AgentUI.initialized) {
+        console.log('Initializing AgentUI after App became available');
+        AgentUI.init();
+      } else {
+        console.log('AgentUI already initialized, continuing initialization after App became available');
+        AgentUI.completeInitialization();
+      }
+    }
   });
 })();

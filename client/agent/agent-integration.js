@@ -204,13 +204,32 @@
     }
   });
 
+  // Listen for app-available event
+  document.addEventListener('app-available', function() {
+    console.log('app-available event received by AgentIntegration');
+
+    // Check if App is now available
+    if (window.App && typeof window.App === 'object') {
+      console.log('App object is now available in AgentIntegration');
+
+      // Initialize or register node types
+      if (!AgentIntegration.initialized) {
+        console.log('Initializing AgentIntegration after App became available');
+        AgentIntegration.init();
+      } else {
+        console.log('AgentIntegration already initialized, registering node types after App became available');
+        AgentIntegration.registerNodeTypes();
+      }
+    }
+  });
+
   // Set up a retry mechanism to wait for the App object
   let retryCount = 0;
   const maxRetries = 10;
   const retryInterval = 300; // ms
 
   const checkApp = () => {
-    if (window.App && typeof App === 'object') {
+    if (window.App && typeof window.App === 'object') {
       console.log('App object found, initializing AgentIntegration');
       AgentIntegration.init();
     } else if (retryCount < maxRetries) {
@@ -219,6 +238,9 @@
       setTimeout(checkApp, retryInterval);
     } else {
       console.error('Failed to find App object after multiple retries in AgentIntegration');
+
+      // Even after retries, we'll wait for the app-available event
+      console.log('Waiting for app-available event as a last resort');
     }
   };
 
