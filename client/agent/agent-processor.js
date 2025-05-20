@@ -112,6 +112,7 @@
         node.reflectionPrompt = 'Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?';
         node.reflectionFrequency = 2;     // How often to reflect (every N iterations)
         node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
+        node.conversationHistory = [];   // Conversation history for the agent
 
         // Initialize with all available tools
         try {
@@ -259,6 +260,8 @@
         _workflowRole: 'none',
         // API logs
         apiLogs: [],
+        // Conversation history
+        conversationHistory: [],
 
         // Add basic methods
         process: async function(input) {
@@ -406,6 +409,11 @@
       try {
         console.log(`Direct processing agent node ${node.id} with input:`, input);
 
+        // Initialize conversation history if not already initialized
+        if (!node.conversationHistory) {
+          node.conversationHistory = [];
+        }
+
         // Get available tools
         const availableTools = [];
 
@@ -432,13 +440,25 @@
         // Get the API endpoint
         const apiEndpoint = '/api/openai/chat';
 
+        // Create messages array with system prompt and conversation history
+        const messages = [
+          { role: 'system', content: this.getEnhancedSystemPrompt(node) },
+          ...node.conversationHistory
+        ];
+
+        // Add the current input as a user message if it's not already in the history
+        if (node.conversationHistory.length === 0 ||
+            node.conversationHistory[node.conversationHistory.length - 1].role !== 'user' ||
+            node.conversationHistory[node.conversationHistory.length - 1].content !== input) {
+          messages.push({ role: 'user', content: input });
+          // Also add to conversation history
+          node.conversationHistory.push({ role: 'user', content: input });
+        }
+
         // Prepare the request payload
         const payload = {
           model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: this.getEnhancedSystemPrompt(node) },
-            { role: 'user', content: input }
-          ],
+          messages: messages,
           tools: toolsForAPI,
           temperature: 0.7,
           max_tokens: 2000
@@ -712,14 +732,19 @@
 
 You have access to the following tools:${toolDescriptions}
 
-When you need information or need to perform an action:
-1. ALWAYS use the appropriate tool rather than making up information
-2. Think step-by-step about which tool would be most helpful
-3. If you need to search for information, use the search tool
-4. If you need documentation, use the documentation tool
-5. If you need to analyze an image, use the image analysis tool
+IMPORTANT INSTRUCTIONS FOR TOOL USAGE:
+1. You MUST use tools to gather information rather than making up facts or relying on potentially outdated knowledge.
+2. Think step-by-step about which tool would be most helpful for the current task.
+3. For ANY factual information, current events, or data that might change over time, use the search tool.
+4. For technical documentation or API details, use the documentation tool.
+5. For image analysis, use the image analysis tool.
+6. For complex problems, break them down and use multiple tools in sequence.
+7. NEVER claim you don't have access to tools or that you can't perform searches.
+8. NEVER make up information when you can use a tool instead.
+9. ALWAYS verify information with tools when possible.
+10. After using tools, synthesize the information to provide a complete and accurate response.
 
-After using tools, synthesize the information to provide a complete and accurate response.`;
+Your primary value comes from using tools effectively to solve problems. Users expect you to leverage these tools rather than relying on your pre-trained knowledge.`;
 
       return enhancedPrompt;
     },
@@ -775,27 +800,42 @@ After using tools, synthesize the information to provide a complete and accurate
         }`
       ).join('\n\n');
 
+      // Get the OpenAI API key if available
+      let headers = {
+        'Content-Type': 'application/json'
+      };
+
+      // Add OpenAI API key if available
+      if (window.ApiService && ApiService.openai && typeof ApiService.openai.getApiKey === 'function') {
+        const apiKey = ApiService.openai.getApiKey();
+        if (apiKey) {
+          headers['x-openai-api-key'] = apiKey;
+          console.log('Using OpenAI API key from ApiService for reflection');
+        }
+      }
+
+      // Create the reflection payload
+      const reflectionPayload = {
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are reflecting on your previous actions to improve your problem-solving approach.'
+          },
+          {
+            role: 'user',
+            content: `${reflectionPrompt}\n\nOriginal input: ${input}\n\nPrevious actions:\n${historyText}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      };
+
       // Make the API request
       const response = await fetch('/api/openai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are reflecting on your previous actions to improve your problem-solving approach.'
-            },
-            {
-              role: 'user',
-              content: `${reflectionPrompt}\n\nOriginal input: ${input}\n\nPrevious actions:\n${historyText}`
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 1000
-        })
+        headers: headers,
+        body: JSON.stringify(reflectionPayload)
       });
 
       if (!response.ok) {
@@ -808,6 +848,14 @@ After using tools, synthesize the information to provide a complete and accurate
       // Store the reflection in memory
       if (node.memory) {
         AgentMemory.store(node, `reflection_${node.currentIteration}`, reflectionResult);
+      }
+
+      // Add the reflection to the conversation history
+      if (node.conversationHistory) {
+        node.conversationHistory.push({
+          role: 'system',
+          content: `Reflection: ${reflectionResult}`
+        });
       }
 
       console.log(`Reflection completed for node ${node.id}:`, reflectionResult);
@@ -842,6 +890,11 @@ After using tools, synthesize the information to provide a complete and accurate
       // Create a new messages array that includes the assistant's response with tool calls
       const updatedMessages = [...messages, message];
 
+      // Add the assistant's message with tool calls to the conversation history
+      if (node.conversationHistory) {
+        node.conversationHistory.push(message);
+      }
+
       // Process each tool call
       for (const toolCall of message.tool_calls) {
         try {
@@ -875,12 +928,20 @@ After using tools, synthesize the information to provide a complete and accurate
 
           console.log(`Tool ${functionName} execution result:`, toolResult);
 
-          // Add the tool result to the messages
-          updatedMessages.push({
+          // Create tool result message
+          const toolResultMessage = {
             role: 'tool',
             tool_call_id: toolCall.id,
             content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult)
-          });
+          };
+
+          // Add the tool result to the messages
+          updatedMessages.push(toolResultMessage);
+
+          // Add the tool result to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push(toolResultMessage);
+          }
 
           // Store the tool execution in memory
           if (node.memory) {
@@ -970,6 +1031,14 @@ After using tools, synthesize the information to provide a complete and accurate
       if (followUpMessage.tool_calls && followUpMessage.tool_calls.length > 0) {
         // Recursively process more tool calls
         return await this.processToolCalls(node, followUpData, originalInput, updatedMessages);
+      }
+
+      // Add the assistant's response to the conversation history
+      if (node.conversationHistory) {
+        node.conversationHistory.push({
+          role: 'assistant',
+          content: followUpMessage.content
+        });
       }
 
       // Return the final content
