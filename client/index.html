@@ -869,11 +869,14 @@
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
 
-  <!-- Then load agent-nodes.js BEFORE mcp-tools.js -->
-  <script src="agent-nodes.js"></script>
-
-  <!-- Finally load mcp-tools.js -->
+  <!-- Load MCP tools -->
   <script src="mcp-tools.js"></script>
+
+  <!-- Load the new modular agent nodes implementation -->
+  <script src="agent/agent-processor.js"></script>
+  <script src="agent/agent-modals.js"></script>
+  <script src="agent/agent-ui.js"></script>
+  <script src="agent/agent-nodes.js"></script>
 
   <!-- Global initialization system -->
   <script>
