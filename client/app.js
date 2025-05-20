@@ -4772,10 +4772,23 @@ const App = {
                          clickedNode._nodeType === 'agent' ||
                          clickedNode.isAgentNode === true;
 
-      if (isAgentNode && window.AgentNodes && typeof window.AgentNodes.openAgentNodeEditor === 'function') {
+      if (isAgentNode && window.AgentNodes) {
         // Use the agent node editor
         DebugManager.addLog(`Opening agent node editor for node ${clickedNode.id}`, 'info');
-        window.AgentNodes.openAgentNodeEditor(clickedNode);
+
+        // Check if we have the handleAgentNodeDoubleClick method
+        if (typeof window.AgentNodes.handleAgentNodeDoubleClick === 'function') {
+          window.AgentNodes.handleAgentNodeDoubleClick(clickedNode);
+        }
+        // Fallback to openAgentNodeEditor if available
+        else if (typeof window.AgentNodes.openAgentNodeEditor === 'function') {
+          window.AgentNodes.openAgentNodeEditor(clickedNode);
+        }
+        // Fallback to regular node editor if neither is available
+        else {
+          console.warn(`Agent node editor methods not available for node ${clickedNode.id}, falling back to regular editor`);
+          this.openNodeEditor(clickedNode);
+        }
       } else {
         // Use the regular node editor
         this.openNodeEditor(clickedNode);
