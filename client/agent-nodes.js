@@ -3090,7 +3090,7 @@ AgentNodes.updateToolsList = function() {
           const isAgentButton = e.target &&
             (e.target.id === 'viewAgentLogs' ||
              e.target.id === 'viewApiPayloads' ||
-               e.target.parentElement.id === 'cancelAgentNode')));
+             e.target.parentElement.id === 'cancelAgentNode');
 
           // If it's one of our buttons, handle it directly
           if (isAgentButton) {

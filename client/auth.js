@@ -57,6 +57,7 @@ const Auth = {
 
 
       return false;
+    }
     // Return true if we have both user profile and a token
     return userProfile !== null && (localToken !== null || sessionToken !== null);
   },
