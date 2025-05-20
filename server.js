@@ -23,17 +23,29 @@ const app = express();
 const PORT = process.env.PORT || 8732;
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "https://api.openai.com"]
+if (process.env.NODE_ENV === 'production') {
+  // Use strict CSP in production
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", "https://api.openai.com"]
+      }
     }
-  }
-}));
+  }));
+} else {
+  // In development, use a more permissive configuration
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disable CSP in development
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false
+  }));
+  console.log('Running in development mode with relaxed security settings');
+}
 
 // Performance middleware
 app.use(compression());
@@ -149,7 +161,7 @@ const connectWithRetry = async () => {
 
         // Create indexes for optimal performance
         await createIndexes();
-        
+
         // Create default test user
         await createDefaultUser();
         return;
@@ -168,7 +180,7 @@ const connectWithRetry = async () => {
 
       // Create indexes for optimal performance
       await createIndexes();
-      
+
       // Create default test user
       await createDefaultUser();
       return;
@@ -191,7 +203,7 @@ const connectWithRetry = async () => {
 
     // Create indexes for optimal performance
     await createIndexes();
-    
+
     // Create default test user
     await createDefaultUser();
 
@@ -212,10 +224,10 @@ const startServer = async () => {
   console.log(`Attempting to start server on port ${PORT}...`);
   const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    
+
     // Start the WebSocket server
     websocketService.initialize(server);
-    
+
     // Start the monitoring service
     monitoringService.start();
   });
@@ -223,31 +235,31 @@ const startServer = async () => {
   // Graceful shutdown
   const gracefulShutdown = () => {
     console.log('Received shutdown signal. Shutting down gracefully...');
-    
+
     // Stop the WebSocket server
     websocketService.shutdown();
-    
+
     // Stop the monitoring service
     monitoringService.stop();
-    
+
     // Close the server
     server.close(() => {
       console.log('HTTP server closed.');
-      
+
       // Close database connection
       mongoose.connection.close(false, () => {
         console.log('MongoDB connection closed.');
         process.exit(0);
       });
     });
-    
+
     // Force close if graceful shutdown fails
     setTimeout(() => {
       console.error('Could not close connections in time, forcefully shutting down');
       process.exit(1);
     }, 10000);
   };
-  
+
   // Listen for termination signals
   process.on('SIGTERM', gracefulShutdown);
   process.on('SIGINT', gracefulShutdown);
