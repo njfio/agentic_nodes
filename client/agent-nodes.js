@@ -2773,6 +2773,105 @@ AgentNodes.createPayloadsModal = function() {
 },
 
 // Alias for updatePayloadsDisplay for backward compatibility
+updatePayloadsDisplay: function() {
+  // Check if we have an editing node
+  if (!this.editingNode) {
+    console.warn('No editing node available for updatePayloadsDisplay');
+    return;
+  }
+
+  // Get the payload content elements
+  const requestPayloadContent = document.getElementById('requestPayloadContent');
+  const responsePayloadContent = document.getElementById('responsePayloadContent');
+  const apiLogCounter = document.getElementById('apiLogCounter');
+  const prevApiLogBtn = document.getElementById('prevApiLog');
+  const nextApiLogBtn = document.getElementById('nextApiLog');
+
+  // Check if we have API logs
+  if (this.editingNode.apiLogs && this.editingNode.apiLogs.length > 0) {
+    // Initialize the current API log index if not set
+    if (typeof this.currentApiLogIndex === 'undefined' || this.currentApiLogIndex < 0) {
+      this.currentApiLogIndex = 0;
+    }
+
+    // Make sure the index is within bounds
+    if (this.currentApiLogIndex >= this.editingNode.apiLogs.length) {
+      this.currentApiLogIndex = this.editingNode.apiLogs.length - 1;
+    }
+
+    // Get the current API log
+    const currentLog = this.editingNode.apiLogs[this.currentApiLogIndex];
+
+    // Update the API log counter
+    if (apiLogCounter) {
+      apiLogCounter.textContent = `Log ${this.currentApiLogIndex + 1} of ${this.editingNode.apiLogs.length}`;
+    }
+
+    // Update the previous and next buttons
+    if (prevApiLogBtn) {
+      prevApiLogBtn.disabled = this.currentApiLogIndex <= 0;
+    }
+
+    if (nextApiLogBtn) {
+      nextApiLogBtn.disabled = this.currentApiLogIndex >= this.editingNode.apiLogs.length - 1;
+    }
+
+    // Format the request payload
+    if (requestPayloadContent) {
+      requestPayloadContent.style.whiteSpace = 'pre-wrap';
+
+      if (currentLog.request && Object.keys(currentLog.request).length > 0) {
+        requestPayloadContent.textContent = JSON.stringify(currentLog.request, null, 2);
+      } else if (this.editingNode.lastRequestPayload && Object.keys(this.editingNode.lastRequestPayload).length > 0) {
+        requestPayloadContent.textContent = JSON.stringify(this.editingNode.lastRequestPayload, null, 2);
+      } else {
+        requestPayloadContent.textContent = 'No request payload available.';
+      }
+    }
+
+    // Format the response payload
+    if (responsePayloadContent) {
+      responsePayloadContent.style.whiteSpace = 'pre-wrap';
+
+      if (currentLog.response && Object.keys(currentLog.response).length > 0) {
+        responsePayloadContent.textContent = JSON.stringify(currentLog.response, null, 2);
+      } else if (this.editingNode.lastResponsePayload && Object.keys(this.editingNode.lastResponsePayload).length > 0) {
+        responsePayloadContent.textContent = JSON.stringify(this.editingNode.lastResponsePayload, null, 2);
+      } else {
+        responsePayloadContent.textContent = 'No response payload available.';
+      }
+    }
+  } else {
+    // No API logs available
+    // Update the API log counter
+    if (apiLogCounter) {
+      apiLogCounter.textContent = 'No API logs available';
+    }
+
+    // Disable the previous and next buttons
+    if (prevApiLogBtn) {
+      prevApiLogBtn.disabled = true;
+    }
+
+    if (nextApiLogBtn) {
+      nextApiLogBtn.disabled = true;
+    }
+
+    // Format the request payload
+    if (requestPayloadContent) {
+      requestPayloadContent.style.whiteSpace = 'pre-wrap';
+      requestPayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
+    }
+
+    // Format the response payload
+    if (responsePayloadContent) {
+      responsePayloadContent.style.whiteSpace = 'pre-wrap';
+      responsePayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
+    }
+  }
+},
+
+// Alias for updatePayloadsDisplay for backward compatibility
 updateApiPayloadsDisplay: function() {
   return this.updatePayloadsDisplay();
 },
