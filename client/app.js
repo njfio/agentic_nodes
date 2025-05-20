@@ -6440,12 +6440,18 @@ const App = {
       const output = await node.process(processInput);
 
       // Store the output in the node's content using our updateNodeContent method
-      if (output) {
+      if (output !== null && output !== undefined) {
         // Use the new updateNodeContent method to properly handle image cache-busting
         node.updateNodeContent(output);
 
-        // Log for debugging
-        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
+        // Log for debugging - safely handle different output types
+        const outputPreview = typeof output === 'string' ?
+          `${output.substring(0, 30)}${output.length > 30 ? '...' : ''}` :
+          'non-text content';
+        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${outputPreview}`, 'info');
+      } else {
+        // Log that output was null or undefined
+        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed but returned null or undefined output`, 'warning');
       }
 
       // Special handling for image-related nodes
