@@ -764,8 +764,14 @@ class Node {
       // Get the combined input
       const processInput = node.inputSources.size > 0 ? node.combineInputs() : node.inputContent;
 
-      // Log the processing attempt
-      DebugManager.addLog(`Starting to process node "${node.title}" (ID: ${node.id}) with input: ${processInput ? (typeof processInput === 'string' ? processInput.substring(0, 30) + '...' : 'non-text content') : 'empty input'}`, 'info');
+      // Log the processing attempt with proper null/undefined checking
+      let inputPreview = 'empty input';
+      if (processInput !== null && processInput !== undefined) {
+        inputPreview = typeof processInput === 'string' ?
+          (processInput.substring(0, 30) + (processInput.length > 30 ? '...' : '')) :
+          `non-string input (${typeof processInput})`;
+      }
+      DebugManager.addLog(`Starting to process node "${node.title}" (ID: ${node.id}) with input: ${inputPreview}`, 'info');
 
       // Process the node with this node as the source
       App.processNodeAndConnections(node, processInput, this)
@@ -6403,9 +6409,15 @@ const App = {
 
     // Log the content being used
     DebugManager.addLog(`Processing node chain starting with node "${startNode.title}" (ID: ${startNode.id})`, 'info');
-    DebugManager.addLog(`Using content: ${typeof content === 'string' ?
-      (content.substring(0, 30) + (content.length > 30 ? '...' : '')) :
-      'non-string content'}`, 'info');
+
+    // Safely log content with proper null/undefined checking
+    let contentPreview = 'empty content';
+    if (content !== null && content !== undefined) {
+      contentPreview = typeof content === 'string' ?
+        (content.substring(0, 30) + (content.length > 30 ? '...' : '')) :
+        `non-string content (${typeof content})`;
+    }
+    DebugManager.addLog(`Using content: ${contentPreview}`, 'info');
 
     try {
       // Process the start node first

@@ -681,8 +681,15 @@
         // Store the original input
         AgentMemory.store(node, 'originalInput', input);
 
-        // Log the input
-        AgentLogger.addLog(node, `Original input: ${input.substring(0, 100)}${input.length > 100 ? '...' : ''}`, 'info');
+        // Log the input with proper null/undefined checking
+        if (input === null || input === undefined) {
+          AgentLogger.addLog(node, 'Original input: null or undefined', 'warning');
+        } else {
+          const inputPreview = typeof input === 'string'
+            ? `${input.substring(0, 100)}${input.length > 100 ? '...' : ''}`
+            : `Non-string input: ${typeof input}`;
+          AgentLogger.addLog(node, `Original input: ${inputPreview}`, 'info');
+        }
       }
 
       // Increment iteration count
@@ -739,8 +746,15 @@
       // Store the result in memory
       AgentMemory.store(node, `result_${node.currentIteration}`, result);
 
-      // Log the result
-      AgentLogger.addLog(node, `Processing result: ${result.substring(0, 100)}${result.length > 100 ? '...' : ''}`, 'success');
+      // Log the result with proper null/undefined checking
+      if (result === null || result === undefined) {
+        AgentLogger.addLog(node, 'Processing result: null or undefined', 'warning');
+      } else {
+        const resultPreview = typeof result === 'string'
+          ? `${result.substring(0, 100)}${result.length > 100 ? '...' : ''}`
+          : `Non-string result: ${typeof result}`;
+        AgentLogger.addLog(node, `Processing result: ${resultPreview}`, 'success');
+      }
 
       // Update the node's content with the result
       node.content = result;
@@ -1464,7 +1478,23 @@ Your primary value comes from using tools effectively to solve problems. Users e
 
           // Create a summary of the results
           const resultsSummary = results.map(r => {
-            return `Tool: ${r.tool}\nResult: ${r.result ? (typeof r.result === 'string' ? r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '') : JSON.stringify(r.result)) : r.error ? `Error: ${r.error}` : 'No result'}`;
+            let resultText = 'No result';
+
+            if (r.result) {
+              if (typeof r.result === 'string') {
+                resultText = r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '');
+              } else {
+                try {
+                  resultText = JSON.stringify(r.result);
+                } catch (e) {
+                  resultText = `[Non-stringifiable result of type ${typeof r.result}]`;
+                }
+              }
+            } else if (r.error) {
+              resultText = `Error: ${r.error}`;
+            }
+
+            return `Tool: ${r.tool}\nResult: ${resultText}`;
           }).join('\n\n');
 
           // Add the original message and tool results to messages

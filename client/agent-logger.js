@@ -24,6 +24,51 @@ const AgentLogger = {
     };
   },
 
+  // Log input for a node
+  logInput(node, input) {
+    if (!node) return;
+
+    // Handle null or undefined input
+    if (input === null || input === undefined) {
+      return this.addLog(node, 'Received null or undefined input', 'warning');
+    }
+
+    // Log the input with proper type checking
+    const inputPreview = typeof input === 'string'
+      ? `${input.substring(0, 100)}${input.length > 100 ? '...' : ''}`
+      : `Non-string input: ${typeof input}`;
+
+    return this.addLog(node, `Input: ${inputPreview}`, 'info');
+  },
+
+  // Log output for a node
+  logOutput(node, output) {
+    if (!node) return;
+
+    // Handle null or undefined output
+    if (output === null || output === undefined) {
+      return this.addLog(node, 'Produced null or undefined output', 'warning');
+    }
+
+    // Log the output with proper type checking
+    const outputPreview = typeof output === 'string'
+      ? `${output.substring(0, 100)}${output.length > 100 ? '...' : ''}`
+      : `Non-string output: ${typeof output}`;
+
+    return this.addLog(node, `Output: ${outputPreview}`, 'info');
+  },
+
+  // Log an error for a node
+  logError(node, error) {
+    if (!node) return;
+
+    const errorMessage = error instanceof Error
+      ? error.message
+      : (typeof error === 'string' ? error : 'Unknown error');
+
+    return this.addLog(node, `Error: ${errorMessage}`, 'error');
+  },
+
   // Add a log entry
   addLog(node, message, level = 'info') {
     if (!node) return;
