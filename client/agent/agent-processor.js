@@ -428,14 +428,25 @@
         }
 
         // Convert tools to OpenAI format
-        const toolsForAPI = availableTools.map(tool => ({
-          type: 'function',
-          function: {
-            name: tool.id,
-            description: tool.description,
-            parameters: this.getToolParameters(tool)
-          }
-        }));
+        let toolsForAPI = [];
+
+        // Only include valid tools
+        if (availableTools && availableTools.length > 0) {
+          toolsForAPI = availableTools
+            .filter(tool => tool && tool.id && tool.description)
+            .map(tool => ({
+              type: 'function',
+              function: {
+                name: tool.id,
+                description: tool.description,
+                parameters: this.getToolParameters(tool)
+              }
+            }));
+
+          console.log(`Converted ${toolsForAPI.length} tools to OpenAI format`);
+        } else {
+          console.warn('No available tools found, will use default tools');
+        }
 
         // Get the API endpoint
         const apiEndpoint = '/api/openai/chat';
@@ -460,9 +471,53 @@
           model: 'gpt-4o',
           messages: messages,
           tools: toolsForAPI,
+          tool_choice: 'auto',
           temperature: 0.7,
           max_tokens: 2000
         };
+
+        // Ensure we have tools in the payload
+        if (!payload.tools || !Array.isArray(payload.tools) || payload.tools.length === 0) {
+          console.warn('No tools in payload, adding default tools');
+
+          // Add default tools
+          payload.tools = [
+            {
+              type: "function",
+              function: {
+                name: "search",
+                description: "Search the web for information",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The search query"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            },
+            {
+              type: "function",
+              function: {
+                name: "get_current_weather",
+                description: "Get the current weather for a location",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    location: {
+                      type: "string",
+                      description: "The location to get weather for"
+                    }
+                  },
+                  required: ["location"]
+                }
+              }
+            }
+          ];
+        }
 
         // Log the request payload
         node.lastRequestPayload = payload;
@@ -998,10 +1053,54 @@ Your primary value comes from using tools effectively to solve problems. Users e
       const followUpPayload = {
         model: 'gpt-4o',
         messages: updatedMessages,
-        tools: data.tools, // Reuse the same tools
+        tools: data.tools || [], // Reuse the same tools
+        tool_choice: 'auto',
         temperature: 0.7,
         max_tokens: 2000
       };
+
+      // Ensure we have tools in the follow-up payload
+      if (!followUpPayload.tools || !Array.isArray(followUpPayload.tools) || followUpPayload.tools.length === 0) {
+        console.warn('No tools in follow-up payload, adding default tools');
+
+        // Add default tools
+        followUpPayload.tools = [
+          {
+            type: "function",
+            function: {
+              name: "search",
+              description: "Search the web for information",
+              parameters: {
+                type: "object",
+                properties: {
+                  query: {
+                    type: "string",
+                    description: "The search query"
+                  }
+                },
+                required: ["query"]
+              }
+            }
+          },
+          {
+            type: "function",
+            function: {
+              name: "get_current_weather",
+              description: "Get the current weather for a location",
+              parameters: {
+                type: "object",
+                properties: {
+                  location: {
+                    type: "string",
+                    description: "The location to get weather for"
+                  }
+                },
+                required: ["location"]
+              }
+            }
+          }
+        ];
+      }
 
       const followUpResponse = await fetch('/api/openai/chat', {
         method: 'POST',
