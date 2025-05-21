@@ -341,6 +341,9 @@ const AgentNodes = {
       node.width = 240;
       node.height = 200;
 
+      // Default reasoning pattern
+      node.reasoningPattern = 'chain-of-thought';
+
       // Add agent-specific properties
       node.agentType = 'default';       // Type of agent (default, custom, etc.)
       node.tools = [];                  // Available tools for this agent
@@ -856,6 +859,11 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
           { role: 'system', content: systemPrompt },
           { role: 'user', content: input }
         ];
+
+        // Apply reasoning pattern modifications
+        if (typeof ReasoningPatterns !== 'undefined') {
+          ReasoningPatterns.applyPattern(node, messages);
+        }
 
         // Add any context from memory
         const memory = AgentMemory.getContext(node);
@@ -1761,6 +1769,11 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       systemPromptInput.value = node.systemPrompt || '';
     }
 
+    const reasoningPatternSelect = document.getElementById('reasoningPattern');
+    if (reasoningPatternSelect) {
+      reasoningPatternSelect.value = node.reasoningPattern || 'chain-of-thought';
+    }
+
     const maxIterationsInput = document.getElementById('maxIterations');
     if (maxIterationsInput) {
       maxIterationsInput.value = node.maxIterations || 5;
@@ -1962,6 +1975,12 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       const systemPromptInput = document.getElementById('agentSystemPrompt');
       if (systemPromptInput) {
         node.systemPrompt = systemPromptInput.value;
+      }
+
+      const reasoningPatternSelect = document.getElementById('reasoningPattern');
+      if (reasoningPatternSelect) {
+        node.reasoningPattern = reasoningPatternSelect.value || 'chain-of-thought';
+        DebugManager.addLog(`Set reasoning pattern to: ${node.reasoningPattern}`, 'info');
       }
 
       const maxIterationsInput = document.getElementById('maxIterations');

@@ -275,6 +275,9 @@ class Node {
 
     // For chat nodes
     this.chatHistory = []; // Array of chat messages with {role: 'user'|'assistant', content: string}
+
+    // Reasoning pattern to use when processing with AI
+    this.reasoningPattern = 'chain-of-thought';
   }
 
   getContentTypeIcon() {
