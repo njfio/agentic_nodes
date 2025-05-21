@@ -218,15 +218,31 @@ body, html {
 /* Toolbar styles */
 #toolbar {
   position: fixed;
-  top: 10px;
-  left: 10px;
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 10;
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background-color: #222;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+#toolbar .toolbar-left,
+#toolbar .toolbar-right {
+  display: flex;
   gap: 10px;
+  align-items: center;
+}
+
+#toolbar .toolbar-right {
+  margin-left: auto;
 }
 
 #toolbar button {
-  padding: 8px 16px;
+  padding: 6px 12px;
   font-size: 14px;
   cursor: pointer;
   background-color: #4a90e2;

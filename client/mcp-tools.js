@@ -38,6 +38,9 @@ const MCPTools = {
       }
 
       return true;
+
+      // Notify listeners that MCP tools are ready
+      document.dispatchEvent(new Event('mcpToolsReady'));
     } catch (error) {
       DebugManager.addLog(`Error initializing MCP tools: ${error.message}`, 'error');
       console.error('Error initializing MCP tools:', error);

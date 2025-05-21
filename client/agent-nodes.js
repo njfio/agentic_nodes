@@ -2116,6 +2116,16 @@ Your primary value comes from using tools effectively to solve problems. Users e
 
     DebugManager.addLog('Initializing agent node editor', 'info');
 
+    // Update MCP tools list once tools finish loading
+    if (!this.mcpToolsReadyListenerAdded) {
+      document.addEventListener('mcpToolsReady', () => {
+        if (this.editingNode) {
+          this.updateMCPToolsList();
+        }
+      });
+      this.mcpToolsReadyListenerAdded = true;
+    }
+
     // Get the agent type select element
     const agentTypeSelect = document.getElementById('agentType');
     if (agentTypeSelect) {
@@ -2276,6 +2286,7 @@ Your primary value comes from using tools effectively to solve problems. Users e
         }
       });
     }
+
 
     // Set up cancel button handler
     const cancelButton = document.getElementById('cancelAgentNode');
@@ -3161,6 +3172,8 @@ AgentNodes.createPayloadsModal = function() {
   DebugManager.addLog(`Viewing API payloads for agent node ${this.editingNode.id}`, 'info');
 };
 
+AgentNodes.updatePayloadsDisplay = function() {
+
   const responsePayloadContent = document.getElementById('responsePayloadContent');
   const apiLogCounter = document.getElementById('apiLogCounter');
   const prevApiLogBtn = document.getElementById('prevApiLog');
@@ -3731,6 +3744,7 @@ updateToolsList: function() {
             (e.target.id === 'viewAgentLogs' ||
              e.target.id === 'viewApiPayloads' ||
              e.target.parentElement.id === 'cancelAgentNode');
+             (e.target.parentElement && e.target.parentElement.id === 'cancelAgentNode'));
 
           // If it's one of our buttons, handle it directly
           if (isAgentButton) {
