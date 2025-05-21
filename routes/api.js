@@ -145,9 +145,69 @@ router.post('/openai/chat', async (req, res) => {
     }
 
     // Log the request payload for debugging
+    console.log('[API] FULL REQUEST PAYLOAD:');
+    console.log(JSON.stringify(req.body, null, 2));
+
+    // Ensure the request has a tools array
+    if (!req.body.tools || !Array.isArray(req.body.tools) || req.body.tools.length === 0) {
+      console.log('[API] No tools in request payload, adding default tools');
+
+      // Add default tools
+      req.body.tools = [
+        {
+          type: "function",
+          function: {
+            name: "search",
+            description: "Search the web for information",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "The search query"
+                }
+              },
+              required: ["query"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "get_current_weather",
+            description: "Get the current weather for a location",
+            parameters: {
+              type: "object",
+              properties: {
+                location: {
+                  type: "string",
+                  description: "The location to get weather for"
+                }
+              },
+              required: ["location"]
+            }
+          }
+        }
+      ];
+
+      // Set tool_choice to auto
+      req.body.tool_choice = 'auto';
+
+      console.log('[API] Added default tools to request payload');
+      console.log('[API] UPDATED REQUEST PAYLOAD:');
+      console.log(JSON.stringify(req.body, null, 2));
+    }
+
     if (req.body.tools && req.body.tools.length > 0) {
       console.log(`[API] Request includes ${req.body.tools.length} tools`);
       console.log(`[API] Tool names: ${req.body.tools.map(t => t.function?.name).filter(Boolean).join(', ')}`);
+
+      // Log detailed information about each tool
+      console.log('[API] TOOLS DETAILED INFO:');
+      req.body.tools.forEach((tool, index) => {
+        console.log(`[API] Tool ${index + 1}/${req.body.tools.length}:`);
+        console.log(JSON.stringify(tool, null, 2));
+      });
 
       // Validate the tools format
       const validTools = req.body.tools.filter(tool => {
@@ -179,6 +239,63 @@ router.post('/openai/chat', async (req, res) => {
       }
     } else {
       console.log('[API] Request does not include any tools');
+
+      // Check if this is an agent node request by examining the messages
+      if (req.body.messages && req.body.messages.length > 0) {
+        const systemMessage = req.body.messages.find(m => m.role === 'system');
+        if (systemMessage && systemMessage.content) {
+          console.log('[API] System message content:');
+          console.log(systemMessage.content);
+
+          if (systemMessage.content.includes('agent') ||
+              systemMessage.content.includes('IMPORTANT INSTRUCTIONS FOR TOOL USAGE')) {
+            console.log('[API] This appears to be an agent node request but no tools were included');
+            console.log('[API] Check that AgentTools.getAllTools() is returning tools correctly');
+
+            // Add default tools for agent node requests
+            console.log('[API] Adding default tools for agent node request');
+            req.body.tools = [
+              {
+                type: "function",
+                function: {
+                  name: "search",
+                  description: "Search the web for information",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      query: {
+                        type: "string",
+                        description: "The search query"
+                      }
+                    },
+                    required: ["query"]
+                  }
+                }
+              },
+              {
+                type: "function",
+                function: {
+                  name: "get_current_weather",
+                  description: "Get the current weather for a location",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      location: {
+                        type: "string",
+                        description: "The location to get weather for"
+                      }
+                    },
+                    required: ["location"]
+                  }
+                }
+              }
+            ];
+
+            req.body.tool_choice = 'auto';
+            console.log('[API] Added default tools to request');
+          }
+        }
+      }
     }
 
     // Check if OpenAI API key is set
@@ -204,6 +321,11 @@ router.post('/openai/chat', async (req, res) => {
       httpsAgent,
       timeout: timeout // Use the timeout from the request headers
     });
+
+    // Log the response data
+    console.log('[API] FULL RESPONSE PAYLOAD:');
+    console.log(JSON.stringify(response.data, null, 2));
+
     res.json(response.data);
   } catch (error) {
     console.error('OpenAI API error:', error.response?.data || error.message);

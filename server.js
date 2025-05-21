@@ -23,17 +23,29 @@ const app = express();
 const PORT = process.env.PORT || 8732;
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "https://api.openai.com"]
+if (process.env.NODE_ENV === 'production') {
+  // Use strict CSP in production
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", "https://api.openai.com"]
+      }
     }
-  }
-}));
+  }));
+} else {
+  // In development, use a more permissive configuration
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disable CSP in development
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false
+  }));
+  console.log('Running in development mode with relaxed security settings');
+}
 
 // Performance middleware
 app.use(compression());
@@ -136,25 +148,34 @@ const connectWithRetry = async () => {
 
   try {
     // First, try to connect to the Docker MongoDB
-    if (process.env.MONGODB_DOCKER_URI) {
+    if (process.env.MONGODB_DOCKER_URI || process.env.DOCKER_ENV) {
       try {
         // Set Docker environment flag
         process.env.DOCKER_ENV = 'true';
 
-        await mongoose.connect(process.env.MONGODB_DOCKER_URI, {
-          serverSelectionTimeoutMS: 5000,
-          connectTimeoutMS: 5000
+        // Use a simple connection string for Docker MongoDB
+        // When running on host machine, use localhost instead of mongodb
+        const isRunningInDocker = process.env.RUNNING_IN_DOCKER === 'true';
+        const mongoHost = isRunningInDocker ? 'mongodb' : 'localhost';
+        const dockerMongoURI = `mongodb://${mongoHost}:27017/multimodal-ai-agent`;
+        console.log(`Attempting to connect to Docker MongoDB at: ${dockerMongoURI} (Running in Docker: ${isRunningInDocker})`);
+
+        await mongoose.connect(dockerMongoURI, {
+          serverSelectionTimeoutMS: 10000, // Increased timeout
+          connectTimeoutMS: 10000,         // Increased timeout
+          socketTimeoutMS: 45000           // Added socket timeout
         });
         console.log('Connected to Docker MongoDB successfully');
 
         // Create indexes for optimal performance
         await createIndexes();
-        
+
         // Create default test user
         await createDefaultUser();
         return;
       } catch (dockerErr) {
         console.error('Docker MongoDB connection error:', dockerErr.message);
+        console.error('Docker MongoDB connection stack:', dockerErr.stack);
       }
     }
 
@@ -168,7 +189,7 @@ const connectWithRetry = async () => {
 
       // Create indexes for optimal performance
       await createIndexes();
-      
+
       // Create default test user
       await createDefaultUser();
       return;
@@ -191,7 +212,7 @@ const connectWithRetry = async () => {
 
     // Create indexes for optimal performance
     await createIndexes();
-    
+
     // Create default test user
     await createDefaultUser();
 
@@ -203,66 +224,115 @@ const connectWithRetry = async () => {
   }
 };
 
-// Start the server after MongoDB connection is established
-const startServer = async () => {
-  if (process.env.NODE_ENV !== 'test') {
-    await connectWithRetry();
+// Create a global server variable to hold the HTTP server instance
+let httpServer = null;
+
+// Define the graceful shutdown function
+const gracefulShutdown = () => {
+  console.log('Received shutdown signal. Shutting down gracefully...');
+
+  // Stop the WebSocket server
+  websocketService.shutdown();
+
+  // Stop the monitoring service
+  monitoringService.stop();
+
+  // Close the HTTP server if it exists
+  if (httpServer) {
+    httpServer.close(() => {
+      console.log('HTTP server closed.');
+
+      // Close database connection using Promise API
+      if (mongoose.connection.readyState !== 0) { // 0 = disconnected
+        try {
+          mongoose.connection.close(false)
+            .then(() => {
+              console.log('MongoDB connection closed.');
+              process.exit(0);
+            })
+            .catch(err => {
+              console.error('Error closing MongoDB connection:', err);
+              process.exit(1);
+            });
+        } catch (err) {
+          console.error('Error closing MongoDB connection:', err);
+          process.exit(1);
+        }
+      } else {
+        console.log('MongoDB already disconnected.');
+        process.exit(0);
+      }
+    });
+  } else {
+    console.log('HTTP server not initialized.');
+    process.exit(0);
   }
 
-  console.log(`Attempting to start server on port ${PORT}...`);
-  const server = app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    
-    // Start the WebSocket server
-    websocketService.initialize(server);
-    
-    // Start the monitoring service
-    monitoringService.start();
-  });
+  // Force close if graceful shutdown fails
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
 
-  // Graceful shutdown
-  const gracefulShutdown = () => {
-    console.log('Received shutdown signal. Shutting down gracefully...');
-    
-    // Stop the WebSocket server
-    websocketService.shutdown();
-    
-    // Stop the monitoring service
-    monitoringService.stop();
-    
-    // Close the server
-    server.close(() => {
-      console.log('HTTP server closed.');
-      
-      // Close database connection
-      mongoose.connection.close(false, () => {
-        console.log('MongoDB connection closed.');
-        process.exit(0);
-      });
+// Start the server after MongoDB connection is established
+const startServer = async () => {
+  try {
+    // Connect to MongoDB if not in test mode
+    if (process.env.NODE_ENV !== 'test') {
+      await connectWithRetry();
+    }
+
+    // Create a Promise to handle server startup
+    return new Promise((resolve, reject) => {
+      try {
+        console.log(`Attempting to start server on port ${PORT}...`);
+
+        // Create the HTTP server
+        httpServer = app.listen(PORT, () => {
+          console.log(`Server running on port ${PORT}`);
+
+          // Start the WebSocket server
+          websocketService.initialize(httpServer);
+
+          // Start the monitoring service
+          monitoringService.start();
+
+          // Register shutdown handlers
+          process.on('SIGTERM', gracefulShutdown);
+          process.on('SIGINT', gracefulShutdown);
+
+          // Resolve the Promise with the server instance
+          resolve(httpServer);
+        });
+
+        // Handle server errors
+        httpServer.on('error', (err) => {
+          console.error('Server error:', err);
+          reject(err);
+        });
+      } catch (err) {
+        console.error('Error starting server:', err);
+        reject(err);
+      }
     });
-    
-    // Force close if graceful shutdown fails
-    setTimeout(() => {
-      console.error('Could not close connections in time, forcefully shutting down');
-      process.exit(1);
-    }, 10000);
-  };
-  
-  // Listen for termination signals
-  process.on('SIGTERM', gracefulShutdown);
-  process.on('SIGINT', gracefulShutdown);
-
-  return server;
+  } catch (err) {
+    console.error('Error in startServer:', err);
+    throw err;
+  }
 };
 
 // Start the server
-const server = startServer();
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
-  // Close server & exit process
-  server.close(() => process.exit(1));
+  // Use the graceful shutdown function to handle server shutdown
+  gracefulShutdown();
 });
 
-module.exports = server; // Export for testing
+module.exports = app; // Export the Express app for testing instead of the server instance

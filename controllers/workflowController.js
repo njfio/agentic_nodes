@@ -5,7 +5,27 @@ const { logger } = require('../services/loggingService');
 // Get all workflows
 exports.getAllWorkflows = async (req, res) => {
   try {
-    const workflows = await Workflow.find({ user: req.user?.id || null });
+    console.time('getAllWorkflows');
+
+    // Use lean() to get plain JavaScript objects instead of Mongoose documents
+    // This is much faster for large result sets
+    // Also use projection to only return the fields we need
+    const workflows = await Workflow.find(
+      { user: req.user?.id || null },
+      {
+        name: 1,
+        description: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        'nodes.id': 1,
+        'nodes.title': 1,
+        'nodes.workflowRole': 1
+      }
+    )
+    .sort({ updatedAt: -1 })
+    .lean();
+
+    console.timeEnd('getAllWorkflows');
     res.json(workflows);
   } catch (error) {
     console.error('Error fetching workflows:', error);
@@ -16,8 +36,13 @@ exports.getAllWorkflows = async (req, res) => {
 // Get workflow by ID
 exports.getWorkflowById = async (req, res) => {
   try {
-    const workflow = await Workflow.findById(req.params.id);
+    console.time('getWorkflowById');
+
+    // Use a more efficient query with lean() for better performance
+    const workflow = await Workflow.findById(req.params.id).lean();
+
     if (!workflow) {
+      console.timeEnd('getWorkflowById');
       return res.status(404).json({ message: 'Workflow not found' });
     }
 
@@ -39,22 +64,28 @@ exports.getWorkflowById = async (req, res) => {
         }
       });
 
-      // If we have image references, try to fetch the images
+      // If we have image references, try to fetch the images in parallel
       if (imageRefs.length > 0) {
         try {
+          console.log(`Loading ${imageRefs.length} images for workflow ${workflow._id}`);
+
           // Get the Image model
           const Image = require('../models/Image');
 
-          // For each node with truncated image content
-          for (const ref of imageRefs) {
-            // Try to find the image in the database
-            const image = await Image.findOne({
+          // Fetch all images in parallel for better performance
+          const imagePromises = imageRefs.map(ref =>
+            Image.findOne({
               workflow: workflow._id,
               node: ref.nodeId
-            });
+            }).lean()
+          );
 
+          const images = await Promise.all(imagePromises);
+
+          // Process the results
+          images.forEach((image, index) => {
             if (image) {
-              // Find the node in the workflow
+              const ref = imageRefs[index];
               const nodeIndex = workflow.nodes.findIndex(n => n.id === ref.nodeId);
 
               if (nodeIndex !== -1) {
@@ -62,7 +93,9 @@ exports.getWorkflowById = async (req, res) => {
                 workflow.nodes[nodeIndex].content = image.data;
               }
             }
-          }
+          });
+
+          console.log(`Loaded ${images.filter(Boolean).length} images for workflow ${workflow._id}`);
         } catch (imageError) {
           console.error('Error fetching workflow images:', imageError);
           // Continue with the workflow even if we couldn't fetch the images
@@ -70,6 +103,7 @@ exports.getWorkflowById = async (req, res) => {
       }
     }
 
+    console.timeEnd('getWorkflowById');
     res.json(workflow);
   } catch (error) {
     console.error('Error fetching workflow:', error);

@@ -556,8 +556,8 @@
         </style>
       `;
 
-      // Attempt auto-login with the correct API URL
-      fetch('http://localhost:8732/api/docker/auto-login')
+      // Attempt auto-login with a relative URL
+      fetch('/api/docker/auto-login')
         .then(response => {
           if (!response.ok) {
             throw new Error('Auto-login failed');
@@ -862,13 +862,220 @@
     </div>
   </div>
 
-  <!-- Agent Node System -->
+  <!-- Agent Node System - Load in specific order with proper attributes -->
+  <!-- First load the AgentNodes initialization script to ensure it's available globally -->
+  <script src="agent-nodes-init.js"></script>
+
+  <!-- Then load the dependencies -->
   <script src="agent-memory.js"></script>
   <script src="agent-tools.js"></script>
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
+
+  <!-- Load MCP tools -->
   <script src="mcp-tools.js"></script>
-  <script src="agent-nodes.js"></script>
+
+  <!-- Load the new modular agent nodes implementation -->
+  <script src="agent/agent-processor.js"></script>
+  <script src="agent/agent-integration.js"></script>
+  <script src="agent/agent-modals.js"></script>
+  <script src="agent/agent-editor.js"></script>
+  <script src="agent/agent-ui.js"></script>
+  <script src="agent-draw.js"></script>
+  <script src="agent/agent-nodes.js"></script>
+
+  <!-- Global initialization system -->
+  <script>
+    // Create a global initialization system
+    window.AppInitSystem = {
+      components: {
+        mcpTools: false,
+        agentNodes: false
+      },
+
+      // Register a component as ready
+      markReady: function(componentName) {
+        console.log(`Component ${componentName} is ready`);
+        if (this.components.hasOwnProperty(componentName)) {
+          this.components[componentName] = true;
+          this.checkAllReady();
+        }
+      },
+
+      // Check if all components are ready
+      checkAllReady: function() {
+        const allReady = Object.values(this.components).every(ready => ready);
+        if (allReady) {
+          console.log('All components are ready, finalizing initialization');
+          this.finalizeInitialization();
+        }
+      },
+
+      // Finalize initialization when all components are ready
+      finalizeInitialization: function() {
+        console.log('Finalizing application initialization');
+
+        // Verify that AgentNodes is available
+        if (!window.AgentNodes) {
+          console.error('AgentNodes not available during finalization');
+          // Try to recover by checking if it's defined in the global scope
+          if (typeof AgentNodes !== 'undefined') {
+            window.AgentNodes = AgentNodes;
+            console.log('Recovered AgentNodes from global scope');
+          }
+        } else {
+          console.log('AgentNodes is available during finalization');
+        }
+
+        // Ensure AgentNodes has all the tools from MCPTools
+        if (window.AgentNodes && window.MCPTools) {
+          console.log('Connecting MCPTools to AgentNodes');
+
+          // Make sure MCPTools are registered with AgentTools
+          if (window.MCPTools.tools && window.MCPTools.tools.length > 0) {
+            if (window.AgentTools) {
+              MCPTools.registerWithAgentTools();
+              console.log(`Registered ${MCPTools.tools.length} MCP tools with AgentTools`);
+            }
+          }
+
+          // Make sure AgentNodes has the latest tools
+          if (window.AgentNodes.updateToolsList) {
+            AgentNodes.updateToolsList();
+            console.log('Updated AgentNodes tools list');
+          }
+
+          // Add the agent node button to the toolbar
+          if (window.AgentNodes.addAgentNodeButton) {
+            console.log('Adding agent node button from finalizeInitialization');
+            setTimeout(() => {
+              window.AgentNodes.addAgentNodeButton();
+            }, 500);
+          }
+        }
+
+        // Dispatch a custom event to notify the application that initialization is complete
+        const event = new CustomEvent('app-initialization-complete');
+        document.dispatchEvent(event);
+        console.log('App initialization complete event dispatched');
+      },
+
+      // Initialize the system
+      init: function() {
+        console.log('Initializing application components');
+
+        // Verify that AgentNodes is available
+        if (!window.AgentNodes) {
+          console.error('AgentNodes not available during initialization');
+          // Try to recover by checking if it's defined in the global scope
+          if (typeof AgentNodes !== 'undefined') {
+            window.AgentNodes = AgentNodes;
+            console.log('Recovered AgentNodes from global scope');
+          }
+        } else {
+          console.log('AgentNodes is available during initialization');
+        }
+
+        // Initialize AgentNodes first
+        if (window.AgentNodes && typeof AgentNodes.init === 'function') {
+          console.log('Initializing AgentNodes');
+          try {
+            AgentNodes.init();
+            this.markReady('agentNodes');
+          } catch (error) {
+            console.error('Error initializing AgentNodes:', error);
+            // Mark as ready anyway to continue initialization
+            this.markReady('agentNodes');
+          }
+        } else {
+          console.warn('AgentNodes not available or init method missing');
+
+          // Set up a retry mechanism for AgentNodes
+          let retryCount = 0;
+          const maxRetries = 10;
+          const retryInterval = 300; // ms
+
+          const checkAgentNodes = () => {
+            if (window.AgentNodes && typeof AgentNodes.init === 'function') {
+              console.log('AgentNodes found after retry, initializing now');
+              try {
+                AgentNodes.init();
+                this.markReady('agentNodes');
+              } catch (error) {
+                console.error('Error initializing AgentNodes after retry:', error);
+                this.markReady('agentNodes');
+              }
+            } else if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes to be available`);
+              setTimeout(checkAgentNodes, retryInterval);
+            } else {
+              console.error('Failed to find AgentNodes after multiple retries');
+              // Mark as ready anyway to continue initialization
+              this.markReady('agentNodes');
+            }
+          };
+
+          // Start the retry process
+          setTimeout(checkAgentNodes, retryInterval);
+        }
+
+        // Initialize MCP tools after AgentNodes
+        if (window.MCPTools && typeof MCPTools.init === 'function') {
+          console.log('Initializing MCPTools');
+          try {
+            MCPTools.init().then(() => {
+              this.markReady('mcpTools');
+            }).catch(error => {
+              console.error('Error initializing MCPTools:', error);
+              // Mark as ready anyway to continue initialization
+              this.markReady('mcpTools');
+            });
+          } catch (error) {
+            console.error('Error calling MCPTools.init():', error);
+            // Mark as ready anyway to continue initialization
+            this.markReady('mcpTools');
+          }
+        } else {
+          console.warn('MCPTools not available or init method missing');
+          // Mark as ready anyway to continue initialization
+          this.markReady('mcpTools');
+        }
+      }
+    };
+
+    // Initialize the system when the DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Verify that AgentNodes is available
+      if (!window.AgentNodes) {
+        console.error('AgentNodes not available during DOMContentLoaded');
+        // Try to recover by checking if it's defined in the global scope
+        if (typeof AgentNodes !== 'undefined') {
+          window.AgentNodes = AgentNodes;
+          console.log('Recovered AgentNodes from global scope');
+        }
+      } else {
+        console.log('AgentNodes is available during DOMContentLoaded');
+      }
+
+      // Wait a short time to ensure all scripts are loaded
+      setTimeout(() => {
+        window.AppInitSystem.init();
+      }, 500);
+    });
+
+    // Add a global error handler for script loading
+    window.addEventListener('error', function(event) {
+      if (event.target && event.target.tagName === 'SCRIPT') {
+        console.error('Error loading script:', event.target.src);
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog(`Error loading script: ${event.target.src}`, 'error');
+        }
+      }
+    }, true);
+  </script>
+
+  <script src="app-global.js"></script>
   <script src="keyboard-config.js" type="module"></script>
   <script src="theme-switcher.js" type="module"></script>
   <script src="mobile-menu.js" type="module"></script>

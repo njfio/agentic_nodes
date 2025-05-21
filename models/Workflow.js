@@ -53,4 +53,9 @@ const workflowSchema = new mongoose.Schema({
   }
 });
 
+// Add indexes to improve query performance
+workflowSchema.index({ user: 1 });
+workflowSchema.index({ createdAt: -1 });
+workflowSchema.index({ updatedAt: -1 });
+
 module.exports = mongoose.model('Workflow', workflowSchema);

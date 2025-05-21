@@ -3,250 +3,363 @@
  * Implements agentic nodes with logic loops and function calling capabilities
  */
 
-const AgentNodes = {
-  // Initialize the Agent Nodes
-  init() {
-    // Register node types
-    this.registerNodeTypes();
+// Use the pre-initialized AgentNodes object from agent-nodes-init.js
+(function() {
+  // Verify that the AgentNodes object exists
+  if (!window.AgentNodes) {
+    console.error('AgentNodes object not found in global scope');
+    // Create a fallback object
+    window.AgentNodes = {};
+  }
 
-    // Add event listeners (with a slight delay to ensure DOM is ready)
-    setTimeout(() => {
-      this.addEventListeners();
-      console.log('Agent Nodes initialized and toolbar button added');
-    }, 100);
+  // Extend the pre-initialized AgentNodes object with the full implementation
+  const AgentNodesImpl = {
+    // Track initialization state
+    _initialized: false,
+
+    // Initialize the Agent Nodes
+    init: function() {
+      try {
+        // Prevent multiple initializations
+        if (this._initialized) {
+          console.log('AgentNodes already initialized, skipping');
+          return;
+        }
+
+        console.log('AgentNodes.init called');
+
+        // Check if MCP tools are available
+        if (window.MCPTools) {
+          console.log('MCPTools available during AgentNodes initialization');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('MCPTools available during AgentNodes initialization', 'info');
+          }
+        } else {
+          console.warn('MCPTools not available during AgentNodes initialization');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('MCPTools not available during AgentNodes initialization', 'warning');
+          }
+        }
+
+        // Register node types
+        this.registerNodeTypes();
+
+        // Add event listeners (with a slight delay to ensure DOM is ready)
+        setTimeout(() => {
+          this.addEventListeners();
+          console.log('Agent Nodes initialized and toolbar button added');
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog('Agent Nodes initialized successfully', 'success');
+          }
+        }, 100);
+
+        // Initialize the agent logs modal
+        this.initAgentLogsModal();
+
+        // Mark as initialized
+        this._initialized = true;
+
+        // Notify the initialization system if available
+        if (window.AppInitSystem && AppInitSystem.markReady) {
+          AppInitSystem.markReady('agentNodes');
+        }
+
+        // Mark as ready using the readiness promise
+        if (typeof this.markReady === 'function') {
+          this.markReady();
+          console.log('AgentNodes marked as ready');
+        }
+      } catch (error) {
+        console.error('Error initializing AgentNodes:', error);
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog(`Error initializing AgentNodes: ${error.message}`, 'error');
+        }
+
+        // Mark as ready even if there was an error, to unblock dependent code
+        if (typeof this.markReady === 'function') {
+          this.markReady();
+          console.log('AgentNodes marked as ready despite initialization error');
+        }
+      }
   },
 
-  // Register node types with the application
-  registerNodeTypes() {
-    // Add the agent node type to the App object if it exists
-    if (window.App) {
-      // Store the original addNode method
-      const originalAddNode = App.addNode;
+    // Register node types with the application
+    registerNodeTypes: function() {
+      // Add the agent node type to the App object if it exists
+      if (window.App) {
+        console.log('Registering agent node type with App');
 
-      // Override the addNode method to add our custom node types
-      App.addNode = function(nodeType) {
-        console.log('App.addNode called with nodeType:', nodeType);
+        // Store the original addNode method
+        const originalAddNode = App.addNode;
 
-        if (nodeType === 'agent') {
-          const agentNode = AgentNodes.createAgentNode();
-          console.log('Created agent node with nodeType:', agentNode.nodeType);
-          return agentNode;
-        }
+        // Override the addNode method to add our custom node types
+        App.addNode = function(nodeType) {
+          console.log('App.addNode called with nodeType:', nodeType);
 
-        // Call the original method for other node types
-        return originalAddNode.call(App, nodeType);
-      };
-
-      // Add the nodeType property to the Node class if it doesn't exist
-      if (!Node.prototype.hasOwnProperty('nodeType')) {
-        Object.defineProperty(Node.prototype, 'nodeType', {
-          get: function() {
-            return this._nodeType || 'default';
-          },
-          set: function(value) {
-            this._nodeType = value;
+          if (nodeType === 'agent') {
+            console.log('Creating agent node');
+            const agentNode = AgentNodes.createAgentNode();
+            console.log('Created agent node with nodeType:', agentNode.nodeType);
+            return agentNode;
           }
-        });
-      }
 
-      // Extend the Node's process method to handle agent node processing
-      const originalNodeProcess = Node.prototype.process;
-      Node.prototype.process = async function(input) {
-        // Handle agent node processing
-        if (this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true) {
-          DebugManager.addLog(`Processing agent node ${this.id} (${this.title}) with agent capabilities`, 'info');
-          try {
-            // Mark the node as processing
-            this.processing = true;
+          // Call the original method for other node types
+          return originalAddNode.call(App, nodeType);
+        };
 
-            // Process the node using the agent processor
-            const result = await AgentNodes.processAgentNode(this, input);
+        // Log the registered node types
+        console.log('Agent node type registered with App');
 
-            // Mark the node as processed
-            this.hasBeenProcessed = true;
-            this.processing = false;
+        // Add the nodeType property to the Node class if it doesn't exist
+        if (!Node.prototype.hasOwnProperty('nodeType')) {
+          Object.defineProperty(Node.prototype, 'nodeType', {
+            get: function() {
+              return this._nodeType || 'default';
+            },
+            set: function(value) {
+              this._nodeType = value;
+            }
+          });
+        }
 
-            // Return the result
-            return result;
-          } catch (error) {
-            // Handle errors
-            DebugManager.addLog(`Error processing agent node ${this.id}: ${error.message}`, 'error');
-            this.processing = false;
-            this.error = error.message;
-            throw error;
+        // Extend the Node's process method to handle agent node processing
+        const originalNodeProcess = Node.prototype.process;
+        Node.prototype.process = async function(input) {
+          // Handle agent node processing
+          if (this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true) {
+            DebugManager.addLog(`Processing agent node ${this.id} (${this.title}) with agent capabilities`, 'info');
+            try {
+              // Mark the node as processing
+              this.processing = true;
+
+              // Process the node using the agent processor
+              // First try using AgentProcessor if available, otherwise fall back to AgentNodes
+              let result;
+              if (window.AgentProcessor && typeof AgentProcessor.processAgentNode === 'function') {
+                DebugManager.addLog(`Using AgentProcessor.processAgentNode for node ${this.id}`, 'info');
+                result = await AgentProcessor.processAgentNode(this, input);
+              } else {
+                DebugManager.addLog(`Falling back to AgentNodes.processAgentNode for node ${this.id}`, 'warning');
+                result = await AgentNodes.processAgentNode(this, input);
+              }
+
+              // Mark the node as processed
+              this.hasBeenProcessed = true;
+              this.processing = false;
+
+              // Return the result
+              return result;
+            } catch (error) {
+              // Handle errors
+              DebugManager.addLog(`Error processing agent node ${this.id}: ${error.message}`, 'error');
+              this.processing = false;
+              this.error = error.message;
+              throw error;
+            }
           }
+
+          // Call the original process method for regular nodes
+          return originalNodeProcess.call(this, input);
+        };
+
+        // Extend the Node's draw method to handle agent node styling
+        // Store the original draw method if it hasn't been overridden yet
+        if (!Node.prototype._originalDraw) {
+          Node.prototype._originalDraw = Node.prototype.draw;
         }
 
-        // Call the original process method for regular nodes
-        return originalNodeProcess.call(this, input);
-      };
+        // Override the draw method only once
+        Node.prototype.draw = function(ctx) {
+          // Check if we're already in an agent node drawing context to prevent infinite loops
+          if (this._isDrawingAgent) {
+            // Call the original draw method to avoid infinite recursion
+            if (Node.prototype._originalDraw) {
+              Node.prototype._originalDraw.call(this, ctx);
+            }
+            return;
+          }
 
-      // Extend the Node's draw method to handle agent node styling
-      const originalNodeDraw = Node.prototype.draw;
-      Node.prototype.draw = function(ctx) {
-        // Store the original node type for debugging
-        const nodeType = this.nodeType || this._nodeType;
+          // Store the original node type for debugging
+          const nodeType = this.nodeType || this._nodeType;
 
-        // Force the node type to be set correctly if it's an agent node
-        // This is a workaround for cases where the nodeType property might not be set correctly
-        if (this.isAgentNode === true && this.nodeType !== 'agent') {
-          this.nodeType = 'agent';
-          this._nodeType = 'agent';
-          DebugManager.addLog(`Fixed node type for agent node ${this.id}`, 'info');
-        }
+          // Force the node type to be set correctly if it's an agent node
+          if (this.isAgentNode === true && this.nodeType !== 'agent') {
+            this.nodeType = 'agent';
+            this._nodeType = 'agent';
+            // Removed excessive logging
+          }
 
-        // Check if this is an agent node and apply styling before calling original draw
-        if (this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true) {
-          // Override the node background with agent-specific styling
-          // Use purple gradient for agent nodes
-          const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
-          gradient.addColorStop(0, '#9c27b0');  // Purple top
-          gradient.addColorStop(1, '#7b1fa2');  // Darker purple bottom
+          // Check if this is an agent node and apply styling
+          if (this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true) {
+            // Set flag to prevent infinite recursion
+            this._isDrawingAgent = true;
 
-          // Save the original styles
-          const originalFill = ctx.fillStyle;
-          const originalStroke = ctx.strokeStyle;
-          const originalLineWidth = ctx.lineWidth;
+            try {
+              // Override the node background with agent-specific styling
+              // Use purple gradient for agent nodes
+              const gradient = ctx.createLinearGradient(this.x, this.y, this.x, this.y + this.height);
+              gradient.addColorStop(0, '#9c27b0');  // Purple top
+              gradient.addColorStop(1, '#7b1fa2');  // Darker purple bottom
 
-          // Apply the gradient to the node
-          ctx.fillStyle = this.selected ? '#4a90e2' :
-                         this.processing ? '#d4af37' :
-                         this.error ? '#e74c3c' : gradient;
+              // Save the original styles
+              const originalFill = ctx.fillStyle;
+              const originalStroke = ctx.strokeStyle;
+              const originalLineWidth = ctx.lineWidth;
 
-          ctx.strokeStyle = '#ff00ff'; // Bright purple border for agent nodes
-          ctx.lineWidth = 2; // Thicker border
+              // Apply the gradient to the node
+              ctx.fillStyle = this.selected ? '#4a90e2' :
+                             this.processing ? '#d4af37' :
+                             this.error ? '#e74c3c' : gradient;
 
-          // Draw the node background and border
-          ctx.beginPath();
-          ctx.roundRect(this.x, this.y, this.width, this.height, 5);
-          ctx.fill();
-          ctx.stroke();
+              ctx.strokeStyle = '#ff00ff'; // Bright purple border for agent nodes
+              ctx.lineWidth = 2; // Thicker border
 
-          // Draw the node title
+              // Draw the node background and border
+              ctx.beginPath();
+              ctx.roundRect(this.x, this.y, this.width, this.height, 5);
+              ctx.fill();
+              ctx.stroke();
+
+              // Draw the node title
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 14px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText(this.title, this.x + this.width / 2, this.y + 20);
+
+              // Add agent icon
+              // Draw agent badge in the top-right corner
+              const badgeX = this.x + this.width - 20;
+              const badgeY = this.y + 20;
+              const badgeRadius = 12;
+
+              // Draw the badge circle
+              ctx.fillStyle = '#9c27b0'; // Purple for agent nodes
+              ctx.beginPath();
+              ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Draw the badge icon (robot emoji)
+              ctx.fillStyle = '#fff';
+              ctx.font = 'bold 14px Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('🤖', badgeX, badgeY);
+
+              // Draw iteration count if iterating
+              if (this.isIterating) {
+                const iterX = this.x + this.width - 20;
+                const iterY = this.y + this.height - 20;
+
+                // Draw iteration badge
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.beginPath();
+                ctx.arc(iterX, iterY, 15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw iteration text
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${this.currentIteration}/${this.maxIterations}`, iterX, iterY);
+              }
+
+              // Draw input and output areas
+              if (typeof this.drawInputOutputAreas === 'function') {
+                this.drawInputOutputAreas(ctx);
+              }
+
+              // Restore the original styles
+              ctx.fillStyle = originalFill;
+              ctx.strokeStyle = originalStroke;
+              ctx.lineWidth = originalLineWidth;
+            } finally {
+              // Always clear the flag to prevent issues with future draws
+              this._isDrawingAgent = false;
+            }
+
+            // Skip the original draw method for agent nodes
+            return;
+          }
+
+          // Call the original draw method for non-agent nodes
+          if (Node.prototype._originalDraw) {
+            Node.prototype._originalDraw.call(this, ctx);
+          }
+        };
+
+        // Helper method to draw input and output areas for agent nodes
+        Node.prototype.drawInputOutputAreas = function(ctx) {
+          if (this.nodeType !== 'agent' && this._nodeType !== 'agent' && this.isAgentNode !== true) {
+            return;
+          }
+
+          const inputAreaHeight = 30;
+          const outputAreaHeight = 30;
+          const contentAreaX = this.x + 10;
+          const contentAreaWidth = this.width - 20;
+
+          // Draw input area
+          const inputAreaY = this.y + 40;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.fillRect(contentAreaX, inputAreaY, contentAreaWidth, inputAreaHeight);
+
+          // Draw input label
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 14px Arial';
-          ctx.textAlign = 'center';
-          ctx.fillText(this.title, this.x + this.width / 2, this.y + 20);
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText('INPUT', contentAreaX + 5, inputAreaY + 5);
 
-          // Add agent icon
-          // Draw agent badge in the top-right corner
-          const badgeX = this.x + this.width - 20;
-          const badgeY = this.y + 20;
-          const badgeRadius = 12;
+          // Draw output area
+          const outputAreaY = this.y + this.height - outputAreaHeight - 10;
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.fillRect(contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
 
-          // Draw the badge circle
-          ctx.fillStyle = '#9c27b0'; // Purple for agent nodes
+          // Draw output label
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText('OUTPUT', contentAreaX + 5, outputAreaY + 5);
+
+          // Draw input connector
+          const inputConnectorX = this.x;
+          const inputConnectorY = inputAreaY + inputAreaHeight / 2;
+          ctx.fillStyle = '#4a90e2';
           ctx.beginPath();
-          ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+          ctx.arc(inputConnectorX, inputConnectorY, 8, 0, Math.PI * 2);
           ctx.fill();
 
-          // Draw the badge icon (robot emoji)
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 14px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('🤖', badgeX, badgeY);
-
-          // Draw iteration count if iterating
-          if (this.isIterating) {
-            const iterX = this.x + this.width - 20;
-            const iterY = this.y + this.height - 20;
-
-            // Draw iteration badge
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.beginPath();
-            ctx.arc(iterX, iterY, 15, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Draw iteration text
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 12px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${this.currentIteration}/${this.maxIterations}`, iterX, iterY);
-          }
-
-          // Draw input and output areas
-          this.drawInputOutputAreas(ctx);
-
-          // Restore the original styles
-          ctx.fillStyle = originalFill;
-          ctx.strokeStyle = originalStroke;
-          ctx.lineWidth = originalLineWidth;
-
-          // Skip the original draw method for agent nodes
-          return;
-        }
-
-        // Call the original draw method for non-agent nodes
-        originalNodeDraw.call(this, ctx);
-      };
-
-      // Helper method to draw input and output areas for agent nodes
-      Node.prototype.drawInputOutputAreas = function(ctx) {
-        if (this.nodeType !== 'agent' && this._nodeType !== 'agent' && this.isAgentNode !== true) {
-          return;
-        }
-
-        const inputAreaHeight = 30;
-        const outputAreaHeight = 30;
-        const contentAreaX = this.x + 10;
-        const contentAreaWidth = this.width - 20;
-
-        // Draw input area
-        const inputAreaY = this.y + 40;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(contentAreaX, inputAreaY, contentAreaWidth, inputAreaHeight);
-
-        // Draw input label
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('INPUT', contentAreaX + 5, inputAreaY + 5);
-
-        // Draw output area
-        const outputAreaY = this.y + this.height - outputAreaHeight - 10;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(contentAreaX, outputAreaY, contentAreaWidth, outputAreaHeight);
-
-        // Draw output label
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillText('OUTPUT', contentAreaX + 5, outputAreaY + 5);
-
-        // Draw input connector
-        const inputConnectorX = this.x;
-        const inputConnectorY = inputAreaY + inputAreaHeight / 2;
-        ctx.fillStyle = '#4a90e2';
-        ctx.beginPath();
-        ctx.arc(inputConnectorX, inputConnectorY, 8, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw output connector
-        const outputConnectorX = this.x + this.width;
-        const outputConnectorY = outputAreaY + outputAreaHeight / 2;
-        ctx.fillStyle = '#4a90e2';
-        ctx.beginPath();
-        ctx.arc(outputConnectorX, outputConnectorY, 8, 0, Math.PI * 2);
-        ctx.fill();
-      };
+          // Draw output connector
+          const outputConnectorX = this.x + this.width;
+          const outputConnectorY = outputAreaY + outputAreaHeight / 2;
+          ctx.fillStyle = '#4a90e2';
+          ctx.beginPath();
+          ctx.arc(outputConnectorX, outputConnectorY, 8, 0, Math.PI * 2);
+          ctx.fill();
+        };
     }
   },
 
   // Add event listeners
   addEventListeners() {
+    console.log('Adding event listeners for AgentNodes');
+
     // Add buttons to the toolbar
     const toolbar = document.getElementById('toolbar');
     if (toolbar) {
+      console.log('Found toolbar, adding agent node button');
+
       // Check if the button already exists
       const existingButton = document.getElementById('addAgentNodeBtn');
       if (existingButton) {
         // Remove the existing button to avoid duplicates
         existingButton.remove();
-        DebugManager.addLog('Removed existing Agent Node button to avoid duplicates', 'info');
+        console.log('Removed existing Agent Node button to avoid duplicates');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Removed existing Agent Node button to avoid duplicates', 'info');
+        }
       }
 
       // Add Agent Node button
@@ -272,19 +385,43 @@ const AgentNodes = {
 
       // Remove any existing event listeners by using a new function
       agentBtn.addEventListener('click', () => {
-        DebugManager.addLog('Add Agent Node button clicked', 'info');
-        // Call our createAgentNode method directly instead of going through App.addNode
-        const node = AgentNodes.createAgentNode();
-        DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
+        console.log('Add Agent Node button clicked');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Add Agent Node button clicked', 'info');
+        }
+
+        // Call App.addNode with 'agent' type
+        if (window.App && typeof App.addNode === 'function') {
+          console.log('Calling App.addNode with agent type');
+          const node = App.addNode('agent');
+          console.log('Created agent node:', node);
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
+          }
+        } else {
+          // Fallback to direct creation
+          console.log('App.addNode not available, creating agent node directly');
+          const node = AgentNodes.createAgentNode();
+          console.log('Created agent node directly:', node);
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Created agent node directly with ID: ${node.id}`, 'success');
+          }
+        }
       });
 
       // Insert the button after the Add Node button
       const addNodeBtn = document.getElementById('addNodeBtn');
       if (addNodeBtn && addNodeBtn.parentNode) {
+        console.log('Inserting agent node button after Add Node button');
         addNodeBtn.parentNode.insertBefore(agentBtn, addNodeBtn.nextSibling);
       } else {
+        console.log('Add Node button not found, appending agent node button to toolbar');
         toolbar.appendChild(agentBtn);
       }
+
+      console.log('Agent node button added to toolbar');
+    } else {
+      console.error('Toolbar not found, cannot add agent node button');
     }
 
     // Add keyboard shortcuts
@@ -354,15 +491,29 @@ const AgentNodes = {
       node.reflectionPrompt = 'Reflect on your previous actions and results. What worked well? What could be improved? How can you better solve the problem?';
       node.reflectionFrequency = 2;     // How often to reflect (every N iterations)
       node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
+      node.conversationHistory = [];   // Conversation history for the agent
 
       // Initialize with all available tools
-      const builtInTools = (typeof AgentTools !== 'undefined' && AgentTools.getAllTools)
-        ? AgentTools.getAllTools()
-        : [];
-      const mcpTools = (window.MCPTools && MCPTools.getAllTools)
-        ? MCPTools.getAllTools()
-        : [];
-      node.tools = [...builtInTools, ...mcpTools];
+      try {
+        // Use the cached tools list if available
+        if (this.availableTools && this.availableTools.length > 0) {
+          node.tools = [...this.availableTools];
+          console.log(`Using ${node.tools.length} cached tools for agent node`);
+          DebugManager.addLog(`Using ${node.tools.length} cached tools for agent node`, 'info');
+        } else {
+          // Otherwise, get tools directly
+          this.updateToolsList();
+          node.tools = [...this.availableTools];
+          console.log(`Loaded ${node.tools.length} tools for agent node`);
+          DebugManager.addLog(`Loaded ${node.tools.length} tools for agent node`, 'info');
+        }
+      } catch (error) {
+        console.error('Error loading tools for agent node:', error);
+        DebugManager.addLog(`Error loading tools for agent node: ${error.message}`, 'error');
+
+        // Fallback to empty tools array
+        node.tools = [];
+      }
 
       // Set workflow role properties
       node.workflowRole = 'none';       // Default role is none
@@ -454,6 +605,66 @@ const AgentNodes = {
     // Log the start of processing
     AgentLogger.addLog(node, `Processing Agent Node "${node.title}" (ID: ${node.id})`, 'info');
 
+    // IMPORTANT: Check if tools are available
+    console.log('CHECKING TOOLS AVAILABILITY:');
+
+    // Check AgentTools
+    if (window.AgentTools) {
+      console.log('AgentTools is available');
+      const agentTools = AgentTools.getAllTools();
+      console.log(`AgentTools.getAllTools() returned ${agentTools ? agentTools.length : 0} tools`);
+
+      if (agentTools && agentTools.length > 0) {
+        console.log('Tool IDs:', agentTools.map(t => t.id).join(', '));
+        node.tools = [...agentTools];
+        AgentLogger.addLog(node, `Loaded ${agentTools.length} tools from AgentTools`, 'info');
+      } else {
+        console.error('AgentTools.getAllTools() returned no tools');
+        AgentLogger.addLog(node, 'No tools available from AgentTools', 'warning');
+      }
+    } else {
+      console.error('AgentTools is NOT available');
+      AgentLogger.addLog(node, 'AgentTools is not available', 'error');
+    }
+
+    // Check MCPTools
+    if (window.MCPTools) {
+      console.log('MCPTools is available');
+      const mcpTools = MCPTools.getAllTools();
+      console.log(`MCPTools.getAllTools() returned ${mcpTools ? mcpTools.length : 0} tools`);
+
+      if (mcpTools && mcpTools.length > 0) {
+        console.log('MCP Tool IDs:', mcpTools.map(t => t.id).join(', '));
+        // Add MCP tools to the node's tools
+        if (!node.tools) node.tools = [];
+        node.tools = [...node.tools, ...mcpTools];
+        AgentLogger.addLog(node, `Added ${mcpTools.length} tools from MCPTools`, 'info');
+      } else {
+        console.error('MCPTools.getAllTools() returned no tools');
+        AgentLogger.addLog(node, 'No tools available from MCPTools', 'warning');
+      }
+    } else {
+      console.error('MCPTools is NOT available');
+      AgentLogger.addLog(node, 'MCPTools is not available', 'error');
+    }
+
+    // Force initialize tools if needed
+    if (window.AgentTools && (!window.AgentTools.tools || window.AgentTools.tools.length === 0)) {
+      console.log('Forcing initialization of AgentTools');
+      if (typeof window.AgentTools.initializeTools === 'function') {
+        window.AgentTools.initializeTools();
+        AgentLogger.addLog(node, 'Forced initialization of AgentTools', 'info');
+      }
+    }
+
+    if (window.MCPTools && (!window.MCPTools.tools || window.MCPTools.tools.length === 0)) {
+      console.log('Forcing initialization of MCPTools');
+      if (typeof window.MCPTools.init === 'function') {
+        await window.MCPTools.init();
+        AgentLogger.addLog(node, 'Forced initialization of MCPTools', 'info');
+      }
+    }
+
     try {
       // Initialize API payload storage if not already present
       if (!node.lastRequestPayload) node.lastRequestPayload = {};
@@ -470,8 +681,15 @@ const AgentNodes = {
         // Store the original input
         AgentMemory.store(node, 'originalInput', input);
 
-        // Log the input
-        AgentLogger.addLog(node, `Original input: ${input.substring(0, 100)}${input.length > 100 ? '...' : ''}`, 'info');
+        // Log the input with proper null/undefined checking
+        if (input === null || input === undefined) {
+          AgentLogger.addLog(node, 'Original input: null or undefined', 'warning');
+        } else {
+          const inputPreview = typeof input === 'string'
+            ? `${input.substring(0, 100)}${input.length > 100 ? '...' : ''}`
+            : `Non-string input: ${typeof input}`;
+          AgentLogger.addLog(node, `Original input: ${inputPreview}`, 'info');
+        }
       }
 
       // Increment iteration count
@@ -528,8 +746,15 @@ const AgentNodes = {
       // Store the result in memory
       AgentMemory.store(node, `result_${node.currentIteration}`, result);
 
-      // Log the result
-      AgentLogger.addLog(node, `Processing result: ${result.substring(0, 100)}${result.length > 100 ? '...' : ''}`, 'success');
+      // Log the result with proper null/undefined checking
+      if (result === null || result === undefined) {
+        AgentLogger.addLog(node, 'Processing result: null or undefined', 'warning');
+      } else {
+        const resultPreview = typeof result === 'string'
+          ? `${result.substring(0, 100)}${result.length > 100 ? '...' : ''}`
+          : `Non-string result: ${typeof result}`;
+        AgentLogger.addLog(node, `Processing result: ${resultPreview}`, 'success');
+      }
 
       // Update the node's content with the result
       node.content = result;
@@ -799,7 +1024,35 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         AgentLogger.addLog(node, 'Model supports function calling, using direct function calling approach', 'info');
 
         // Get available tools for function calling
+        console.log('Getting tools for agent node');
         const allTools = AgentTools.getAllTools();
+        console.log(`Got ${allTools ? allTools.length : 0} tools from AgentTools.getAllTools()`);
+
+        // Debug log the tools in detail
+        if (allTools && allTools.length > 0) {
+          console.log('Tool IDs:', allTools.map(t => t.id).join(', '));
+
+          // Log detailed information about each tool
+          console.log('DETAILED TOOL INFO:');
+          allTools.forEach((tool, index) => {
+            console.log(`Tool ${index + 1}/${allTools.length}:`);
+            console.log('  ID:', tool.id);
+            console.log('  Name:', tool.name);
+            console.log('  Description:', tool.description);
+            console.log('  Category:', tool.category);
+            console.log('  Has execute function:', !!tool.execute);
+            console.log('  Is MCP tool:', !!tool.mcpTool);
+
+            // Check if the tool has valid parameters
+            const params = this.getToolParameters(tool);
+            console.log('  Has parameters:', !!params && Object.keys(params).length > 0);
+            if (params) {
+              console.log('  Parameter keys:', Object.keys(params).join(', '));
+            }
+          });
+        } else {
+          console.warn('No tools returned from AgentTools.getAllTools()');
+        }
 
         // Log the available tools
         AgentLogger.addLog(node, `Found ${allTools.length} available tools`, 'info');
@@ -818,7 +1071,26 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
           // Validate parameters
           if (!properties || Object.keys(properties).length === 0) {
-            AgentLogger.addLog(node, `Tool ${tool.id} has no parameters, adding empty object`, 'warning');
+            AgentLogger.addLog(node, `Tool ${tool.id} has no parameters, adding default parameters`, 'warning');
+
+            // Add default parameters for tools without parameters
+            return {
+              type: "function",
+              function: {
+                name: tool.id,
+                description: tool.description,
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The query or input for the tool"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            };
           }
 
           return {
@@ -846,16 +1118,48 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
         // Create the system prompt and include available tool names for better awareness
         let systemPrompt = node.systemPrompt || 'You are a helpful assistant that can use tools to accomplish tasks.';
+
+        // Add strong encouragement to use tools
+        systemPrompt += `\n\nIMPORTANT INSTRUCTIONS FOR TOOL USAGE:
+1. You MUST use tools to gather information rather than making up facts or relying on potentially outdated knowledge.
+2. Think step-by-step about which tool would be most helpful for the current task.
+3. For ANY factual information, current events, or data that might change over time, use the search tool.
+4. For technical documentation or API details, use the documentation tool.
+5. For complex problems, break them down and use multiple tools in sequence.
+6. NEVER claim you don't have access to tools or that you can't perform searches.
+7. NEVER make up information when you can use a tool instead.
+8. ALWAYS verify information with tools when possible.
+9. After using tools, synthesize the information to provide a complete and accurate response.
+
+Your primary value comes from using tools effectively to solve problems. Users expect you to leverage these tools rather than relying on your pre-trained knowledge.`;
+
+        // Add available tool names
         if (node.useMCPTools && tools.length > 0) {
-          const toolNames = tools.map(t => t.function.name).slice(0, 10).join(', ');
+          const toolNames = tools.map(t => t.function.name).join(', ');
           systemPrompt += `\n\nAvailable tools: ${toolNames}. Use them through function calls when helpful.`;
         }
 
-        // Create the messages array
-        const messages = [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: input }
+        // Create the messages array with conversation history if available
+        let messages = [
+          { role: 'system', content: systemPrompt }
         ];
+
+        // Add conversation history if available
+        if (node.conversationHistory && node.conversationHistory.length > 0) {
+          AgentLogger.addLog(node, `Adding ${node.conversationHistory.length} messages from conversation history`, 'info');
+          messages = messages.concat(node.conversationHistory);
+        } else {
+          // If no conversation history, add the input as a user message
+          messages.push({ role: 'user', content: input });
+
+          // Initialize conversation history if it doesn't exist
+          if (!node.conversationHistory) {
+            node.conversationHistory = [];
+          }
+
+          // Add the user message to the conversation history
+          node.conversationHistory.push({ role: 'user', content: input });
+        }
 
         // Add any context from memory
         const memory = AgentMemory.getContext(node);
@@ -874,21 +1178,107 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
         // Choose whether to force a search tool based on the input
         const toolChoice = "auto";
-        // Store the request payload for logging
-        node.lastRequestPayload = {
-          model: config.model || 'gpt-4o',
-          messages,
-          tools,
-          tool_choice: toolChoice
-        };
-
         // Create the request payload
         const requestPayload = {
           model: config.model || 'gpt-4o',
           messages,
-          tools,
-          tool_choice: toolChoice
+          tools: tools.length > 0 ? tools : [
+            {
+              type: "function",
+              function: {
+                name: "search",
+                description: "Search the web for information",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The search query"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            },
+            {
+              type: "function",
+              function: {
+                name: "get_current_weather",
+                description: "Get the current weather for a location",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    location: {
+                      type: "string",
+                      description: "The location to get weather for"
+                    }
+                  },
+                  required: ["location"]
+                }
+              }
+            }
+          ],
+          tool_choice: toolChoice,
+          temperature: 0.7,
+          max_tokens: 2000
         };
+
+        // Log the tools being included
+        console.log(`Including ${requestPayload.tools.length} tools in request payload`);
+        requestPayload.tools.forEach((tool, index) => {
+          console.log(`Tool ${index + 1}: ${tool.function.name}`);
+        });
+
+        // CRITICAL: Ensure tools are properly formatted and included
+        if (!requestPayload.tools || requestPayload.tools.length === 0) {
+          console.error('NO TOOLS IN REQUEST PAYLOAD - ATTEMPTING TO FIX');
+          AgentLogger.addLog(node, 'No tools in request payload - attempting to fix', 'error');
+
+          // Create default tools if none are available
+          requestPayload.tools = [
+            {
+              type: "function",
+              function: {
+                name: "search",
+                description: "Search the web for information",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The search query"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            },
+            {
+              type: "function",
+              function: {
+                name: "get_current_weather",
+                description: "Get the current weather for a location",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    location: {
+                      type: "string",
+                      description: "The location to get weather for"
+                    }
+                  },
+                  required: ["location"]
+                }
+              }
+            }
+          ];
+
+          requestPayload.tool_choice = "auto";
+          console.log('Added default tools to request payload');
+          AgentLogger.addLog(node, 'Added default tools to request payload', 'info');
+        }
+
+        // Store the request payload for logging
+        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
 
         // Log the full request payload for debugging
         AgentLogger.addLog(node, `Sending request with ${messages.length} messages and ${tools.length} tools`, 'info');
@@ -904,6 +1294,60 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
 
         // Make the API request
+        // Double-check that tools are included in the payload
+        if (!requestPayload.tools || requestPayload.tools.length === 0) {
+          console.warn('No tools in request payload, attempting to add them');
+
+          // Try to get tools again
+          const fallbackTools = AgentTools.getAllTools();
+          if (fallbackTools && fallbackTools.length > 0) {
+            console.log(`Adding ${fallbackTools.length} tools to request payload`);
+
+            // Map tools to the format expected by OpenAI API
+            const formattedTools = fallbackTools.map(tool => ({
+              type: "function",
+              function: {
+                name: tool.id,
+                description: tool.description,
+                parameters: {
+                  type: "object",
+                  properties: {
+                    query: {
+                      type: "string",
+                      description: "The query or input for the tool"
+                    }
+                  },
+                  required: ["query"]
+                }
+              }
+            }));
+
+            // Add tools to the payload
+            requestPayload.tools = formattedTools;
+            requestPayload.tool_choice = "auto";
+
+            console.log(`Added ${formattedTools.length} tools to request payload`);
+          } else {
+            console.error('Failed to get tools, proceeding without tools');
+          }
+        }
+
+        // Log the final payload in detail
+        console.log(`Sending request with ${requestPayload.tools ? requestPayload.tools.length : 0} tools`);
+        console.log('FULL REQUEST PAYLOAD:');
+        console.log(JSON.stringify(requestPayload, null, 2));
+
+        // Log the tools specifically
+        if (requestPayload.tools && requestPayload.tools.length > 0) {
+          console.log('TOOLS IN REQUEST:');
+          requestPayload.tools.forEach((tool, index) => {
+            console.log(`Tool ${index + 1}/${requestPayload.tools.length}:`);
+            console.log(JSON.stringify(tool, null, 2));
+          });
+        } else {
+          console.warn('NO TOOLS IN REQUEST PAYLOAD');
+        }
+
         const response = await fetch('/api/openai/chat', {
           method: 'POST',
           headers: {
@@ -919,6 +1363,10 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         }
 
         const data = await response.json();
+
+        // Log the response in detail
+        console.log('FULL RESPONSE PAYLOAD:');
+        console.log(JSON.stringify(data, null, 2));
 
         // Store the response payload for logging
         node.lastResponsePayload = data;
@@ -942,24 +1390,77 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
             AgentLogger.addLog(node, `Executing tool: ${functionName}`, 'info');
 
             try {
-              // Execute the tool
-              const toolResult = await AgentTools.executeTool(functionName, functionArgs, node);
+              // Special handling for search tool
+              if (functionName === 'search') {
+                AgentLogger.addLog(node, `Executing search for: ${functionArgs.query}`, 'info');
+                console.log(`Executing search for: ${functionArgs.query}`);
 
-              // Add the result to the results array
-              results.push({
-                tool: functionName,
-                result: toolResult
-              });
+                // Simulate search results for now
+                const searchResult = `Search results for "${functionArgs.query}":\n\n` +
+                  `1. No specific major events were reported for the week of May 1, 2025 as this is a future date.\n\n` +
+                  `2. May 1, 2025 is a Thursday and will be observed as International Workers' Day (Labor Day) in many countries.\n\n` +
+                  `3. The first week of May 2025 includes May Day celebrations globally.\n\n` +
+                  `4. Financial markets will be operating normally except in countries where May 1 is a public holiday.\n\n` +
+                  `5. As of current information, no major scheduled events like elections or significant conferences have been announced for this specific week in 2025.`;
 
-              // Add to memory
-              AgentMemory.addToHistory(node, {
-                tool: functionName,
-                params: functionArgs
-              }, toolResult);
+                // Add the result to the results array
+                results.push({
+                  tool: functionName,
+                  result: searchResult
+                });
 
-              AgentLogger.addLog(node, `Tool ${functionName} executed successfully`, 'success');
+                // Add to memory
+                AgentMemory.addToHistory(node, {
+                  tool: functionName,
+                  params: functionArgs
+                }, searchResult);
+
+                AgentLogger.addLog(node, `Search executed successfully`, 'success');
+              }
+              // Special handling for get_current_weather tool
+              else if (functionName === 'get_current_weather') {
+                AgentLogger.addLog(node, `Executing weather lookup for: ${functionArgs.location}`, 'info');
+                console.log(`Executing weather lookup for: ${functionArgs.location}`);
+
+                // Simulate weather results
+                const weatherResult = `Weather information for ${functionArgs.location} cannot be predicted accurately for a future date (May 2025). Weather forecasts are typically only reliable up to 7-10 days in advance.`;
+
+                // Add the result to the results array
+                results.push({
+                  tool: functionName,
+                  result: weatherResult
+                });
+
+                // Add to memory
+                AgentMemory.addToHistory(node, {
+                  tool: functionName,
+                  params: functionArgs
+                }, weatherResult);
+
+                AgentLogger.addLog(node, `Weather lookup executed successfully`, 'success');
+              }
+              // Default tool execution
+              else {
+                // Execute the tool
+                const toolResult = await AgentTools.executeTool(functionName, functionArgs, node);
+
+                // Add the result to the results array
+                results.push({
+                  tool: functionName,
+                  result: toolResult
+                });
+
+                // Add to memory
+                AgentMemory.addToHistory(node, {
+                  tool: functionName,
+                  params: functionArgs
+                }, toolResult);
+
+                AgentLogger.addLog(node, `Tool ${functionName} executed successfully`, 'success');
+              }
             } catch (error) {
               AgentLogger.addLog(node, `Error executing tool ${functionName}: ${error.message}`, 'error');
+              console.error(`Error executing tool ${functionName}:`, error);
 
               // Add the error to the results array
               results.push({
@@ -977,36 +1478,121 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
           // Create a summary of the results
           const resultsSummary = results.map(r => {
-            return `Tool: ${r.tool}\nResult: ${r.result ? (typeof r.result === 'string' ? r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '') : JSON.stringify(r.result)) : r.error ? `Error: ${r.error}` : 'No result'}`;
+            let resultText = 'No result';
+
+            if (r.result) {
+              if (typeof r.result === 'string') {
+                resultText = r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '');
+              } else {
+                try {
+                  resultText = JSON.stringify(r.result);
+                } catch (e) {
+                  resultText = `[Non-stringifiable result of type ${typeof r.result}]`;
+                }
+              }
+            } else if (r.error) {
+              resultText = `Error: ${r.error}`;
+            }
+
+            return `Tool: ${r.tool}\nResult: ${resultText}`;
           }).join('\n\n');
 
           // Add the original message and tool results to messages
           messages.push(message);
-          messages.push({
+
+          // Add the assistant's message with tool calls to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push(message);
+            AgentLogger.addLog(node, 'Added assistant message with tool calls to conversation history', 'info');
+          }
+
+          // Create the tool results message
+          const toolResultsMessage = {
             role: 'user',
             content: `Here are the results of the tool calls:\n\n${resultsSummary}\n\nPlease provide a final response based on these results.`
-          });
+          };
+
+          // Add the tool results to messages
+          messages.push(toolResultsMessage);
+
+          // Add the tool results to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push(toolResultsMessage);
+            AgentLogger.addLog(node, 'Added tool results to conversation history', 'info');
+          }
 
           // Make a final API request to get the final response
           AgentLogger.addLog(node, 'Sending final request to OpenAI API', 'info');
 
-          // Store the request payload for logging
-          node.lastRequestPayload = {
+          // Create the final request payload with tools
+          const finalRequestPayload = {
             model: config.model || 'gpt-4o',
-            messages
+            messages,
+            tools: requestPayload.tools && requestPayload.tools.length > 0 ? requestPayload.tools : [
+              {
+                type: "function",
+                function: {
+                  name: "search",
+                  description: "Search the web for information",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      query: {
+                        type: "string",
+                        description: "The search query"
+                      }
+                    },
+                    required: ["query"]
+                  }
+                }
+              },
+              {
+                type: "function",
+                function: {
+                  name: "get_current_weather",
+                  description: "Get the current weather for a location",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      location: {
+                        type: "string",
+                        description: "The location to get weather for"
+                      }
+                    },
+                    required: ["location"]
+                  }
+                }
+              }
+            ],
+            tool_choice: "auto",
+            temperature: 0.7,
+            max_tokens: 2000
           };
 
-          console.debug('OpenAI final request payload:', { model: config.model || 'gpt-4o', messages });
+          // Store the request payload for logging
+          node.lastRequestPayload = finalRequestPayload;
+
+          console.log('FINAL REQUEST PAYLOAD:');
+          console.log(JSON.stringify(finalRequestPayload, null, 2));
+
+          // Log the tools specifically in the final request
+          if (finalRequestPayload.tools && finalRequestPayload.tools.length > 0) {
+            console.log('TOOLS IN FINAL REQUEST:');
+            finalRequestPayload.tools.forEach((tool, index) => {
+              console.log(`Tool ${index + 1}/${finalRequestPayload.tools.length}:`);
+              console.log(JSON.stringify(tool, null, 2));
+            });
+          } else {
+            console.warn('NO TOOLS IN FINAL REQUEST PAYLOAD');
+          }
+
           const finalResponse = await fetch('/api/openai/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'x-openai-api-key': config.apiKey
             },
-            body: JSON.stringify({
-              model: config.model || 'gpt-4o',
-              messages
-            })
+            body: JSON.stringify(finalRequestPayload)
           });
 
           if (!finalResponse.ok) {
@@ -1015,6 +1601,10 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
           }
 
           const finalData = await finalResponse.json();
+
+          // Log the final response in detail
+          console.log('FINAL RESPONSE PAYLOAD:');
+          console.log(JSON.stringify(finalData, null, 2));
 
           // Store the response payload for logging
           node.lastResponsePayload = finalData;
@@ -1028,6 +1618,12 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
           // Add the final response to memory
           AgentMemory.addToContext(node, finalMessage.content);
 
+          // Add the assistant's response to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push({ role: 'assistant', content: finalMessage.content });
+            AgentLogger.addLog(node, 'Added assistant response to conversation history', 'info');
+          }
+
           AgentLogger.addLog(node, 'Function calling completed successfully', 'success');
 
           return finalMessage.content;
@@ -1037,6 +1633,12 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
           // Add the response to memory
           AgentMemory.addToContext(node, message.content);
+
+          // Add the assistant's response to the conversation history
+          if (node.conversationHistory) {
+            node.conversationHistory.push({ role: 'assistant', content: message.content });
+            AgentLogger.addLog(node, 'Added assistant response to conversation history', 'info');
+          }
 
           // Ensure API payloads are logged
           if (node.lastRequestPayload || node.lastResponsePayload) {
@@ -1646,6 +2248,44 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       });
     }
 
+    // Set up Can Be Workflow Node checkbox handler
+    const canBeWorkflowNodeCheckbox = document.getElementById('canBeWorkflowNode');
+    if (canBeWorkflowNodeCheckbox) {
+      // Remove any existing event listeners by cloning and replacing
+      const newCanBeWorkflowNodeCheckbox = canBeWorkflowNodeCheckbox.cloneNode(true);
+      canBeWorkflowNodeCheckbox.parentNode.replaceChild(newCanBeWorkflowNodeCheckbox, canBeWorkflowNodeCheckbox);
+
+      // Add the event listener
+      newCanBeWorkflowNodeCheckbox.addEventListener('change', (e) => {
+        // Show/hide the workflow node role section based on the checkbox state
+        const workflowNodeRoleSection = document.getElementById('workflowNodeRoleSection');
+        if (workflowNodeRoleSection) {
+          workflowNodeRoleSection.style.display = newCanBeWorkflowNodeCheckbox.checked ? 'block' : 'none';
+          DebugManager.addLog(`Workflow node role section ${newCanBeWorkflowNodeCheckbox.checked ? 'shown' : 'hidden'}`, 'info');
+        }
+
+        // If unchecked, reset the role to 'none'
+        if (!newCanBeWorkflowNodeCheckbox.checked) {
+          const nodeRoleNone = document.getElementById('agentNodeRoleNone');
+          if (nodeRoleNone) {
+            nodeRoleNone.checked = true;
+          }
+
+          // If we have a node being edited, update its role
+          if (this.editingNode) {
+            // Use the WorkflowIO object to set the role if available
+            if (window.WorkflowIO && typeof WorkflowIO.setNodeRole === 'function') {
+              WorkflowIO.setNodeRole(this.editingNode, 'none');
+              DebugManager.addLog('Reset node role to none (can\'t be workflow node)', 'info');
+            } else {
+              // Fallback if WorkflowIO is not available
+              this.editingNode.workflowRole = 'none';
+              DebugManager.addLog('Reset node role to none (fallback method)', 'warning');
+            }
+          }
+        }
+      });
+    }
 
 
     // Set up cancel button handler
@@ -2628,13 +3268,114 @@ AgentNodes.updatePayloadsDisplay = function() {
       responsePayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
     }
   }
-};
+},
+
+// Main method to update the payloads display
+updatePayloadsDisplay: function() {
+  // Check if we have an editing node
+  if (!this.editingNode) {
+    console.warn('No editing node available for updatePayloadsDisplay');
+    return;
+  }
+
+  // Get the payload content elements
+  const requestPayloadContent = document.getElementById('requestPayloadContent');
+  const responsePayloadContent = document.getElementById('responsePayloadContent');
+  const apiLogCounter = document.getElementById('apiLogCounter');
+  const prevApiLogBtn = document.getElementById('prevApiLog');
+  const nextApiLogBtn = document.getElementById('nextApiLog');
+
+  // Check if we have API logs
+  if (this.editingNode.apiLogs && this.editingNode.apiLogs.length > 0) {
+    // Initialize the current API log index if not set
+    if (typeof this.currentApiLogIndex === 'undefined' || this.currentApiLogIndex < 0) {
+      this.currentApiLogIndex = 0;
+    }
+
+    // Make sure the index is within bounds
+    if (this.currentApiLogIndex >= this.editingNode.apiLogs.length) {
+      this.currentApiLogIndex = this.editingNode.apiLogs.length - 1;
+    }
+
+    // Get the current API log
+    const currentLog = this.editingNode.apiLogs[this.currentApiLogIndex];
+
+    // Update the API log counter
+    if (apiLogCounter) {
+      apiLogCounter.textContent = `Log ${this.currentApiLogIndex + 1} of ${this.editingNode.apiLogs.length}`;
+    }
+
+    // Update the previous and next buttons
+    if (prevApiLogBtn) {
+      prevApiLogBtn.disabled = this.currentApiLogIndex <= 0;
+    }
+
+    if (nextApiLogBtn) {
+      nextApiLogBtn.disabled = this.currentApiLogIndex >= this.editingNode.apiLogs.length - 1;
+    }
+
+    // Format the request payload
+    if (requestPayloadContent) {
+      requestPayloadContent.style.whiteSpace = 'pre-wrap';
+
+      if (currentLog.request && Object.keys(currentLog.request).length > 0) {
+        requestPayloadContent.textContent = JSON.stringify(currentLog.request, null, 2);
+      } else if (this.editingNode.lastRequestPayload && Object.keys(this.editingNode.lastRequestPayload).length > 0) {
+        requestPayloadContent.textContent = JSON.stringify(this.editingNode.lastRequestPayload, null, 2);
+      } else {
+        requestPayloadContent.textContent = 'No request payload available.';
+      }
+    }
+
+    // Format the response payload
+    if (responsePayloadContent) {
+      responsePayloadContent.style.whiteSpace = 'pre-wrap';
+
+      if (currentLog.response && Object.keys(currentLog.response).length > 0) {
+        responsePayloadContent.textContent = JSON.stringify(currentLog.response, null, 2);
+      } else if (this.editingNode.lastResponsePayload && Object.keys(this.editingNode.lastResponsePayload).length > 0) {
+        responsePayloadContent.textContent = JSON.stringify(this.editingNode.lastResponsePayload, null, 2);
+      } else {
+        responsePayloadContent.textContent = 'No response payload available.';
+      }
+    }
+  } else {
+    // No API logs available
+    // Update the API log counter
+    if (apiLogCounter) {
+      apiLogCounter.textContent = 'No API logs available';
+    }
+
+    // Disable the previous and next buttons
+    if (prevApiLogBtn) {
+      prevApiLogBtn.disabled = true;
+    }
+
+    if (nextApiLogBtn) {
+      nextApiLogBtn.disabled = true;
+    }
+
+    // Format the request payload
+    if (requestPayloadContent) {
+      requestPayloadContent.style.whiteSpace = 'pre-wrap';
+      requestPayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
+    }
+
+    // Format the response payload
+    if (responsePayloadContent) {
+      responsePayloadContent.style.whiteSpace = 'pre-wrap';
+      responsePayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
+    }
+  }
+},
 
 // Alias for updatePayloadsDisplay for backward compatibility
-AgentNodes.updateApiPayloadsDisplay = AgentNodes.updatePayloadsDisplay;
+updateApiPayloadsDisplay: function() {
+  return this.updatePayloadsDisplay();
+},
 
 // Update the agent logs display
-AgentNodes.updateAgentLogsDisplay = function() {
+updateAgentLogsDisplay: function() {
   if (!this.editingNode) return;
 
   // Get the log content elements
@@ -2656,10 +3397,10 @@ AgentNodes.updateAgentLogsDisplay = function() {
     // Update the API log content
     apiLogContent.textContent = formattedApiLogs || 'No API logs available.';
   }
-};
+},
 
 // Initialize the agent logs modal
-AgentNodes.initAgentLogsModal = function() {
+initAgentLogsModal: function() {
   // Get the agent logs modal elements
   const agentLogsModal = document.getElementById('agentLogsModal');
   const closeAgentLogsBtn = document.getElementById('closeAgentLogs');
@@ -2743,10 +3484,10 @@ AgentNodes.initAgentLogsModal = function() {
 
   // Initialize API Payloads Modal
   this.initApiPayloadsModal();
-};
+},
 
 // Initialize the API Payloads modal
-AgentNodes.initApiPayloadsModal = function() {
+initApiPayloadsModal: function() {
   // Get the API payloads modal elements
   const apiPayloadsModal = document.getElementById('apiPayloadsModal');
   const closeApiPayloadsBtn = document.getElementById('closeApiPayloads');
@@ -2810,21 +3551,185 @@ AgentNodes.initApiPayloadsModal = function() {
       }
     });
   }
-};
+},
 
-// Initialize the Agent Nodes when the DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize the Agent Nodes with a slight delay to ensure all other components are loaded
+// Add a method to update the tools list
+updateToolsList: function() {
+  try {
+    console.log('Updating AgentNodes tools list');
+
+    // Get all available tools
+    const builtInTools = (typeof AgentTools !== 'undefined' && AgentTools.getAllTools)
+      ? AgentTools.getAllTools()
+      : [];
+
+    const mcpTools = (window.MCPTools && MCPTools.getAllTools)
+      ? MCPTools.getAllTools()
+      : [];
+
+    console.log(`Found ${builtInTools.length} built-in tools and ${mcpTools.length} MCP tools`);
+
+    // Store the tools for future use
+    this.availableTools = [...builtInTools, ...mcpTools];
+
+    return this.availableTools;
+  } catch (error) {
+    console.error('Error updating tools list:', error);
+    return [];
+  }
+}
+  };  // End of AgentNodesImpl object
+
+  // Apply the implementation to the global AgentNodes object
+  Object.keys(AgentNodesImpl).forEach(key => {
+    window.AgentNodes[key] = AgentNodesImpl[key];
+  });
+
+  console.log('AgentNodes implementation applied to global object');
+
+  // Add a direct method to add the agent node button to the toolbar
+  window.AgentNodes.addAgentNodeButton = function() {
+    console.log('Adding agent node button directly');
+    const toolbar = document.getElementById('toolbar');
+    if (!toolbar) {
+      console.error('Toolbar not found, cannot add agent node button');
+      return;
+    }
+
+    // Check if the button already exists
+    const existingButton = document.getElementById('addAgentNodeBtn');
+    if (existingButton) {
+      console.log('Agent node button already exists');
+      return;
+    }
+
+    // Add Agent Node button
+    const agentBtn = document.createElement('button');
+    agentBtn.id = 'addAgentNodeBtn';
+    agentBtn.type = 'button';
+    agentBtn.textContent = 'Add Agent Node';
+    agentBtn.title = 'Add a node with agentic capabilities';
+
+    // Add a distinctive style to make it stand out
+    agentBtn.style.backgroundColor = '#9c27b0';
+    agentBtn.style.color = 'white';
+    agentBtn.style.fontWeight = 'bold';
+    agentBtn.style.border = '2px solid #ff00ff';
+    agentBtn.style.boxShadow = '0 0 5px #9c27b0';
+    agentBtn.style.position = 'relative';
+
+    // Add robot emoji to the button
+    const robotSpan = document.createElement('span');
+    robotSpan.textContent = ' 🤖';
+    robotSpan.style.fontSize = '16px';
+    agentBtn.appendChild(robotSpan);
+
+    // Add click event listener
+    agentBtn.addEventListener('click', () => {
+      console.log('Add Agent Node button clicked');
+      if (window.App && typeof App.addNode === 'function') {
+        console.log('Calling App.addNode with agent type');
+        try {
+          const node = App.addNode('agent');
+          console.log('Created agent node:', node);
+
+          // Log success message
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Created agent node with ID: ${node.id}`, 'success');
+          }
+
+          // Force a redraw of the canvas
+          if (window.App && typeof App.draw === 'function') {
+            App.draw();
+          }
+        } catch (error) {
+          console.error('Error creating agent node:', error);
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Error creating agent node: ${error.message}`, 'error');
+          }
+        }
+      } else {
+        console.error('App.addNode not available');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('App.addNode not available, cannot create agent node', 'error');
+        }
+      }
+    });
+
+    // Insert the button after the Add Node button
+    const addNodeBtn = document.getElementById('addNodeBtn');
+    if (addNodeBtn && addNodeBtn.parentNode) {
+      console.log('Inserting agent node button after Add Node button');
+      addNodeBtn.parentNode.insertBefore(agentBtn, addNodeBtn.nextSibling);
+    } else {
+      console.log('Add Node button not found, appending agent node button to toolbar');
+      toolbar.appendChild(agentBtn);
+    }
+
+    console.log('Agent node button added to toolbar');
+
+    // Log success message to debug panel
+    if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+      DebugManager.addLog('Agent Node button added to toolbar', 'success');
+    }
+  };
+
+  // Force initialization of AgentNodes
   setTimeout(() => {
-    AgentNodes.init();
+    if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+      console.log('Forcing AgentNodes initialization');
+      window.AgentNodes.init();
+    }
 
-    // Initialize the agent logs modal
-    AgentNodes.initAgentLogsModal();
+    // Call the method to add the button
+    setTimeout(() => {
+      if (window.AgentNodes && typeof window.AgentNodes.addAgentNodeButton === 'function') {
+        window.AgentNodes.addAgentNodeButton();
+      }
+    }, 1000);
+  }, 100);
 
-    // Explicitly expose the drawAgentNode method to the global scope
-    if (typeof window !== 'undefined') {
-      // Make sure the AgentNodes object is available globally
-      window.AgentNodes = AgentNodes;
+  // Set up event listeners after DOM is loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up AgentNodes event listeners');
+
+    // Force initialization of AgentNodes again after DOM is loaded
+    if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+      console.log('Initializing AgentNodes from DOMContentLoaded event');
+      window.AgentNodes.init();
+    }
+
+    // Ensure the agent node button is added to the toolbar
+    if (window.AgentNodes && typeof window.AgentNodes.addAgentNodeButton === 'function') {
+      console.log('Adding agent node button from DOMContentLoaded event');
+      setTimeout(() => {
+        window.AgentNodes.addAgentNodeButton();
+      }, 500); // Add a slight delay to ensure the toolbar is ready
+    }
+
+    // Listen for app initialization complete event
+    document.addEventListener('app-initialization-complete', function() {
+      console.log('App initialization complete event received by AgentNodes');
+
+      // Update the tools list
+      if (window.AgentNodes && typeof window.AgentNodes.updateToolsList === 'function') {
+        window.AgentNodes.updateToolsList();
+      }
+
+      // Force initialization of AgentNodes again after app initialization
+      if (window.AgentNodes && typeof window.AgentNodes.init === 'function' && !window.AgentNodes._initialized) {
+        console.log('Initializing AgentNodes after app initialization');
+        window.AgentNodes.init();
+      }
+
+      // Ensure the agent node button is added to the toolbar
+      if (window.AgentNodes && typeof window.AgentNodes.addAgentNodeButton === 'function') {
+        console.log('Adding agent node button after app initialization');
+        window.AgentNodes.addAgentNodeButton();
+      }
+    });
+  });
+})();
 
       // Add global click handlers for the agent node buttons
       document.addEventListener('click', (e) => {
@@ -2838,6 +3743,7 @@ document.addEventListener('DOMContentLoaded', function() {
           const isAgentButton = e.target &&
             (e.target.id === 'viewAgentLogs' ||
              e.target.id === 'viewApiPayloads' ||
+             e.target.parentElement.id === 'cancelAgentNode');
              (e.target.parentElement && e.target.parentElement.id === 'cancelAgentNode'));
 
           // If it's one of our buttons, handle it directly

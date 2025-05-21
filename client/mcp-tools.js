@@ -7,25 +7,56 @@ const MCPTools = {
   // Available MCP servers and tools
   servers: {},
   tools: [],
+  initialized: false,
 
   // Initialize MCP tools
   async init() {
     try {
+      console.log('MCPTools.init called');
       DebugManager.addLog('Initializing MCP tools...', 'info');
 
       // Load MCP configuration
       await this.loadMCPConfig();
 
-      // Register MCP tools with agent tools
-      this.registerWithAgentTools();
+      // Register MCP tools with agent tools if available
+      if (window.AgentTools) {
+        this.registerWithAgentTools();
+        console.log('Registered MCP tools with AgentTools');
+      } else {
+        console.warn('AgentTools not available, will register later');
+      }
 
       DebugManager.addLog(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`, 'success');
+      console.log(`MCP tools initialized with ${this.tools.length} tools from ${Object.keys(this.servers).length} servers`);
+
+      // Set the initialized flag
+      this.initialized = true;
+
+      // Notify the initialization system if available
+      if (window.AppInitSystem && AppInitSystem.markReady) {
+        AppInitSystem.markReady('mcpTools');
+      }
+
+      return true;
 
       // Notify listeners that MCP tools are ready
       document.dispatchEvent(new Event('mcpToolsReady'));
     } catch (error) {
       DebugManager.addLog(`Error initializing MCP tools: ${error.message}`, 'error');
       console.error('Error initializing MCP tools:', error);
+
+      // Use fallback configuration
+      this.useFallbackConfig();
+
+      // Set the initialized flag even if there was an error
+      this.initialized = true;
+
+      // Notify the initialization system even if there was an error
+      if (window.AppInitSystem && AppInitSystem.markReady) {
+        AppInitSystem.markReady('mcpTools');
+      }
+
+      return false;
     }
   },
 
@@ -36,13 +67,25 @@ const MCPTools = {
       const response = await fetch('/api/mcp/config');
 
       if (!response.ok) {
-        throw new Error(`Failed to load MCP configuration: ${response.statusText}`);
+        console.error(`Failed to load MCP configuration: ${response.statusText}`);
+        DebugManager.addLog(`Failed to load MCP configuration: ${response.statusText}. Using fallback configuration.`, 'error');
+        // Use fallback configuration if the server request fails
+        this.useFallbackConfig();
+        return;
       }
 
       const config = await response.json();
 
       // Store server configurations
       this.servers = config.mcpServers || {};
+
+      // If no servers are configured, use fallback
+      if (Object.keys(this.servers).length === 0) {
+        console.warn('No MCP servers configured, using fallback configuration');
+        DebugManager.addLog('No MCP servers configured, using fallback configuration', 'warning');
+        this.useFallbackConfig();
+        return;
+      }
 
       // Parse tools from each server
       this.tools = [];
@@ -58,6 +101,13 @@ const MCPTools = {
         this.tools.push(...serverTools);
       }
 
+      // If no tools were found, use fallback
+      if (this.tools.length === 0) {
+        console.warn('No MCP tools found, using fallback configuration');
+        DebugManager.addLog('No MCP tools found, using fallback configuration', 'warning');
+        this.useFallbackConfig();
+      }
+
       DebugManager.addLog(`Loaded ${this.tools.length} MCP tools from ${Object.keys(this.servers).length} servers`, 'info');
     } catch (error) {
       DebugManager.addLog(`Error loading MCP configuration: ${error.message}`, 'error');
@@ -70,6 +120,7 @@ const MCPTools = {
 
   // Use fallback configuration for development
   useFallbackConfig() {
+    console.warn('Using fallback MCP configuration');
     DebugManager.addLog('Using fallback MCP configuration', 'warning');
 
     // Define fallback servers
@@ -142,6 +193,17 @@ const MCPTools = {
         autoApprove: false
       }
     ];
+
+    // Register the fallback tools with AgentTools if available
+    if (window.AgentTools) {
+      this.registerWithAgentTools();
+    } else {
+      console.warn('AgentTools not available, cannot register fallback MCP tools');
+      DebugManager.addLog('AgentTools not available, cannot register fallback MCP tools', 'warning');
+    }
+
+    // Set the initialized flag
+    this.initialized = true;
   },
 
   // Get tools from a server
@@ -295,20 +357,33 @@ const MCPTools = {
 
       // Add Perplexity API key if this is a Perplexity tool
       if (tool.server.includes('perplexity')) {
-        // Try to get the Perplexity API key from localStorage
-        const perplexityConfig = JSON.parse(localStorage.getItem('perplexity_config') || '{}');
-        if (perplexityConfig.apiKey) {
-          env.PERPLEXITY_API_KEY = perplexityConfig.apiKey;
-        } else {
-          // Check if we have a default API key in the .env file
+        try {
+          // Try to get the Perplexity API key from localStorage
+          const perplexityConfig = JSON.parse(localStorage.getItem('perplexity_config') || '{}');
+          if (perplexityConfig.apiKey) {
+            env.PERPLEXITY_API_KEY = perplexityConfig.apiKey;
+          } else {
+            // Check if we have a default API key in the .env file
+            const defaultKey = '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';
+            env.PERPLEXITY_API_KEY = defaultKey;
+
+            // Log a warning
+            if (node && window.AgentLogger) {
+              AgentLogger.addLog(node, 'Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            } else {
+              DebugManager.addLog('Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            }
+          }
+        } catch (error) {
+          console.error('Error accessing localStorage for Perplexity API key:', error);
+          // Use default key as fallback
           const defaultKey = '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';
           env.PERPLEXITY_API_KEY = defaultKey;
 
-          // Log a warning
           if (node && window.AgentLogger) {
-            AgentLogger.addLog(node, 'Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            AgentLogger.addLog(node, `Error accessing localStorage: ${error.message}. Using default Perplexity API key.`, 'warning');
           } else {
-            DebugManager.addLog('Using default Perplexity API key. For better results, configure your own key in the settings.', 'warning');
+            DebugManager.addLog(`Error accessing localStorage: ${error.message}. Using default Perplexity API key.`, 'warning');
           }
         }
       }
@@ -324,8 +399,13 @@ const MCPTools = {
 
       // Store the request payload in the node for logging
       if (node) {
-        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
-        node.lastRequestTime = new Date().toISOString();
+        try {
+          node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
+          node.lastRequestTime = new Date().toISOString();
+        } catch (error) {
+          console.error('Error storing request payload in node:', error);
+          // Continue execution even if we can't store the payload
+        }
       }
 
       // Call the MCP API
@@ -346,24 +426,34 @@ const MCPTools = {
 
       // Store the response payload in the node for logging
       if (node) {
-        node.lastResponsePayload = JSON.parse(JSON.stringify(data));
-        node.lastResponseTime = new Date().toISOString();
+        try {
+          node.lastResponsePayload = JSON.parse(JSON.stringify(data));
+          node.lastResponseTime = new Date().toISOString();
 
-        // Log the API call if we have a logger
-        if (window.AgentLogger) {
-          AgentLogger.addApiLog(node, requestPayload, data);
+          // Log the API call if we have a logger
+          if (window.AgentLogger) {
+            AgentLogger.addApiLog(node, requestPayload, data);
+          }
+        } catch (error) {
+          console.error('Error storing response payload in node:', error);
+          // Continue execution even if we can't store the payload
         }
       }
 
       // Store the result in the node's memory
       if (node && node.memory) {
-        AgentMemory.store(node, `mcp_result_${tool.id}`, data.result);
-        AgentMemory.addToHistory(node, {
-          tool: tool.id,
-          params,
-          server: tool.server,
-          method: tool.method
-        }, data.result);
+        try {
+          AgentMemory.store(node, `mcp_result_${tool.id}`, data.result);
+          AgentMemory.addToHistory(node, {
+            tool: tool.id,
+            params,
+            server: tool.server,
+            method: tool.method
+          }, data.result);
+        } catch (error) {
+          console.error('Error storing result in node memory:', error);
+          // Continue execution even if we can't store the result
+        }
       }
 
       // Log the success
@@ -388,7 +478,72 @@ const MCPTools = {
 
   // Get all available MCP tools
   getAllTools() {
-    return this.tools;
+    console.log(`MCPTools.getAllTools called, returning ${this.tools.length} tools`);
+
+    // Log detailed information about each tool
+    console.log('MCP TOOLS DETAILED INFO:');
+    this.tools.forEach((tool, index) => {
+      console.log(`MCP Tool ${index + 1}/${this.tools.length}:`);
+      console.log('  ID:', tool.id);
+      console.log('  Name:', tool.name);
+      console.log('  Description:', tool.description);
+      console.log('  Category:', tool.category);
+      console.log('  Server:', tool.server);
+      console.log('  Method:', tool.method);
+      console.log('  Has execute function:', !!tool.execute);
+      console.log('  Auto approve:', !!tool.autoApprove);
+
+      // Check if the tool has all required properties
+      const hasAllProps = tool.id && tool.name && tool.description && tool.category && tool.server && tool.method;
+      console.log('  Has all required properties:', hasAllProps);
+
+      if (!hasAllProps) {
+        console.log('  Missing properties:', [
+          !tool.id ? 'id' : null,
+          !tool.name ? 'name' : null,
+          !tool.description ? 'description' : null,
+          !tool.category ? 'category' : null,
+          !tool.server ? 'server' : null,
+          !tool.method ? 'method' : null
+        ].filter(Boolean).join(', '));
+      }
+    });
+
+    // Check if tools are properly formatted
+    const formattedTools = this.tools.map(tool => {
+      // Ensure the tool has all required properties
+      if (!tool.id || !tool.name || !tool.description || !tool.category) {
+        console.warn(`MCP tool missing required properties: ${tool.id || 'unknown'}`);
+        return null;
+      }
+
+      // Create an execute function for this tool if it doesn't have one
+      if (!tool.execute) {
+        tool.execute = async (params, node) => {
+          return await this.executeMCPTool(tool.id, params, node);
+        };
+      }
+
+      return tool;
+    }).filter(Boolean);
+
+    if (formattedTools.length !== this.tools.length) {
+      console.warn(`Filtered out ${this.tools.length - formattedTools.length} invalid MCP tools`);
+    }
+
+    // Log the tool IDs for debugging
+    const toolIds = formattedTools.map(tool => tool.id);
+    console.log('Available MCP tools:', toolIds.join(', '));
+
+    // Log the formatted tools in detail
+    console.log('FORMATTED MCP TOOLS:');
+    console.log(JSON.stringify(formattedTools, (key, value) => {
+      // Skip the execute function in the output
+      if (key === 'execute') return '[Function]';
+      return value;
+    }, 2));
+
+    return formattedTools;
   },
 
   // Get MCP tools by category
@@ -402,17 +557,36 @@ const MCPTools = {
   }
 };
 
-// Initialize MCP tools when the DOM is loaded
+// Make the MCPTools object available globally
 document.addEventListener('DOMContentLoaded', function() {
-  // Initialize with a slight delay to ensure all other components are loaded
-  setTimeout(() => {
-    MCPTools.init();
+  if (typeof window !== 'undefined') {
+    window.MCPTools = MCPTools;
+    console.log('MCPTools exposed to global scope');
 
-    // Make sure the MCPTools object is available globally
-    if (typeof window !== 'undefined') {
-      window.MCPTools = MCPTools;
-    }
-  }, 1000);
+    // Initialize MCP tools immediately
+    MCPTools.init().then(() => {
+      console.log('MCPTools initialized on page load');
+
+      // Register with AgentTools if available
+      if (window.AgentTools) {
+        MCPTools.registerWithAgentTools();
+        console.log('MCPTools registered with AgentTools on page load');
+      }
+    }).catch(error => {
+      console.error('Error initializing MCPTools on page load:', error);
+    });
+
+    // Listen for app initialization complete event
+    document.addEventListener('app-initialization-complete', function() {
+      console.log('App initialization complete event received by MCPTools');
+
+      // Make sure we're registered with AgentTools
+      if (window.AgentTools && MCPTools.tools && MCPTools.tools.length > 0) {
+        MCPTools.registerWithAgentTools();
+        console.log('Registered MCP tools with AgentTools after initialization');
+      }
+    });
+  }
 });
 
 // Export the MCPTools object

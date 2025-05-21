@@ -764,8 +764,14 @@ class Node {
       // Get the combined input
       const processInput = node.inputSources.size > 0 ? node.combineInputs() : node.inputContent;
 
-      // Log the processing attempt
-      DebugManager.addLog(`Starting to process node "${node.title}" (ID: ${node.id}) with input: ${processInput ? (typeof processInput === 'string' ? processInput.substring(0, 30) + '...' : 'non-text content') : 'empty input'}`, 'info');
+      // Log the processing attempt with proper null/undefined checking
+      let inputPreview = 'empty input';
+      if (processInput !== null && processInput !== undefined) {
+        inputPreview = typeof processInput === 'string' ?
+          (processInput.substring(0, 30) + (processInput.length > 30 ? '...' : '')) :
+          `non-string input (${typeof processInput})`;
+      }
+      DebugManager.addLog(`Starting to process node "${node.title}" (ID: ${node.id}) with input: ${inputPreview}`, 'info');
 
       // Process the node with this node as the source
       App.processNodeAndConnections(node, processInput, this)
@@ -2694,13 +2700,17 @@ class Node {
 
   // Get text lines for a given string and max width
   getTextLines(ctx, text, maxWidth) {
-    // Check if text is a string before trying to split it
-    if (typeof text !== 'string') {
+    // Check if text is null, undefined, or not a string
+    if (text === null || text === undefined || typeof text !== 'string') {
       // Return a single line with a placeholder for non-string content
+      console.warn(`getTextLines called with ${text === null ? 'null' : text === undefined ? 'undefined' : typeof text} text`);
       return ['[Non-text content]'];
     }
 
-    const words = text.split(' ');
+    // Ensure text is a string (defensive programming)
+    const textStr = String(text);
+
+    const words = textStr.split(' ');
     const lines = [];
     let currentLine = '';
 
@@ -4772,10 +4782,23 @@ const App = {
                          clickedNode._nodeType === 'agent' ||
                          clickedNode.isAgentNode === true;
 
-      if (isAgentNode && window.AgentNodes && typeof window.AgentNodes.openAgentNodeEditor === 'function') {
+      if (isAgentNode && window.AgentNodes) {
         // Use the agent node editor
         DebugManager.addLog(`Opening agent node editor for node ${clickedNode.id}`, 'info');
-        window.AgentNodes.openAgentNodeEditor(clickedNode);
+
+        // Check if we have the handleAgentNodeDoubleClick method
+        if (typeof window.AgentNodes.handleAgentNodeDoubleClick === 'function') {
+          window.AgentNodes.handleAgentNodeDoubleClick(clickedNode);
+        }
+        // Fallback to openAgentNodeEditor if available
+        else if (typeof window.AgentNodes.openAgentNodeEditor === 'function') {
+          window.AgentNodes.openAgentNodeEditor(clickedNode);
+        }
+        // Fallback to regular node editor if neither is available
+        else {
+          console.warn(`Agent node editor methods not available for node ${clickedNode.id}, falling back to regular editor`);
+          this.openNodeEditor(clickedNode);
+        }
       } else {
         // Use the regular node editor
         this.openNodeEditor(clickedNode);
@@ -6375,12 +6398,37 @@ const App = {
 
   // Process a chain of nodes starting from the given node
   async processNodeChain(startNode) {
-    if (!startNode) return;
+    if (!startNode) {
+      DebugManager.addLog('Cannot process node chain: startNode is null or undefined', 'error');
+      return;
+    }
 
-    // Process the start node first
-    await this.processNodeAndConnections(startNode, startNode.content);
+    // Ensure startNode.content is not null or undefined
+    const content = startNode.content === null || startNode.content === undefined ?
+      (startNode.inputContent || "") : startNode.content;
 
-    DebugManager.addLog('Node chain processing completed', 'success');
+    // Log the content being used
+    DebugManager.addLog(`Processing node chain starting with node "${startNode.title}" (ID: ${startNode.id})`, 'info');
+
+    // Safely log content with proper null/undefined checking
+    let contentPreview = 'empty content';
+    if (content !== null && content !== undefined) {
+      contentPreview = typeof content === 'string' ?
+        (content.substring(0, 30) + (content.length > 30 ? '...' : '')) :
+        `non-string content (${typeof content})`;
+    }
+    DebugManager.addLog(`Using content: ${contentPreview}`, 'info');
+
+    try {
+      // Process the start node first
+      await this.processNodeAndConnections(startNode, content);
+      DebugManager.addLog('Node chain processing completed', 'success');
+    } catch (error) {
+      DebugManager.addLog(`Error in node chain processing: ${error.message}`, 'error');
+      console.error('Node chain processing error:', error);
+      // Re-throw the error to be handled by the caller
+      throw error;
+    }
   },
 
   // Process a node and all its connected nodes
@@ -6423,12 +6471,18 @@ const App = {
       const output = await node.process(processInput);
 
       // Store the output in the node's content using our updateNodeContent method
-      if (output) {
+      if (output !== null && output !== undefined) {
         // Use the new updateNodeContent method to properly handle image cache-busting
         node.updateNodeContent(output);
 
-        // Log for debugging
-        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${output.substring ? output.substring(0, 30) + '...' : 'non-text content'}`, 'info');
+        // Log for debugging - safely handle different output types
+        const outputPreview = typeof output === 'string' ?
+          `${output.substring(0, 30)}${output.length > 30 ? '...' : ''}` :
+          'non-text content';
+        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed with output: ${outputPreview}`, 'info');
+      } else {
+        // Log that output was null or undefined
+        DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) processed but returned null or undefined output`, 'warning');
       }
 
       // Special handling for image-related nodes
@@ -7693,27 +7747,87 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       document.head.appendChild(script);
     } else {
-      console.log('AgentNodes script already exists in the DOM, waiting for it to initialize');
+      console.log('AgentNodes script already exists in the DOM, waiting for it to be ready');
 
-      // Set up a retry mechanism
-      let retryCount = 0;
-      const maxRetries = 5;
+      // Verify that AgentNodes is available
+      if (!window.AgentNodes) {
+        console.error('AgentNodes not available in app.js');
+        // Create a fallback object
+        window.AgentNodes = {
+          ready: function() {
+            return Promise.resolve();
+          }
+        };
+        console.log('Created fallback AgentNodes object in app.js');
+      } else {
+        console.log('AgentNodes is available in app.js');
+      }
 
-      const checkAgentNodes = () => {
-        if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
-          console.log('AgentNodes module found after waiting, initializing now');
-          window.AgentNodes.init();
-        } else if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes to initialize`);
-          setTimeout(checkAgentNodes, 500);
-        } else {
-          console.error('Failed to initialize AgentNodes after multiple retries');
-        }
-      };
+      // Use the AgentNodes.ready() promise to wait for initialization
+      if (window.AgentNodes && typeof window.AgentNodes.ready === 'function') {
+        window.AgentNodes.ready().then(() => {
+          console.log('AgentNodes is ready from ready() promise');
+          DebugManager.addLog('AgentNodes is ready from ready() promise', 'success');
 
-      // Start the retry process
-      setTimeout(checkAgentNodes, 500);
+          // Add the agent node button to the toolbar
+          if (typeof window.AgentNodes.addAgentNodeButton === 'function') {
+            console.log('Adding agent node button from app.js');
+            window.AgentNodes.addAgentNodeButton();
+          }
+
+          // Notify the app that AgentNodes is ready
+          if (window.AppInitSystem && AppInitSystem.markReady) {
+            AppInitSystem.markReady('agentNodes');
+          }
+        }).catch(error => {
+          console.error('Error waiting for AgentNodes to be ready:', error);
+          DebugManager.addLog(`Error waiting for AgentNodes to be ready: ${error.message}`, 'error');
+        });
+      } else {
+        console.warn('AgentNodes.ready() function not available');
+        DebugManager.addLog('AgentNodes.ready() function not available', 'warning');
+
+        // Listen for app initialization complete event as fallback
+        document.addEventListener('app-initialization-complete', function() {
+          console.log('App initialization complete event received by App');
+
+          // Check if AgentNodes is available
+          if (window.AgentNodes) {
+            console.log('AgentNodes is available after app initialization');
+            DebugManager.addLog('AgentNodes is available after app initialization', 'success');
+          } else {
+            console.error('AgentNodes is not available after app initialization');
+            DebugManager.addLog('AgentNodes is not available after app initialization', 'error');
+          }
+        });
+
+        // Set up a minimal retry mechanism as a last resort
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retryInterval = 200; // ms
+
+        const checkAgentNodes = () => {
+          if (window.AgentNodes) {
+            console.log('AgentNodes found after retry');
+            DebugManager.addLog('AgentNodes found after retry', 'success');
+
+            // Notify the app that AgentNodes is ready
+            if (window.AppInitSystem && AppInitSystem.markReady) {
+              AppInitSystem.markReady('agentNodes');
+            }
+          } else if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes`);
+            setTimeout(checkAgentNodes, retryInterval);
+          } else {
+            console.error('Failed to find AgentNodes after retries');
+            DebugManager.addLog('Failed to find AgentNodes after retries', 'error');
+          }
+        };
+
+        // Start the retry process
+        setTimeout(checkAgentNodes, 500);
+      }
     }
   }, 1000); // Wait 1 second to ensure all scripts are loaded
 });
