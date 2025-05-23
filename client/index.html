@@ -29,6 +29,25 @@
   <!-- Error Boundary and Logging Systems - Load Early -->
   <script src="error-boundary.js"></script>
   <script src="centralized-logger.js"></script>
+  
+  <!-- Core Architecture Modules -->
+  <script src="state-manager.js"></script>
+  <script src="config-manager.js"></script>
+  
+  <!-- Canvas and Node Modules -->
+  <script type="module">
+    // Import ES6 modules
+    import { CanvasUtils } from './modules/canvas-utils.js';
+    import { NodeManager } from './modules/node-manager.js';
+    import { ConnectionManager } from './modules/connection-manager.js';
+    import { CanvasRenderer } from './modules/canvas-renderer.js';
+    
+    // Make them available globally for now (will refactor later)
+    window.CanvasUtils = CanvasUtils;
+    window.NodeManager = NodeManager;
+    window.ConnectionManager = ConnectionManager;
+    window.CanvasRenderer = CanvasRenderer;
+  </script>
 </head>
 <body>
   <div id="toolbar">
