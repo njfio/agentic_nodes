@@ -1,0 +1,68 @@
+  <!-- Agent Node System - Unified Implementation -->
+  <!-- Load the unified agent system that replaces all fix files -->
+  <script src="unified-agent-system.js"></script>
+  
+  <!-- Core agent dependencies (these will be integrated into unified system later) -->
+  <script src="agent-memory.js"></script>
+  <script src="agent-tools.js"></script>
+  <script src="agent-planner.js"></script>
+  <script src="agent-logger.js"></script>
+  
+  <!-- MCP tools integration -->
+  <script src="mcp-tools.js"></script>
+  
+  <!-- Legacy agent modules (to be refactored) -->
+  <script src="agent/agent-editor.js"></script>
+  <script src="agent/agent-modals.js"></script>
+  <script src="agent-draw.js"></script>
+  
+  <!-- Global initialization system -->
+  <script>
+    // Simplified initialization system
+    window.AppInitSystem = {
+      components: {
+        unifiedAgentSystem: false,
+        mcpTools: false
+      },
+
+      markReady: function(componentName) {
+        console.log(`Component ${componentName} is ready`);
+        if (this.components.hasOwnProperty(componentName)) {
+          this.components[componentName] = true;
+          this.checkAllReady();
+        }
+      },
+
+      checkAllReady: function() {
+        const allReady = Object.values(this.components).every(ready => ready);
+        if (allReady) {
+          console.log('All components are ready');
+          const event = new CustomEvent('app-initialization-complete');
+          document.dispatchEvent(event);
+        }
+      }
+    };
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      // Mark UnifiedAgentSystem as ready when it initializes
+      if (window.UnifiedAgentSystem) {
+        window.UnifiedAgentSystem.onReady(() => {
+          AppInitSystem.markReady('unifiedAgentSystem');
+        });
+      }
+
+      // Mark MCPTools as ready when available
+      if (window.MCPTools) {
+        AppInitSystem.markReady('mcpTools');
+      } else {
+        // Wait for MCPTools
+        const checkMCP = setInterval(() => {
+          if (window.MCPTools) {
+            clearInterval(checkMCP);
+            AppInitSystem.markReady('mcpTools');
+          }
+        }, 100);
+      }
+    });
+  </script>

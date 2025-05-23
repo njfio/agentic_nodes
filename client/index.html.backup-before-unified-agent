@@ -25,10 +25,6 @@
   <link rel="stylesheet" href="responsive.css" />
   <link rel="stylesheet" href="improved-toolbar.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
-  
-  <!-- Error Boundary and Logging Systems - Load Early -->
-  <script src="error-boundary.js"></script>
-  <script src="centralized-logger.js"></script>
 </head>
 <body>
   <div id="toolbar">
@@ -916,50 +912,296 @@
     </div>
   </div>
 
-  <!-- Agent Node System - Unified Loading -->
-  <!-- Core agent dependencies -->
+  <!-- Agent Node System - Load in specific order with proper attributes -->
+  <!-- First load the AgentNodes initialization script to ensure it's available globally -->
+  <script src="agent-nodes-init.js"></script>
+
+  <!-- Then load the dependencies -->
   <script src="agent-memory.js"></script>
   <script src="agent-tools.js"></script>
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
+
+  <!-- Load MCP tools -->
   <script src="mcp-tools.js"></script>
   
-  <!-- Agent draw functionality -->
-  <script src="agent-draw.js"></script>
-  
-  <!-- Unified agent system - replaces all fix scripts -->
-  <script src="unified-agent-system.js"></script>
+  <!-- Fix tool names for OpenAI -->
+  <script src="fix-tool-names.js"></script>
+  <script src="fix-mcp-tools.js"></script>
+  <script src="fix-mcp-execution.js"></script>
+  <script src="fix-browser-search-tool.js"></script>
 
-  <!-- Simplified initialization -->
+  <!-- Load the new modular agent nodes implementation -->
+  <script src="agent/agent-editor.js"></script>
+  <script src="agent/agent-modals.js"></script>
+  <script src="agent/agent-processor.js"></script>
+  <script src="agent/agent-integration.js"></script>
+  <script src="agent/agent-ui.js"></script>
+  <script src="agent-draw.js"></script>
+  <!-- Load agent-nodes.js last as it depends on all other modules -->
+  <script src="agent/agent-nodes.js"></script>
+  
+  <!-- Fix browser search execution -->
+  <script src="fix-browser-search-execution.js"></script>
+  
+  <!-- Capture all agent iterations -->
+  <script src="capture-all-iterations.js"></script>
+  
+  <!-- Enhanced iteration display -->
+  <script src="enhance-iteration-display.js"></script>
+  
+  <!-- Capture full agent history with all iterations -->
+  <script src="capture-full-agent-history.js"></script>
+  
+  <!-- Force agents to use tools when appropriate -->
+  <script src="force-agent-tool-usage.js"></script>
+  
+  <!-- Fix agent nodes to use original query -->
+  <script src="fix-agent-original-query.js"></script>
+  
+  <!-- Add agent node button handler -->
+  <script src="add-agent-button-handler.js"></script>
+  
+  <!-- Fix duplicate tools -->
+  <script src="fix-duplicate-tools.js"></script>
+  
+  <!-- Fix API base URL first -->
+  <script src="fix-api-base-url.js"></script>
+  
+  <!-- Add network resilience -->
+  <script src="fix-network-resilience.js"></script>
+  
+  <!-- Fix agent timeouts -->
+  <script src="fix-agent-timeouts.js"></script>
+  
+  <!-- Fix Docker network issues -->
+  <script src="fix-docker-network.js"></script>
+  
+  <!-- Ultimate fallback for network failures -->
+  <script src="fix-ultimate-fallback.js"></script>
+  
+  <!-- Fix agent iterations and tool errors -->
+  <script src="fix-agent-iterations.js"></script>
+  
+  <!-- Improve agent completion detection -->
+  <script src="fix-agent-completion.js"></script>
+  
+  <!-- Check Perplexity key configuration -->
+  <script src="check-perplexity-key.js"></script>
+  
+  <!-- Fix Perplexity key passing -->
+  <script src="fix-perplexity-key-passing.js"></script>
+  
+  <!-- Fix MCP tool schemas -->
+  <script src="fix-mcp-tool-schemas.js"></script>
+  
+  <!-- Disable problematic tools -->
+  <script src="disable-problematic-tools.js"></script>
+  
+  <!-- Fix Perplexity API key saving -->
+  <script src="fix-perplexity-save.js"></script>
+  
+  <!-- Fix agent iterations UI -->
+  <script src="fix-agent-iterations-ui.js"></script>
+  
+  <!-- Restore agent reasoning and reflection -->
+  <script src="restore-agent-reasoning.js"></script>
+  
+  <!-- Enhance agent planner with reasoning -->
+  <script src="enhance-agent-planner.js"></script>
+  
+  <!-- Agent features summary -->
+  <script src="agent-features-summary.js"></script>
+
+  <!-- Global initialization system -->
   <script>
-    // Simplified initialization system
+    // Create a global initialization system
     window.AppInitSystem = {
-      init: function() {
-        console.log('Initializing unified agent system');
-        
-        // Initialize unified agent system
-        if (window.UnifiedAgentSystem && typeof UnifiedAgentSystem.init === 'function') {
-          UnifiedAgentSystem.init().then(() => {
-            console.log('Unified agent system initialized successfully');
-            
-            // Dispatch initialization complete event
-            const event = new CustomEvent('app-initialization-complete');
-            document.dispatchEvent(event);
-          }).catch(error => {
-            console.error('Error initializing unified agent system:', error);
-          });
+      components: {
+        mcpTools: false,
+        agentNodes: false
+      },
+
+      // Register a component as ready
+      markReady: function(componentName) {
+        console.log(`Component ${componentName} is ready`);
+        if (this.components.hasOwnProperty(componentName)) {
+          this.components[componentName] = true;
+          this.checkAllReady();
+        }
+      },
+
+      // Check if all components are ready
+      checkAllReady: function() {
+        const allReady = Object.values(this.components).every(ready => ready);
+        if (allReady) {
+          console.log('All components are ready, finalizing initialization');
+          this.finalizeInitialization();
+        }
+      },
+
+      // Finalize initialization when all components are ready
+      finalizeInitialization: function() {
+        console.log('Finalizing application initialization');
+
+        // Verify that AgentNodes is available
+        if (!window.AgentNodes) {
+          console.error('AgentNodes not available during finalization');
+          // Try to recover by checking if it's defined in the global scope
+          if (typeof AgentNodes !== 'undefined') {
+            window.AgentNodes = AgentNodes;
+            console.log('Recovered AgentNodes from global scope');
+          }
         } else {
-          console.error('UnifiedAgentSystem not available');
+          console.log('AgentNodes is available during finalization');
+        }
+
+        // Ensure AgentNodes has all the tools from MCPTools
+        if (window.AgentNodes && window.MCPTools) {
+          console.log('Connecting MCPTools to AgentNodes');
+
+          // Make sure MCPTools are registered with AgentTools
+          if (window.MCPTools.tools && window.MCPTools.tools.length > 0) {
+            if (window.AgentTools) {
+              MCPTools.registerWithAgentTools();
+              console.log(`Registered ${MCPTools.tools.length} MCP tools with AgentTools`);
+            }
+          }
+
+          // Make sure AgentNodes has the latest tools
+          if (window.AgentNodes.updateToolsList) {
+            AgentNodes.updateToolsList();
+            console.log('Updated AgentNodes tools list');
+          }
+
+          // Add the agent node button to the toolbar
+          if (window.AgentNodes.addAgentNodeButton) {
+            console.log('Adding agent node button from finalizeInitialization');
+            setTimeout(() => {
+              window.AgentNodes.addAgentNodeButton();
+            }, 500);
+          }
+        }
+
+        // Dispatch a custom event to notify the application that initialization is complete
+        const event = new CustomEvent('app-initialization-complete');
+        document.dispatchEvent(event);
+        console.log('App initialization complete event dispatched');
+      },
+
+      // Initialize the system
+      init: function() {
+        console.log('Initializing application components');
+
+        // Verify that AgentNodes is available
+        if (!window.AgentNodes) {
+          console.error('AgentNodes not available during initialization');
+          // Try to recover by checking if it's defined in the global scope
+          if (typeof AgentNodes !== 'undefined') {
+            window.AgentNodes = AgentNodes;
+            console.log('Recovered AgentNodes from global scope');
+          }
+        } else {
+          console.log('AgentNodes is available during initialization');
+        }
+
+        // Initialize AgentNodes first
+        if (window.AgentNodes && typeof AgentNodes.init === 'function') {
+          console.log('Initializing AgentNodes');
+          try {
+            AgentNodes.init();
+            this.markReady('agentNodes');
+          } catch (error) {
+            console.error('Error initializing AgentNodes:', error);
+            // Mark as ready anyway to continue initialization
+            this.markReady('agentNodes');
+          }
+        } else {
+          console.warn('AgentNodes not available or init method missing');
+
+          // Set up a retry mechanism for AgentNodes
+          let retryCount = 0;
+          const maxRetries = 10;
+          const retryInterval = 300; // ms
+
+          const checkAgentNodes = () => {
+            if (window.AgentNodes && typeof AgentNodes.init === 'function') {
+              console.log('AgentNodes found after retry, initializing now');
+              try {
+                AgentNodes.init();
+                this.markReady('agentNodes');
+              } catch (error) {
+                console.error('Error initializing AgentNodes after retry:', error);
+                this.markReady('agentNodes');
+              }
+            } else if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes to be available`);
+              setTimeout(checkAgentNodes, retryInterval);
+            } else {
+              console.error('Failed to find AgentNodes after multiple retries');
+              // Mark as ready anyway to continue initialization
+              this.markReady('agentNodes');
+            }
+          };
+
+          // Start the retry process
+          setTimeout(checkAgentNodes, retryInterval);
+        }
+
+        // Initialize MCP tools after AgentNodes
+        if (window.MCPTools && typeof MCPTools.init === 'function') {
+          console.log('Initializing MCPTools');
+          try {
+            MCPTools.init().then(() => {
+              this.markReady('mcpTools');
+            }).catch(error => {
+              console.error('Error initializing MCPTools:', error);
+              // Mark as ready anyway to continue initialization
+              this.markReady('mcpTools');
+            });
+          } catch (error) {
+            console.error('Error calling MCPTools.init():', error);
+            // Mark as ready anyway to continue initialization
+            this.markReady('mcpTools');
+          }
+        } else {
+          console.warn('MCPTools not available or init method missing');
+          // Mark as ready anyway to continue initialization
+          this.markReady('mcpTools');
         }
       }
     };
 
-    // Initialize when DOM is loaded
+    // Initialize the system when the DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
+      // Verify that AgentNodes is available
+      if (!window.AgentNodes) {
+        console.error('AgentNodes not available during DOMContentLoaded');
+        // Try to recover by checking if it's defined in the global scope
+        if (typeof AgentNodes !== 'undefined') {
+          window.AgentNodes = AgentNodes;
+          console.log('Recovered AgentNodes from global scope');
+        }
+      } else {
+        console.log('AgentNodes is available during DOMContentLoaded');
+      }
+
+      // Wait a short time to ensure all scripts are loaded
       setTimeout(() => {
         window.AppInitSystem.init();
-      }, 100);
+      }, 500);
     });
+
+    // Add a global error handler for script loading
+    window.addEventListener('error', function(event) {
+      if (event.target && event.target.tagName === 'SCRIPT') {
+        console.error('Error loading script:', event.target.src);
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog(`Error loading script: ${event.target.src}`, 'error');
+        }
+      }
+    }, true);
   </script>
 
   <script src="app-global.js"></script>
@@ -967,7 +1209,15 @@
   <script src="theme-switcher.js" type="module"></script>
   <script src="mobile-menu.js" type="module"></script>
   <script src="onboarding-tutorial.js" type="module"></script>
-  <!-- MCP client integration (commented out to avoid conflicts) -->
+  <script src="debug-agent-processing.js" defer></script>
+  <script src="clean-agent-fix.js" defer></script>
+  <script src="test-agent-immediate.js" defer></script>
+  <script src="force-tools-fix.js" defer></script>
+  <script src="ultimate-agent-fix.js" defer></script>
+  <!-- Disable MCP client to avoid conflicts -->
+  <script src="disable-mcp-client.js"></script>
+  
   <!-- <script src="mcp-client-integration.js" defer></script> -->
+  <script src="intercept-node-processing.js"></script>
 </body>
 </html>
