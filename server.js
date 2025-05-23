@@ -1,4 +1,9 @@
 require('dotenv').config();
+
+// Validate configuration before starting the application
+const { validateConfig, isProduction } = require('./utils/config-validation');
+validateConfig();
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -12,9 +17,10 @@ const websocketService = require('./services/websocketService');
 const monitoringService = require('./services/monitoringService');
 const { createIndexes } = require('./utils/db-indexes');
 
-// Import routes
+// Import routes and middleware
 const apiRoutes = require('./routes/api');
 const apiImprovedRoutes = require('./routes/api-improved');
+const { apiLimiter, authLimiter } = require('./middleware/security/rateLimiter');
 
 // Create Express app
 const app = express();
@@ -24,22 +30,45 @@ const PORT = process.env.PORT || 8732;
 
 // Security middleware
 if (process.env.NODE_ENV === 'production') {
-  // Use strict CSP in production
+  // Use strict security headers in production
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Remove unsafe-eval for better security
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'", "https://api.openai.com"]
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: ["'self'", "https://api.openai.com", "wss:", "ws:"],
+        fontSrc: ["'self'", "https:", "data:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"]
       }
-    }
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true
+    },
+    crossOriginEmbedderPolicy: { policy: "require-corp" },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: ["no-referrer", "strict-origin-when-cross-origin"] }
   }));
 } else {
-  // In development, use a more permissive configuration
+  // In development, use a more permissive configuration but still secure
   app.use(helmet({
-    contentSecurityPolicy: false, // Disable CSP in development
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Allow eval in development
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+        connectSrc: ["'self'", "https:", "http:", "wss:", "ws:"],
+        fontSrc: ["'self'", "https:", "data:"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"]
+      }
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
     crossOriginOpenerPolicy: false
@@ -50,13 +79,55 @@ if (process.env.NODE_ENV === 'production') {
 // Performance middleware
 app.use(compression());
 
-// Standard middleware
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Configure CORS with security in mind
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(',')
+      : ['http://localhost:3000', 'http://localhost:8732'];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200
+};
+
+// In development, be more permissive
+if (process.env.NODE_ENV === 'development') {
+  corsOptions.origin = true; // Allow all origins in development
+}
+
+app.use(cors(corsOptions));
+
+// Body parsing middleware with security limits
+app.use(express.json({ 
+  limit: '10mb', // Reduced from 50mb for security
+  strict: true,
+  type: 'application/json'
+}));
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '10mb', // Reduced from 50mb for security
+  parameterLimit: 1000 // Limit number of parameters
+}));
 
 // Logging middleware
-app.use(morgan('dev'));
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined')); // More detailed logging in production
+} else {
+  app.use(morgan('dev'));
+}
+
+// Trust proxy for rate limiting behind reverse proxies
+app.set('trust proxy', 1);
 
 // Request tracking for monitoring
 app.use((req, res, next) => {
@@ -70,9 +141,15 @@ app.use((req, res, next) => {
 // Serve static files from the 'client' directory
 app.use(express.static(path.join(__dirname, 'client')));
 
-// API routes
-app.use('/api', apiRoutes);
-app.use('/api/v2', apiImprovedRoutes);
+// Apply rate limiting to API routes
+app.use('/api', apiLimiter, apiRoutes);
+app.use('/api/v2', apiLimiter, apiImprovedRoutes);
+
+// Apply stricter rate limiting to auth endpoints
+app.use('/api/users/login', authLimiter);
+app.use('/api/users/register', authLimiter);
+app.use('/api/v2/auth/login', authLimiter);
+app.use('/api/v2/auth/register', authLimiter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -1,119 +1,127 @@
 /**
- * Rate limiting middleware to protect against abuse
+ * Rate Limiting Middleware
+ * Using express-rate-limit for production-ready rate limiting
  */
 
-// In-memory store for rate limiting
-const rateStore = new Map();
+const rateLimit = require('express-rate-limit');
 
 /**
- * Simple rate limiter middleware
- * @param {object} options - Rate limiter options
- * @param {number} options.windowMs - Time window in milliseconds
- * @param {number} options.maxRequests - Maximum number of requests per window
- * @param {string} options.keyGenerator - Function to generate rate limit key (default: IP address)
- * @param {boolean} options.skipSuccessfulRequests - Whether to skip counting successful requests
- * @returns {function} - Express middleware function
+ * General API rate limiter
  */
-function rateLimiter(options = {}) {
-  const {
-    windowMs = 60 * 1000, // 1 minute by default
-    maxRequests = 100, // 100 requests per minute by default
-    skipSuccessfulRequests = false,
-    keyGenerator = (req) => req.ip || req.headers['x-forwarded-for'] || 'unknown'
-  } = options;
-
-  // Cleanup function to remove old entries
-  const cleanup = () => {
-    const now = Date.now();
-    for (const [key, data] of rateStore.entries()) {
-      if (now - data.timestamp > windowMs) {
-        rateStore.delete(key);
-      }
-    }
-  };
-
-  // Run cleanup every minute
-  setInterval(cleanup, 60 * 1000);
-
-  // Return middleware function
-  return (req, res, next) => {
-    // Generate key for this request
-    const key = keyGenerator(req);
-
-    // Get current time
-    const now = Date.now();
-
-    // Get or create rate data for this key
-    let rateData = rateStore.get(key);
-    if (!rateData) {
-      rateData = {
-        count: 0,
-        timestamp: now,
-        blocked: false
-      };
-      rateStore.set(key, rateData);
-    }
-
-    // If time window has passed, reset count
-    if (now - rateData.timestamp > windowMs) {
-      rateData.count = 0;
-      rateData.timestamp = now;
-      rateData.blocked = false;
-    }
-
-    // Check if request is blocked
-    if (rateData.blocked) {
-      return res.status(429).json({
-        error: 'Too many requests, please try again later',
-        retryAfter: Math.ceil((rateData.timestamp + windowMs - now) / 1000)
-      });
-    }
-
-    // Increment request count
-    rateData.count++;
-
-    // Add headers to response
-    res.setHeader('X-RateLimit-Limit', maxRequests);
-    res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - rateData.count));
-    res.setHeader('X-RateLimit-Reset', Math.ceil((rateData.timestamp + windowMs) / 1000));
-
-    // If count exceeds maximum, block requests
-    if (rateData.count > maxRequests) {
-      rateData.blocked = true;
-      return res.status(429).json({
-        error: 'Too many requests, please try again later',
-        retryAfter: Math.ceil((rateData.timestamp + windowMs - now) / 1000)
-      });
-    }
-
-    // If skipSuccessfulRequests is enabled, decrement count on successful response
-    if (skipSuccessfulRequests) {
-      const originalSend = res.send;
-      res.send = function (...args) {
-        if (res.statusCode < 400) {
-          rateData.count--;
-        }
-        return originalSend.apply(res, args);
-      };
-    }
-
-    next();
-  };
-}
-
-// Special rate limiters for sensitive routes
-const authRateLimiter = rateLimiter({
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 20, // 20 requests per 15 minutes
-  skipSuccessfulRequests: true // Don't count successful logins
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again later',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many requests from this IP, please try again later',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
+    });
+  }
 });
 
-const apiRateLimiter = rateLimiter({
-  windowMs: 60 * 1000, // 1 minute
-  maxRequests: 100 // 100 requests per minute
+/**
+ * Strict rate limiter for authentication endpoints
+ */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 auth attempts per windowMs
+  message: {
+    success: false,
+    message: 'Too many authentication attempts from this IP, please try again later',
+    retryAfter: '15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful requests
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many authentication attempts from this IP, please try again later',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
+    });
+  }
 });
+
+/**
+ * Very strict rate limiter for password reset
+ */
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // limit each IP to 3 password reset requests per hour
+  message: {
+    success: false,
+    message: 'Too many password reset attempts from this IP, please try again later',
+    retryAfter: '1 hour'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many password reset attempts from this IP, please try again later',
+      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
+    });
+  }
+});
+
+/**
+ * Rate limiter for file uploads
+ */
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 uploads per minute
+  message: {
+    success: false,
+    message: 'Too many upload requests from this IP, please try again later',
+    retryAfter: '1 minute'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+/**
+ * Rate limiter for AI/agent requests (more expensive operations)
+ */
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // limit each IP to 20 AI requests per minute
+  message: {
+    success: false,
+    message: 'Too many AI requests from this IP, please try again later',
+    retryAfter: '1 minute'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Legacy exports for backward compatibility
+const rateLimiter = (options = {}) => {
+  return rateLimit({
+    windowMs: options.windowMs || 60 * 1000,
+    max: options.maxRequests || 100,
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+};
+
+const authRateLimiter = authLimiter;
+const apiRateLimiter = apiLimiter;
 
 module.exports = {
+  apiLimiter,
+  authLimiter,
+  passwordResetLimiter,
+  uploadLimiter,
+  aiLimiter,
+  // Legacy exports
   rateLimiter,
   authRateLimiter,
   apiRateLimiter

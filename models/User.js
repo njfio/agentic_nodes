@@ -15,12 +15,25 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    validate: {
+      validator: function(email) {
+        return /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email);
+      },
+      message: 'Please enter a valid email address'
+    }
   },
   password: {
     type: String,
     required: true,
-    minlength: 6
+    minlength: 8,
+    validate: {
+      validator: function(password) {
+        // Password must contain at least one uppercase, one lowercase, one number, and one special char
+        return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password);
+      },
+      message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+    }
   },
   firstName: {
     type: String,
@@ -61,12 +74,8 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: {
     type: Date
   },
-  tokens: [{
-    token: {
-      type: String,
-      required: true
-    }
-  }],
+  // Note: JWT tokens are no longer stored in database for security
+  // Session management is now handled externally
   lastLogin: {
     type: Date
   },
@@ -105,19 +114,17 @@ userSchema.virtual('nodes', {
   foreignField: 'user'
 });
 
-// Generate JWT token
-userSchema.methods.generateAuthToken = async function() {
+// Generate JWT token (no longer stored in database)
+userSchema.methods.generateAuthToken = function() {
   const user = this;
   const token = jwt.sign(
-    { id: user._id.toString() },
+    { id: user._id.toString(), username: user.username },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
 
-  // Add token to user's tokens array
-  user.tokens = user.tokens.concat({ token });
-  await user.save();
-
+  // Note: Token is no longer stored in database for security
+  // Session management should be handled externally (Redis, etc.)
   return token;
 };
 
@@ -148,7 +155,7 @@ userSchema.pre('save', async function(next) {
   if (user.isModified('password')) {
     // Check if the password is already hashed (starts with $2a$ or $2b$)
     if (!user.password.startsWith('$2a$') && !user.password.startsWith('$2b$')) {
-      user.password = await bcrypt.hash(user.password, 10);
+      user.password = await bcrypt.hash(user.password, 12); // Increased salt rounds for security
     }
   }
 
@@ -228,7 +235,6 @@ userSchema.methods.toJSON = function() {
 
   // Remove sensitive data
   delete userObject.password;
-  delete userObject.tokens;
   delete userObject.verificationToken;
   delete userObject.resetPasswordToken;
   delete userObject.resetPasswordExpires;

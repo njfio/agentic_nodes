@@ -21,8 +21,15 @@ const dataMigration = require('../utils/data-migration');
 
 // Import middleware
 const { auth, optionalAuth } = require('../middleware/auth');
-const { authRateLimiter, apiRateLimiter } = require('../middleware/security/rateLimiter');
-// const { validateRequest } = require('../middleware/security/validator');
+const { authLimiter, apiLimiter, passwordResetLimiter, aiLimiter } = require('../middleware/security/rateLimiter');
+const { 
+  validateUserRegistration, 
+  validateUserLogin, 
+  validateWorkflow, 
+  validateNode,
+  validateObjectId,
+  validatePasswordReset
+} = require('../middleware/validation');
 const { requestIdMiddleware } = require('../services/loggingService');
 
 // Apply request ID middleware to all routes
@@ -44,8 +51,8 @@ router.post('/migrate', auth, async (req, res) => {
   }
 });
 
-// OpenAI API proxy routes - with rate limiting
-router.post('/openai/chat', apiRateLimiter, async (req, res) => {
+// OpenAI API proxy routes - with AI-specific rate limiting
+router.post('/openai/chat', aiLimiter, async (req, res) => {
   try {
     // Check if the payload was optimized by the client
     const isOptimizedPayload = req.headers['x-payload-optimized'] === 'true';
@@ -67,7 +74,7 @@ router.post('/openai/chat', apiRateLimiter, async (req, res) => {
   }
 });
 
-router.post('/openai/images', apiRateLimiter, async (req, res) => {
+router.post('/openai/images', aiLimiter, async (req, res) => {
   try {
     // Check if the payload was optimized by the client
     const isOptimizedPayload = req.headers['x-payload-optimized'] === 'true';
@@ -91,10 +98,10 @@ router.post('/openai/images', apiRateLimiter, async (req, res) => {
 
 // Workflow routes - apply rate limiting to write operations
 router.get('/workflows', optionalAuth, workflowController.getAllWorkflows);
-router.get('/workflows/:id', optionalAuth, workflowController.getWorkflowById);
-router.post('/workflows', auth, apiRateLimiter, workflowController.createWorkflow);
-router.put('/workflows/:id', auth, apiRateLimiter, workflowController.updateWorkflow);
-router.delete('/workflows/:id', auth, apiRateLimiter, workflowController.deleteWorkflow);
+router.get('/workflows/:id', optionalAuth, validateObjectId('id'), workflowController.getWorkflowById);
+router.post('/workflows', auth, apiLimiter, validateWorkflow, workflowController.createWorkflow);
+router.put('/workflows/:id', auth, apiLimiter, validateObjectId('id'), validateWorkflow, workflowController.updateWorkflow);
+router.delete('/workflows/:id', auth, apiLimiter, validateObjectId('id'), workflowController.deleteWorkflow);
 
 // New workflow versioning routes
 router.get('/workflows/:id/versions', optionalAuth, workflowController.getWorkflowVersions || (async (req, res) => {
@@ -110,23 +117,23 @@ router.post('/workflows/:id/rollback/:versionId', auth, apiRateLimiter, workflow
 
 // Node routes
 router.get('/nodes', optionalAuth, nodeController.getAllNodes);
-router.get('/nodes/:id', optionalAuth, nodeController.getNodeById);
-router.post('/nodes', auth, apiRateLimiter, nodeController.createNode);
-router.put('/nodes/:id', auth, apiRateLimiter, nodeController.updateNode);
-router.delete('/nodes/:id', auth, apiRateLimiter, nodeController.deleteNode);
+router.get('/nodes/:id', optionalAuth, validateObjectId('id'), nodeController.getNodeById);
+router.post('/nodes', auth, apiLimiter, validateNode, nodeController.createNode);
+router.put('/nodes/:id', auth, apiLimiter, validateObjectId('id'), validateNode, nodeController.updateNode);
+router.delete('/nodes/:id', auth, apiLimiter, validateObjectId('id'), nodeController.deleteNode);
 
-// User routes - apply strict rate limiting to auth endpoints
-router.post('/users/register', authRateLimiter, userController.register);
-router.post('/users/login', authRateLimiter, userController.login);
+// User routes - apply strict rate limiting and validation to auth endpoints
+router.post('/users/register', authLimiter, validateUserRegistration, userController.register);
+router.post('/users/login', authLimiter, validateUserLogin, userController.login);
 router.get('/users/profile', auth, userController.getProfile);
-router.put('/users/profile', auth, apiRateLimiter, userController.updateProfile);
+router.put('/users/profile', auth, apiLimiter, userController.updateProfile);
 router.post('/users/logout', auth, userController.logout);
 router.post('/users/logoutAll', auth, userController.logoutAll);
 
 // Email verification and password reset - with rate limiting
-router.get('/users/verify-email', authRateLimiter, userController.verifyEmail);
-router.post('/users/request-password-reset', authRateLimiter, userController.requestPasswordReset);
-router.post('/users/reset-password', authRateLimiter, userController.resetPassword);
+router.get('/users/verify-email', authLimiter, userController.verifyEmail);
+router.post('/users/request-password-reset', passwordResetLimiter, validatePasswordReset, userController.requestPasswordReset);
+router.post('/users/reset-password', passwordResetLimiter, userController.resetPassword);
 
 // Add refresh token endpoint
 router.post('/users/refresh-token', authRateLimiter, userController.refreshToken);

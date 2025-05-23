@@ -75,8 +75,11 @@ const auth = async (req, res, next) => {
     }
 
     try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      // Verify token (ensure JWT_SECRET is set)
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Find user by id
       const user = await User.findById(decoded.id);
@@ -151,8 +154,11 @@ const optionalAuth = async (req, res, next) => {
     }
 
     try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      // Verify token (ensure JWT_SECRET is set)
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Find user by id
       const user = await User.findById(decoded.id);
