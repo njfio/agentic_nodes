@@ -258,6 +258,10 @@ const LogicNodes = {
     node.splitDelimiter = '\\n'; // Default to newline
     node.splitParallel = true;   // Process items in parallel by default
     node.maxItems = 10;          // Maximum number of items to process
+    node.splitMethod = 'delimiter'; // Options: delimiter, regex, json, csv, custom
+    node.splitRegex = '';           // For regex splitting
+    node.cleanupClones = true;      // Automatically cleanup cloned nodes
+    node.clonedNodes = [];          // Track cloned nodes for cleanup
 
     // Add the node to the canvas
     App.nodes.push(node);
@@ -295,8 +299,13 @@ const LogicNodes = {
     node.height = 200;
 
     // Add collector-specific properties
-    node.collectedItems = [];
-    node.combineMethod = 'concatenate'; // Options: concatenate, summarize, list
+    node.collectedItems = {};
+    node.combineMethod = 'concatenate'; // Options: concatenate, summarize, list, merge-json, aggregate, custom
+    node.waitForAllInputs = true;      // Whether to wait for all inputs
+    node.collectionTimeout = 30000;    // Timeout in milliseconds (30 seconds)
+    node.collectionStartTime = null;   // Track when collection started
+    node.expectedItemCount = 0;        // Expected number of items
+    node.processPartialResults = false; // Process even if not all items collected
     node.separator = '\n\n';
     node.waitForAllInputs = true;       // Wait for all inputs before processing
 
@@ -336,11 +345,19 @@ const LogicNodes = {
     node.height = 200;
 
     // Add conditional-specific properties
-    node.conditionCriteria = 'PASS';  // Text to check for success
-    node.maxIterations = 3;           // Maximum number of iterations
-    node.currentIteration = 0;        // Current iteration count
-    node.feedbackNode = null;         // Node to send feedback to
-    node.loopActive = false;          // Whether a loop is currently active
+    node.conditionExpression = 'true'; // JavaScript expression to evaluate
+    node.conditionType = 'simple';      // Options: simple, complex, ai-evaluate, custom
+    node.conditionCriteria = 'PASS';   // What to look for in AI evaluation
+    node.conditionPaths = {             // Multiple condition paths
+      'true': [],                       // Nodes to process when true
+      'false': [],                      // Nodes to process when false
+      'error': []                       // Nodes to process on error
+    };
+    node.maxIterations = 3;             // Maximum number of iterations
+    node.currentIteration = 0;          // Current iteration count
+    node.feedbackNode = null;           // Node to send feedback to on failure
+    node.loopActive = false;            // Whether a loop is currently active
+    node.conditionVariables = {};       // Variables available in condition evaluation
 
     // Add the node to the canvas
     App.nodes.push(node);
@@ -378,17 +395,25 @@ const LogicNodes = {
     node.height = 200;
 
     // Add programmatic-specific properties
-    node.programType = 'chapterProcessor';  // Default program type
-    node.processInParallel = true;          // Process items in parallel by default
-    node.maxItems = 10;                     // Maximum number of items to process
-    node.customCode = '';                   // Custom code for advanced users
-    node.visualGuideNodeId = null;          // ID of the node containing visual guide info
-    node.processingSteps = [                // Steps to perform for each item
-      'write',                              // Write chapter content
-      'createIllustrationPrompt',           // Create illustration prompt
-      'generateIllustration',               // Generate illustration
-      'formatChapter'                       // Format chapter with layout
-    ];
+    node.programType = 'custom';  // Options: transform, filter, aggregate, custom
+    node.programCode = '// Process the input\\n// Available: input, node, utils\\nreturn input;'; // Default code
+    node.sandboxed = true;        // Run in sandboxed environment
+    node.allowedModules = [];     // Modules allowed in sandbox
+    node.programTimeout = 5000;   // Execution timeout (5 seconds)
+    node.customCode = '';         // Legacy property for compatibility
+    node.programUtils = {         // Utility functions available in sandbox
+      log: (msg) => DebugManager.addLog(`[Programmatic ${node.id}] ${msg}`, 'info'),
+      parse: {
+        json: (str) => JSON.parse(str),
+        csv: (str) => str.split('\\n').map(line => line.split(',')),
+        number: (str) => Number(str)
+      },
+      format: {
+        json: (obj) => JSON.stringify(obj, null, 2),
+        currency: (num) => `$${num.toFixed(2)}`,
+        percentage: (num) => `${(num * 100).toFixed(2)}%`
+      }
+    };
 
     // Add the node to the canvas
     App.nodes.push(node);

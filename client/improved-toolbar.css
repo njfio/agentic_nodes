@@ -1,0 +1,176 @@
+/* Improved Toolbar Styles */
+#toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: linear-gradient(to bottom, #2a2a2a, #1e1e1e);
+  border-bottom: 1px solid #444;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 8px;
+}
+
+/* Group related buttons */
+.toolbar-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 0 8px;
+  border-right: 1px solid #444;
+}
+
+.toolbar-group:last-child {
+  border-right: none;
+}
+
+/* Improved button styling */
+#toolbar button {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: transparent;
+  color: #ccc;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+#toolbar button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: #555;
+}
+
+#toolbar button:active {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(1px);
+}
+
+/* Primary action buttons */
+#toolbar button.primary {
+  background-color: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+#toolbar button.primary:hover {
+  background-color: #357abd;
+  border-color: #357abd;
+}
+
+/* Agent node button special styling */
+#toolbar button.agent-btn {
+  background: linear-gradient(135deg, #9c27b0, #673ab7);
+  color: white;
+  border: none;
+  font-weight: 600;
+}
+
+#toolbar button.agent-btn:hover {
+  background: linear-gradient(135deg, #7b1fa2, #512da8);
+  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.3);
+}
+
+/* Icon styling */
+.toolbar-icon {
+  font-size: 16px;
+  margin-right: 4px;
+}
+
+/* Workflow dropdown styling */
+.toolbar-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.toolbar-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Settings/Config buttons */
+#toolbar button.settings {
+  background-color: transparent;
+  border: 1px solid #666;
+  color: #aaa;
+}
+
+#toolbar button.settings:hover {
+  background-color: #333;
+  border-color: #888;
+  color: #fff;
+}
+
+/* Help button styling */
+#helpBtn {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background-color: #444;
+  color: #aaa;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+#helpBtn:hover {
+  background-color: #555;
+  color: #fff;
+}
+
+/* Mobile menu button (hidden on desktop) */
+#mobileMenuBtn {
+  display: none;
+}
+
+/* Adjust canvas to account for toolbar */
+#canvas {
+  top: 56px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  #toolbar {
+    padding: 0 10px;
+  }
+  
+  #toolbar button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .toolbar-group {
+    padding: 0 4px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* Hide most buttons on mobile */
+  #toolbar button:not(#mobileMenuBtn):not(#helpBtn) {
+    display: none;
+  }
+  
+  .toolbar-group {
+    display: none;
+  }
+  
+  #mobileMenuBtn {
+    display: flex;
+  }
+  
+  #helpBtn {
+    margin-left: auto;
+  }
+}

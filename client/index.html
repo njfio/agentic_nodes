@@ -23,40 +23,85 @@
   <link rel="stylesheet" href="auth.css" />
   <link rel="stylesheet" href="dark-theme.css" />
   <link rel="stylesheet" href="responsive.css" />
+  <link rel="stylesheet" href="improved-toolbar.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 </head>
 <body>
   <div id="toolbar">
-    <button id="addNodeBtn" type="button">Add Node</button>
-    <button id="addChatNodeBtn" type="button">Add Chat Node</button>
-    <button id="workflowInterfaceBtn" type="button">Workflow Interface</button>
-    <button id="testWorkflowBtn" type="button">Test Workflow</button>
-    <button id="configBtn" type="button">OpenAI Config</button>
+    <!-- Node Creation Group -->
+    <div class="toolbar-group">
+      <button id="addNodeBtn" type="button" title="Add a standard node">
+        <span class="toolbar-icon">📄</span> Add Node
+      </button>
+      <button id="addChatNodeBtn" type="button" title="Add a chat node">
+        <span class="toolbar-icon">💬</span> Chat Node
+      </button>
+      <button id="addAgentNodeBtn" type="button" class="agent-btn" title="Add an AI agent node">
+        <span class="toolbar-icon">🤖</span> Agent Node
+      </button>
+    </div>
+
+    <!-- Workflow Management Group -->
+    <div class="toolbar-group">
+      <div class="toolbar-dropdown">
+        <button id="workflowsBtn" type="button">
+          <span class="toolbar-icon">📊</span> Workflows ▾
+        </button>
+        <div id="workflowsDropdown" class="dropdown-content">
+          <div class="dropdown-header">
+            <input type="text" id="workflowSearch" placeholder="Search workflows...">
+          </div>
+          <div id="workflowsList" class="dropdown-list">
+            <!-- Workflows will be loaded here -->
+            <div class="dropdown-item loading">Loading workflows...</div>
+          </div>
+          <div class="dropdown-footer">
+            <button id="newWorkflowBtn" class="dropdown-btn" type="button">New Workflow</button>
+          </div>
+        </div>
+      </div>
+      <button id="saveWorkflowBtn" type="button" class="primary" title="Save current workflow">
+        <span class="toolbar-icon">💾</span> Save
+      </button>
+      <button id="workflowInterfaceBtn" type="button" title="Open workflow interface">
+        <span class="toolbar-icon">🔄</span> Interface
+      </button>
+      <button id="testWorkflowBtn" type="button" title="Test current workflow">
+        <span class="toolbar-icon">▶️</span> Test
+      </button>
+    </div>
+
+    <!-- File Operations Group -->
+    <div class="toolbar-group">
+      <button id="saveBtn" type="button" title="Save canvas to local storage">
+        <span class="toolbar-icon">📁</span> Save Canvas
+      </button>
+      <button id="loadBtn" type="button" title="Load canvas from local storage">
+        <span class="toolbar-icon">📂</span> Load Canvas
+      </button>
+      <button id="exportBtn" type="button" title="Export workflow">
+        <span class="toolbar-icon">📤</span> Export
+      </button>
+      <button id="importBtn" type="button" title="Import workflow">
+        <span class="toolbar-icon">📥</span> Import
+      </button>
+    </div>
+
+    <!-- Tools & Settings Group -->
+    <div class="toolbar-group">
+      <button id="templateGeneratorBtn" type="button" title="Generate workflow template">
+        <span class="toolbar-icon">🎨</span> Templates
+      </button>
+      <button id="configBtn" type="button" class="settings" title="OpenAI & API Configuration">
+        <span class="toolbar-icon">⚙️</span> Config
+      </button>
+    </div>
+
+    <!-- Mobile menu button -->
     <button id="mobileMenuBtn" type="button"><i class="fas fa-bars"></i> Menu</button>
     <div id="mobileMenuDropdown" class="mobile-menu-dropdown" style="display: none;"></div>
 
-    <div class="toolbar-dropdown">
-      <button id="workflowsBtn" type="button">Workflows ▾</button>
-      <div id="workflowsDropdown" class="dropdown-content">
-        <div class="dropdown-header">
-          <input type="text" id="workflowSearch" placeholder="Search workflows...">
-        </div>
-        <div id="workflowsList" class="dropdown-list">
-          <!-- Workflows will be loaded here -->
-          <div class="dropdown-item loading">Loading workflows...</div>
-        </div>
-        <div class="dropdown-footer">
-          <button id="newWorkflowBtn" class="dropdown-btn" type="button">New Workflow</button>
-        </div>
-      </div>
-    </div>
-
-    <button id="saveWorkflowBtn" type="button">Save Workflow</button>
-    <button id="saveBtn" type="button">Save Canvas</button>
-    <button id="loadBtn" type="button">Load Canvas</button>
-    <button id="exportBtn" type="button">Export</button>
-    <button id="importBtn" type="button">Import</button>
-    <button id="templateGeneratorBtn" type="button" title="Generate Template">Template Generator</button>
+    <!-- Help button (aligned to right) -->
     <button id="helpBtn" type="button" title="Show Help">?</button>
   </div>
 
@@ -913,6 +958,9 @@
   
   <!-- Fix agent nodes to use original query -->
   <script src="fix-agent-original-query.js"></script>
+  
+  <!-- Add agent node button handler -->
+  <script src="add-agent-button-handler.js"></script>
   
   <!-- Fix duplicate tools -->
   <script src="fix-duplicate-tools.js"></script>
