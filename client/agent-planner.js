@@ -322,8 +322,7 @@ Return ONLY a valid JSON object.`
     
     return params;
   },
-
-  // Execute an entire plan
+// Execute an entire plan with iteration control and reflection
   async executePlan(node) {
     // Generate a plan if one doesn't exist
     let plan = AgentMemory.retrieve(node, 'currentPlan');
@@ -331,19 +330,39 @@ Return ONLY a valid JSON object.`
       plan = await this.generatePlan(node, node.inputContent);
     }
 
-    // Execute all steps in the plan
+    // Use autoIterate and maxIterations to control iteration
+    const maxIterations = node.maxIterations || 5;
+    let iteration = 0;
+
+    // Execute all steps in the plan with iteration control
     const results = [];
-    while (!plan.completed) {
+    while (!plan.completed && (node.autoIterate === true) && iteration < maxIterations) {
       const stepResult = await this.executeNextStep(node);
       results.push(stepResult);
       
       // Get the updated plan
       plan = AgentMemory.retrieve(node, 'currentPlan');
       
+      iteration++;
+
       // Break if we've completed the plan
       if (plan.completed) {
         break;
       }
+
+      // Perform reflection every reflectionFrequency iterations if enabled
+      if (node.enableReflection && (iteration % (node.reflectionFrequency || 2) === 0)) {
+        const reflection = await window.AgentNodes.performReflection(node, node.inputContent, false);
+        AgentMemory.addToContext(node, `Reflection: ${reflection}`);
+        DebugManager.addLog(`Reflection performed at iteration ${iteration}`, 'info');
+      }
+    }
+
+    // Perform final reflection if enabled
+    if (node.enableReflection) {
+      const finalReflection = await window.AgentNodes.performReflection(node, node.inputContent, true);
+      AgentMemory.addToContext(node, `Final Reflection: ${finalReflection}`);
+      DebugManager.addLog('Final reflection performed', 'info');
     }
 
     // Compile the final result
@@ -424,3 +443,7 @@ Compile these results into a coherent response that addresses the original input
 
 // Export the AgentPlanner object
 window.AgentPlanner = AgentPlanner;
+AgentPlanner.processNode = async function(node, input) {
+  node.inputContent = input;
+  return await this.executePlan(node);
+};

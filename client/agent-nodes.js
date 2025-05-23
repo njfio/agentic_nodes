@@ -133,7 +133,7 @@
               this.processing = true;
 
               // Process the node using the agent processor
-              const result = await AgentNodes.processAgentNode(this, input);
+              const result = await window.AgentProcessor.processAgentNode(this, input);
 
               // Mark the node as processed
               this.hasBeenProcessed = true;
@@ -459,27 +459,8 @@
       node.reflectionFrequency = 2;     // How often to reflect (every N iterations)
       node.canBeWorkflowNode = true;    // Whether this node can be an input/output node
 
-      // Initialize with all available tools
-      try {
-        // Use the cached tools list if available
-        if (this.availableTools && this.availableTools.length > 0) {
-          node.tools = [...this.availableTools];
-          console.log(`Using ${node.tools.length} cached tools for agent node`);
-          DebugManager.addLog(`Using ${node.tools.length} cached tools for agent node`, 'info');
-        } else {
-          // Otherwise, get tools directly
-          this.updateToolsList();
-          node.tools = [...this.availableTools];
-          console.log(`Loaded ${node.tools.length} tools for agent node`);
-          DebugManager.addLog(`Loaded ${node.tools.length} tools for agent node`, 'info');
-        }
-      } catch (error) {
-        console.error('Error loading tools for agent node:', error);
-        DebugManager.addLog(`Error loading tools for agent node: ${error.message}`, 'error');
-
-        // Fallback to empty tools array
-        node.tools = [];
-      }
+      // Initialize with all available tools (will be updated by AppInitSystem)
+      node.tools = [];
 
       // Set workflow role properties
       node.workflowRole = 'none';       // Default role is none
@@ -564,136 +545,6 @@
   },
 
   // Process an Agent Node
-  async processAgentNode(node, input) {
-    // Initialize the logger
-    AgentLogger.initLogger(node);
-
-    // Log the start of processing
-    AgentLogger.addLog(node, `Processing Agent Node "${node.title}" (ID: ${node.id})`, 'info');
-
-    try {
-      // Initialize API payload storage if not already present
-      if (!node.lastRequestPayload) node.lastRequestPayload = {};
-      if (!node.lastResponsePayload) node.lastResponsePayload = {};
-
-      // Reset iteration count if this is a new processing run
-      if (!node.isIterating) {
-        node.currentIteration = 0;
-        node.isIterating = true;
-
-        // Initialize memory if needed
-        AgentMemory.initMemory(node);
-
-        // Store the original input
-        AgentMemory.store(node, 'originalInput', input);
-
-        // Log the input
-        AgentLogger.addLog(node, `Original input: ${input.substring(0, 100)}${input.length > 100 ? '...' : ''}`, 'info');
-      }
-
-      // Increment iteration count
-      node.currentIteration++;
-
-      // Check if we've exceeded the maximum number of iterations
-      if (node.currentIteration > node.maxIterations) {
-        AgentLogger.addLog(node, `Reached maximum iterations (${node.maxIterations})`, 'warning');
-        node.isIterating = false;
-
-        // Perform final reflection if enabled
-        if (node.enableReflection) {
-          AgentLogger.addLog(node, 'Performing final reflection', 'info');
-          const finalReflection = await this.performReflection(node, input, true);
-          AgentLogger.addLog(node, `Final reflection: ${finalReflection.substring(0, 100)}${finalReflection.length > 100 ? '...' : ''}`, 'info');
-
-          // Add the reflection to the result
-          return `Agent reached maximum iterations (${node.maxIterations}).\n\nFinal result: ${input}\n\nFinal reflection: ${finalReflection}`;
-        }
-
-        return `Agent reached maximum iterations (${node.maxIterations}). Final result: ${input}`;
-      }
-
-      // Log the current iteration
-      AgentLogger.addLog(node, `Iteration ${node.currentIteration}/${node.maxIterations}`, 'info');
-
-      // Check if we should perform reflection before processing
-      let reflectionResult = null;
-      if (node.enableReflection &&
-          node.currentIteration > 1 &&
-          node.currentIteration % node.reflectionFrequency === 0) {
-        AgentLogger.addLog(node, `Performing reflection at iteration ${node.currentIteration}`, 'info');
-        reflectionResult = await this.performReflection(node, input);
-        AgentLogger.addLog(node, `Reflection result: ${reflectionResult.substring(0, 100)}${reflectionResult.length > 100 ? '...' : ''}`, 'info');
-
-        // Store the reflection in memory
-        AgentMemory.store(node, `reflection_${node.currentIteration}`, reflectionResult);
-      }
-
-      // Process the input based on agent type
-      let result;
-      AgentLogger.addLog(node, `Processing with agent type: ${node.agentType}`, 'info');
-      switch (node.agentType) {
-        case 'default':
-          result = await this.processDefaultAgent(node, input, reflectionResult);
-          break;
-        case 'custom':
-          result = await this.processCustomAgent(node, input, reflectionResult);
-          break;
-        default:
-          throw new Error(`Unknown agent type: ${node.agentType}`);
-      }
-
-      // Store the result in memory
-      AgentMemory.store(node, `result_${node.currentIteration}`, result);
-
-      // Log the result
-      AgentLogger.addLog(node, `Processing result: ${result.substring(0, 100)}${result.length > 100 ? '...' : ''}`, 'success');
-
-      // Update the node's content with the result
-      node.content = result;
-      node.hasBeenProcessed = true;
-
-      // Make sure the node has an apiLogs array
-      if (!node.apiLogs) {
-        node.apiLogs = [];
-      }
-
-      // Log the number of API logs
-      if (node.apiLogs.length > 0) {
-        AgentLogger.addLog(node, `Node has ${node.apiLogs.length} API logs available for viewing`, 'info');
-        DebugManager.addLog(`Agent node ${node.id} has ${node.apiLogs.length} API logs`, 'info');
-      } else {
-        AgentLogger.addLog(node, `No API logs found. This may indicate no API calls were made during processing.`, 'warning');
-        DebugManager.addLog(`No API logs found for agent node ${node.id}`, 'warning');
-      }
-
-      // Check if we need to continue iterating
-      if (node.autoIterate && node.isIterating && node.currentIteration < node.maxIterations) {
-        AgentLogger.addLog(node, `Continuing to iteration ${node.currentIteration + 1}`, 'info');
-        await App.processNodeAndConnections(node, result, node);
-      } else {
-        // Mark the agent as done iterating
-        node.isIterating = false;
-        AgentLogger.addLog(node, 'Agent processing completed', 'success');
-      }
-
-      return result;
-    } catch (error) {
-      // Log the error
-      AgentLogger.addLog(node, `Error: ${error.message}`, 'error');
-
-      // Set the error on the node
-      node.error = error.message;
-      node.isIterating = false;
-
-      // Store the error in memory
-      if (node.memory) {
-        AgentMemory.store(node, `error_${node.currentIteration}`, error.message);
-      }
-
-      // Throw the error to be handled by the caller
-      throw error;
-    }
-  },
 
   // Perform reflection on the agent's actions and results
   async performReflection(node, currentInput, isFinal = false) {
@@ -907,166 +758,235 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
         }
       };
 
-      // Check if the model supports function calling
-      // Most GPT models (3.5 and up) provide this capability. Use a regex
-      // match instead of a fixed list so new models are handled automatically.
-      const supportsFunctionCalling = /gpt-(3\.5|4)/.test(config.model || 'gpt-4o');
+      // Multi-round iterative execution loop
+      let finalOutput = null;
+      let continueIteration = true;
+      node.currentIteration = 0;
 
-      if (supportsFunctionCalling) {
-        AgentLogger.addLog(node, 'Model supports function calling, using direct function calling approach', 'info');
+      while (continueIteration && node.currentIteration < (node.maxIterations || 5)) {
+        node.currentIteration++;
+        node.isIterating = true;
+        AgentLogger.addLog(node, `Starting iteration ${node.currentIteration}`, 'info');
 
-        // Get available tools for function calling
-        const allTools = AgentTools.getAllTools();
+        // Check if the model supports function calling
+        const supportsFunctionCalling = /gpt-(3\.5|4)/.test(config.model || 'gpt-4o');
 
-        // Log the available tools
-        AgentLogger.addLog(node, `Found ${allTools.length} available tools`, 'info');
+        if (supportsFunctionCalling) {
+          AgentLogger.addLog(node, 'Model supports function calling, using direct function calling approach', 'info');
 
-        // Map tools to the format expected by OpenAI API
-        const tools = allTools.map(tool => {
-          // Ensure tool has all required properties
-          if (!tool.id || !tool.description) {
-            AgentLogger.addLog(node, `Skipping invalid tool: ${tool.id || 'unknown'}`, 'warning');
-            return null;
-          }
+          // Get available tools for function calling
+          const allTools = AgentTools.getAllTools();
 
-          // Get parameters and required parameters
-          const properties = this.getToolParameters(tool);
-          const required = this.getToolRequiredParameters(tool);
+          // Log the available tools
+          AgentLogger.addLog(node, `Found ${allTools.length} available tools`, 'info');
 
-          // Validate parameters
-          if (!properties || Object.keys(properties).length === 0) {
-            AgentLogger.addLog(node, `Tool ${tool.id} has no parameters, adding empty object`, 'warning');
-          }
-
-          return {
-            type: "function",
-            function: {
-              name: tool.id,
-              description: tool.description,
-              parameters: {
-                type: "object",
-                properties: properties || {},
-                required: required || []
-              }
+          // Map tools to the format expected by OpenAI API
+          const tools = allTools.map(tool => {
+            // Ensure tool has all required properties
+            if (!tool.id || !tool.description) {
+              AgentLogger.addLog(node, `Skipping invalid tool: ${tool.id || 'unknown'}`, 'warning');
+              return null;
             }
-          };
-        }).filter(Boolean); // Remove any null entries
 
-        // Log the tools being used
-        AgentLogger.addLog(node, `Using ${tools.length} tools for function calling`, 'info');
-        tools.forEach(tool => {
-          AgentLogger.addLog(node, `Tool: ${tool.function.name} - ${tool.function.description}`, 'debug');
-        });
+            // Get parameters and required parameters
+            const properties = this.getToolParameters(tool);
+            const required = this.getToolRequiredParameters(tool);
 
-        // Add the tools to the node for reference
-        node.availableTools = tools;
+            // Validate parameters
+            if (!properties || Object.keys(properties).length === 0) {
+              AgentLogger.addLog(node, `Tool ${tool.id} has no parameters, adding empty object`, 'warning');
+            }
 
-        // Create the system prompt and include available tool names for better awareness
-        let systemPrompt = node.systemPrompt || 'You are a helpful assistant that can use tools to accomplish tasks.';
-        if (node.useMCPTools && tools.length > 0) {
-          const toolNames = tools.map(t => t.function.name).slice(0, 10).join(', ');
-          systemPrompt += `\n\nAvailable tools: ${toolNames}. Use them through function calls when helpful.`;
-        }
+            return {
+              type: "function",
+              function: {
+                name: tool.id,
+                description: tool.description,
+                parameters: {
+                  type: "object",
+                  properties: properties || {},
+                  required: required || []
+                }
+              }
+            };
+          }).filter(Boolean); // Remove any null entries
 
-        // Create the messages array
-        const messages = [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: input }
-        ];
-
-        // Add any context from memory
-        const memory = AgentMemory.getContext(node);
-        if (memory && memory.length > 0) {
-          // Add the last few context items as messages
-          const contextMessages = memory.slice(-5).map(item => {
-            return { role: 'assistant', content: item.content };
+          // Log the tools being used
+          AgentLogger.addLog(node, `Using ${tools.length} tools for function calling`, 'info');
+          tools.forEach(tool => {
+            AgentLogger.addLog(node, `Tool: ${tool.function.name} - ${tool.function.description}`, 'debug');
           });
 
-          // Insert the context messages before the user message
-          messages.splice(1, 0, ...contextMessages);
-        }
+          // Add the tools to the node for reference
+          node.availableTools = tools;
 
-        // Log the request
-        AgentLogger.addLog(node, 'Sending request to OpenAI API with function calling', 'info');
+          // Create the system prompt and include available tool names for better awareness
+          let systemPrompt = node.systemPrompt || 'You are a helpful assistant that can use tools to accomplish tasks.';
+          if (node.useMCPTools && tools.length > 0) {
+            const toolNames = tools.map(t => t.function.name).slice(0, 10).join(', ');
+            systemPrompt += `\n\nAvailable tools: ${toolNames}. Use them through function calls when helpful.`;
+          }
 
-        // Choose whether to force a search tool based on the input
-        const toolChoice = "auto";
-        // Store the request payload for logging
-        node.lastRequestPayload = {
-          model: config.model || 'gpt-4o',
-          messages,
-          tools,
-          tool_choice: toolChoice
-        };
+          // Create the messages array
+          const memory = AgentMemory.getContext(node);
+          const messages = [
+            { role: 'system', content: systemPrompt }
+          ];
 
-        // Create the request payload
-        const requestPayload = {
-          model: config.model || 'gpt-4o',
-          messages,
-          tools,
-          tool_choice: toolChoice
-        };
+          if (memory && memory.length > 0) {
+            // Add the last few context items as messages
+            const contextMessages = memory.slice(-5).map(item => {
+              return { role: 'assistant', content: item.content };
+            });
 
-        // Log the full request payload for debugging
-        AgentLogger.addLog(node, `Sending request with ${messages.length} messages and ${tools.length} tools`, 'info');
-        console.debug('OpenAI request payload:', requestPayload);
+            // Insert the context messages before the user message
+            messages.push(...contextMessages);
+          }
 
-        // Log the first few tools for debugging
-        if (tools.length > 0) {
-          const toolNames = tools.map(t => t.function.name).slice(0, 5);
-          AgentLogger.addLog(node, `Tools available: ${toolNames.join(', ')}${tools.length > 5 ? ` and ${tools.length - 5} more...` : ''}`, 'info');
-        }
+          // Add the user input or previous output as user message
+          messages.push({ role: 'user', content: finalOutput || input });
 
-        // Store the request payload for logging
-        node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
+          // Log the request
+          AgentLogger.addLog(node, `Sending request to OpenAI API with function calling, iteration ${node.currentIteration}`, 'info');
 
-        // Make the API request
-        const response = await fetch('/api/openai/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-openai-api-key': config.apiKey
-          },
-          body: JSON.stringify(requestPayload)
-        });
+          // Choose whether to force a search tool based on the input
+          const toolChoice = "auto";
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
-        }
+          // Store the request payload for logging
+          node.lastRequestPayload = {
+            model: config.model || 'gpt-4o',
+            messages,
+            tools,
+            tool_choice: toolChoice
+          };
 
-        const data = await response.json();
+          // Create the request payload
+          const requestPayload = {
+            model: config.model || 'gpt-4o',
+            messages,
+            tools: tools,
+            tool_choice: toolChoice
+          };
 
-        // Store the response payload for logging
-        node.lastResponsePayload = data;
+          // Log the full request payload for debugging
+          AgentLogger.addLog(node, `Sending request with ${messages.length} messages and ${tools.length} tools`, 'info');
+          console.debug('OpenAI request payload:', requestPayload);
 
-        // API logs are now automatically captured by the ApiService.logApiCall method
-        // No need to manually log them here
+          // Log the first few tools for debugging
+          if (tools.length > 0) {
+            const toolNames = tools.map(t => t.function.name).slice(0, 5);
+            AgentLogger.addLog(node, `Tools available: ${toolNames.join(', ')}${tools.length > 5 ? ` and ${tools.length - 5} more...` : ''}`, 'info');
+          }
 
-        // Process the response
-        const message = data.choices[0].message;
+          // Store the request payload for logging
+          node.lastRequestPayload = JSON.parse(JSON.stringify(requestPayload));
 
-        // Check if the model wants to call a function
-        if (message.tool_calls && message.tool_calls.length > 0) {
-          AgentLogger.addLog(node, `Model requested ${message.tool_calls.length} tool calls`, 'info');
+          // Make the API request
+          const response = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-openai-api-key': config.apiKey
+            },
+            body: JSON.stringify(requestPayload)
+          });
 
-          // Process each tool call
-          const results = [];
-          for (const toolCall of message.tool_calls) {
-            const functionName = toolCall.function.name;
-            const functionArgs = JSON.parse(toolCall.function.arguments);
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+          }
 
-            AgentLogger.addLog(node, `Executing tool: ${functionName}`, 'info');
+          const data = await response.json();
 
-            try {
-              // Execute the tool
-              const toolResult = await AgentTools.executeTool(functionName, functionArgs, node);
+          // Store the response payload for logging
+          node.lastResponsePayload = data;
 
-              // Add the result to the results array
-              results.push({
-                tool: functionName,
-                result: toolResult
+          // Process the response
+          const message = data.choices[0].message;
+
+          // Check if the model wants to call a function (supports both old and new format)
+          if (message.tool_calls || message.function_call) {
+            // Handle new tool_calls format
+            if (message.tool_calls && message.tool_calls.length > 0) {
+              AgentLogger.addLog(node, `Model requested ${message.tool_calls.length} tool call(s)`, 'info');
+              
+              // Process all tool calls
+              const allResults = [];
+              for (const toolCall of message.tool_calls) {
+                const functionName = toolCall.function.name;
+                const functionArgs = JSON.parse(toolCall.function.arguments || '{}');
+                
+                AgentLogger.addLog(node, `Executing tool: ${functionName}`, 'info');
+                
+                try {
+                  // Execute the tool
+                  const toolResult = await AgentTools.executeTool(functionName, functionArgs, node);
+                  
+                  allResults.push({
+                    tool: functionName,
+                    result: toolResult
+                  });
+                  
+                  // Add to memory
+                  AgentMemory.addToHistory(node, {
+                    tool: functionName,
+                    params: functionArgs
+                  }, toolResult);
+                  
+                  AgentLogger.addLog(node, `Tool ${functionName} executed successfully`, 'success');
+                } catch (error) {
+                  AgentLogger.addLog(node, `Error executing tool ${functionName}: ${error.message}`, 'error');
+                  
+                  allResults.push({
+                    tool: functionName,
+                    error: error.message
+                  });
+                  
+                  // Add to memory
+                  AgentMemory.addToHistory(node, {
+                    tool: functionName,
+                    params: functionArgs
+                  }, `Error: ${error.message}`);
+                }
+              }
+              
+              // Create a summary of all results
+              const resultsSummary = allResults.map(r => {
+                return `Tool: ${r.tool}\nResult: ${r.result ? (typeof r.result === 'string' ? r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '') : JSON.stringify(r.result)) : r.error ? `Error: ${r.error}` : 'No result'}`;
+              }).join('\n\n');
+              
+              // Add the original message and tool results to messages
+              messages.push(message);
+              messages.push({
+                role: 'user',
+                content: `Here are the results of the tool calls:\n\n${resultsSummary}\n\nPlease provide the next step or final response.`
               });
+              
+              // Continue or finish based on iteration count
+              if (node.currentIteration >= (node.maxIterations || 5)) {
+                continueIteration = false;
+                finalOutput = resultsSummary;
+                AgentLogger.addLog(node, 'Max iterations reached, stopping', 'info');
+              } else {
+                finalOutput = resultsSummary;
+                AgentLogger.addLog(node, 'Continuing to next iteration after tool calls', 'info');
+              }
+            } else if (message.function_call) {
+              // Handle old function_call format (legacy)
+              AgentLogger.addLog(node, `Model requested function call (legacy format): ${message.function_call.name}`, 'info');
+
+              const functionName = message.function_call.name;
+              const functionArgs = JSON.parse(message.function_call.arguments || '{}');
+
+              try {
+                // Execute the tool
+                const toolResult = await AgentTools.executeTool(functionName, functionArgs, node);
+
+                // Add the result to the results array
+                const results = [{
+                  tool: functionName,
+                result: toolResult
+              }];
 
               // Add to memory
               AgentMemory.addToHistory(node, {
@@ -1075,121 +995,136 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
               }, toolResult);
 
               AgentLogger.addLog(node, `Tool ${functionName} executed successfully`, 'success');
+
+              // Create a summary of the results
+              const resultsSummary = results.map(r => {
+                return `Tool: ${r.tool}\nResult: ${r.result ? (typeof r.result === 'string' ? r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '') : JSON.stringify(r.result)) : r.error ? `Error: ${r.error}` : 'No result'}`;
+              }).join('\n\n');
+
+              // Add the original message and tool results to messages
+              messages.push(message);
+              messages.push({
+                role: 'user',
+                content: `Here are the results of the tool call:\n\n${resultsSummary}\n\nPlease provide the next step or final response.`
+              });
+
+              // Decide whether to continue iterating or finish
+              // Simple heuristic: stop if final response or max iterations reached
+              if (node.currentIteration >= (node.maxIterations || 5)) {
+                continueIteration = false;
+                finalOutput = resultsSummary;
+                AgentLogger.addLog(node, 'Max iterations reached, stopping', 'info');
+              } else {
+                // Check if the message content indicates completion
+                const lowerContent = message.content.toLowerCase();
+                if (lowerContent.includes('final response') || lowerContent.includes('done') || lowerContent.includes('complete')) {
+                  continueIteration = false;
+                  finalOutput = message.content;
+                  AgentLogger.addLog(node, 'Model indicated completion, stopping', 'info');
+                } else {
+                  // Continue iterating with updated context
+                  finalOutput = message.content;
+                  AgentLogger.addLog(node, 'Continuing to next iteration', 'info');
+                }
+              }
             } catch (error) {
               AgentLogger.addLog(node, `Error executing tool ${functionName}: ${error.message}`, 'error');
 
               // Add the error to the results array
-              results.push({
+              const results = [{
                 tool: functionName,
                 error: error.message
-              });
+              }];
 
               // Add to memory
               AgentMemory.addToHistory(node, {
                 tool: functionName,
                 params: functionArgs
               }, `Error: ${error.message}`);
+
+              finalOutput = `Error executing tool ${functionName}: ${error.message}`;
+              continueIteration = false;
+              }
+            }
+          } else {
+            // No function calls, just return the message content
+            AgentLogger.addLog(node, 'No function calls requested, returning message content', 'info');
+
+            // Add the response to memory
+            AgentMemory.addToContext(node, message.content);
+
+            finalOutput = message.content;
+            continueIteration = false;
+          }
+        } else {
+          // Fall back to the plan-based approach with iterative execution
+          AgentLogger.addLog(node, 'Model does not support function calling, using iterative plan-based approach', 'info');
+
+          // Generate a plan with all available tools (including MCP tools)
+          AgentLogger.addLog(node, 'Generating plan', 'info');
+          const plan = await AgentPlanner.generatePlan(node, finalOutput || input);
+
+          // Log the plan
+          if (plan && plan.steps) {
+            AgentLogger.addLog(node, `Plan generated with ${plan.steps.length} steps`, 'success');
+
+            // Log each step in the plan
+            plan.steps.forEach((step, index) => {
+              AgentLogger.addLog(node, `Step ${index + 1}: [${step.toolId}] ${step.description}`, 'info');
+            });
+          } else {
+            AgentLogger.addLog(node, 'Plan generation failed or returned empty plan', 'warning');
+          }
+
+          // Execute the plan
+          AgentLogger.addLog(node, 'Executing plan', 'info');
+          const result = await AgentPlanner.executePlan(node);
+
+          // Add the result to memory
+          AgentMemory.addToContext(node, result);
+
+          // Decide whether to continue iterating or finish
+          if (node.currentIteration >= (node.maxIterations || 5)) {
+            continueIteration = false;
+            finalOutput = result;
+            AgentLogger.addLog(node, 'Max iterations reached, stopping', 'info');
+          } else {
+            // Simple heuristic: stop if result contains completion keywords
+            const lowerResult = result.toLowerCase();
+            if (lowerResult.includes('final response') || lowerResult.includes('done') || lowerResult.includes('complete')) {
+              continueIteration = false;
+              finalOutput = result;
+              AgentLogger.addLog(node, 'Plan execution indicated completion, stopping', 'info');
+            } else {
+              // Continue iterating with updated context
+              finalOutput = result;
+              AgentLogger.addLog(node, 'Continuing to next iteration', 'info');
             }
           }
-
-          // Create a summary of the results
-          const resultsSummary = results.map(r => {
-            return `Tool: ${r.tool}\nResult: ${r.result ? (typeof r.result === 'string' ? r.result.substring(0, 100) + (r.result.length > 100 ? '...' : '') : JSON.stringify(r.result)) : r.error ? `Error: ${r.error}` : 'No result'}`;
-          }).join('\n\n');
-
-          // Add the original message and tool results to messages
-          messages.push(message);
-          messages.push({
-            role: 'user',
-            content: `Here are the results of the tool calls:\n\n${resultsSummary}\n\nPlease provide a final response based on these results.`
-          });
-
-          // Make a final API request to get the final response
-          AgentLogger.addLog(node, 'Sending final request to OpenAI API', 'info');
-
-          // Store the request payload for logging
-          node.lastRequestPayload = {
-            model: config.model || 'gpt-4o',
-            messages
-          };
-
-          console.debug('OpenAI final request payload:', { model: config.model || 'gpt-4o', messages });
-          const finalResponse = await fetch('/api/openai/chat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-openai-api-key': config.apiKey
-            },
-            body: JSON.stringify({
-              model: config.model || 'gpt-4o',
-              messages
-            })
-          });
-
-          if (!finalResponse.ok) {
-            const errorData = await finalResponse.json();
-            throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
-          }
-
-          const finalData = await finalResponse.json();
-
-          // Store the response payload for logging
-          node.lastResponsePayload = finalData;
-
-          // Log the API call
-          AgentLogger.addApiLog(node, node.lastRequestPayload, node.lastResponsePayload);
-
-          // Get the final response
-          const finalMessage = finalData.choices[0].message;
-
-          // Add the final response to memory
-          AgentMemory.addToContext(node, finalMessage.content);
-
-          AgentLogger.addLog(node, 'Function calling completed successfully', 'success');
-
-          return finalMessage.content;
-        } else {
-          // No function calls, just return the message content
-          AgentLogger.addLog(node, 'No function calls requested, returning message content', 'info');
-
-          // Add the response to memory
-          AgentMemory.addToContext(node, message.content);
-
-          // Ensure API payloads are logged
-          if (node.lastRequestPayload || node.lastResponsePayload) {
-            AgentLogger.addApiLog(node, node.lastRequestPayload, node.lastResponsePayload);
-            AgentLogger.addLog(node, `API payloads captured and stored for viewing`, 'info');
-          }
-
-          return message.content;
-        }
-      } else {
-        // Fall back to the plan-based approach
-        AgentLogger.addLog(node, 'Model does not support function calling, using plan-based approach', 'info');
-
-        // Generate a plan with all available tools (including MCP tools)
-        AgentLogger.addLog(node, 'Generating plan', 'info');
-        const plan = await AgentPlanner.generatePlan(node, input);
-
-        // Log the plan
-        if (plan && plan.steps) {
-          AgentLogger.addLog(node, `Plan generated with ${plan.steps.length} steps`, 'success');
-
-          // Log each step in the plan
-          plan.steps.forEach((step, index) => {
-            AgentLogger.addLog(node, `Step ${index + 1}: [${step.toolId}] ${step.description}`, 'info');
-          });
-        } else {
-          AgentLogger.addLog(node, 'Plan generation failed or returned empty plan', 'warning');
         }
 
-        // Execute the plan
-        AgentLogger.addLog(node, 'Executing plan', 'info');
-        const result = await AgentPlanner.executePlan(node);
-
-        AgentLogger.addLog(node, 'Plan execution completed', 'success');
-        return result;
+        // Perform reflection if enabled and at the configured frequency
+        if (node.enableReflection && node.currentIteration % (node.reflectionFrequency || 2) === 0) {
+          AgentLogger.addLog(node, 'Performing reflection', 'info');
+          const reflection = await this.performReflection(node, finalOutput, false);
+          AgentMemory.addToContext(node, `Reflection: ${reflection}`);
+          AgentLogger.addLog(node, 'Reflection added to context', 'info');
+        }
       }
+
+      node.isIterating = false;
+      node.currentIteration = 0;
+
+      // Perform final reflection if enabled
+      if (node.enableReflection) {
+        AgentLogger.addLog(node, 'Performing final reflection', 'info');
+        const finalReflection = await this.performReflection(node, finalOutput, true);
+        AgentMemory.addToContext(node, `Final Reflection: ${finalReflection}`);
+        AgentLogger.addLog(node, 'Final reflection added to context', 'info');
+      }
+
+      AgentLogger.addLog(node, 'Multi-round iterative execution completed', 'success');
+      return finalOutput;
     } catch (error) {
       AgentLogger.addLog(node, `Error in default agent: ${error.message}`, 'error');
       throw error;
@@ -1198,6 +1133,11 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
   // Get tool parameters for function calling
   getToolParameters(tool) {
+    // Check if the tool has its own parameters defined
+    if (tool.parameters && tool.parameters.properties) {
+      return tool.parameters.properties;
+    }
+    
     // Default parameters for all tools
     const defaultParams = {
       text: {
@@ -1314,6 +1254,14 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
             description: "Documentation query"
           }
         };
+      case 'external-api':
+        // For external API tools like browser.search
+        return {
+          query: {
+            type: "string",
+            description: "The search query"
+          }
+        };
       default:
         // For unknown categories, return a generic text parameter
         return {
@@ -1324,6 +1272,11 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
 
   // Get required parameters for a tool
   getToolRequiredParameters(tool) {
+    // Check if the tool has its own required parameters defined
+    if (tool.parameters && tool.parameters.required) {
+      return tool.parameters.required;
+    }
+    
     // Return required parameters based on tool category
     switch (tool.category) {
       case 'text-processing':
@@ -1351,6 +1304,8 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
           return ['query'];
         }
         return [];
+      case 'external-api':
+        return ['query'];
       default:
         return ['text'];
     }
@@ -1648,6 +1603,52 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
       });
     }
 
+    // Get the enableReasoning checkbox
+    const enableReasoningCheckbox = document.getElementById('enableReasoning');
+    if (enableReasoningCheckbox) {
+      // Remove any existing event listeners by cloning and replacing
+      const newEnableReasoningCheckbox = enableReasoningCheckbox.cloneNode(true);
+      enableReasoningCheckbox.parentNode.replaceChild(newEnableReasoningCheckbox, enableReasoningCheckbox);
+
+      // Add event listener to show/hide reasoning section
+      newEnableReasoningCheckbox.addEventListener('change', (e) => {
+        const reasoningSection = document.getElementById('reasoningSection');
+        if (reasoningSection) {
+          reasoningSection.style.display = e.target.checked ? 'block' : 'none';
+          DebugManager.addLog(`Reasoning section ${e.target.checked ? 'shown' : 'hidden'}`, 'info');
+        }
+      });
+
+      // Initialize the display state based on the checkbox
+      const reasoningSection = document.getElementById('reasoningSection');
+      if (reasoningSection) {
+        reasoningSection.style.display = newEnableReasoningCheckbox.checked ? 'block' : 'none';
+      }
+    }
+
+    // Get the enableReflection checkbox
+    const enableReflectionCheckbox = document.getElementById('enableReflection');
+    if (enableReflectionCheckbox) {
+      // Remove any existing event listeners by cloning and replacing
+      const newEnableReflectionCheckbox = enableReflectionCheckbox.cloneNode(true);
+      enableReflectionCheckbox.parentNode.replaceChild(newEnableReflectionCheckbox, enableReflectionCheckbox);
+
+      // Add event listener to show/hide reflection section
+      newEnableReflectionCheckbox.addEventListener('change', (e) => {
+        const reflectionSection = document.getElementById('reflectionSection');
+        if (reflectionSection) {
+          reflectionSection.style.display = e.target.checked ? 'block' : 'none';
+          DebugManager.addLog(`Reflection section ${e.target.checked ? 'shown' : 'hidden'}`, 'info');
+        }
+      });
+
+      // Initialize the display state based on the checkbox
+      const reflectionSection = document.getElementById('reflectionSection');
+      if (reflectionSection) {
+        reflectionSection.style.display = newEnableReflectionCheckbox.checked ? 'block' : 'none';
+      }
+    }
+
     // Set up save button handler
     const saveButton = document.getElementById('saveAgentNode');
     if (saveButton) {
@@ -1875,8 +1876,20 @@ ${isFinal ? '\nThis is your final reflection. Summarize your overall approach, r
     DebugManager.addLog('Agent node editor initialized successfully', 'success');
   },
 
-  // Open the agent node editor
+  // Open the agent node editor - delegates to the implementation in agent-editor.js
   openAgentNodeEditor(node) {
+    console.log('agent-nodes.js openAgentNodeEditor called, delegating to AgentEditor implementation');
+
+    // Check if AgentEditor is available
+    if (window.AgentEditor && typeof AgentEditor.openAgentNodeEditor === 'function') {
+      // Delegate to the AgentEditor implementation
+      return AgentEditor.openAgentNodeEditor(node);
+    }
+
+    // Fallback implementation if AgentEditor is not available
+    console.warn('AgentEditor not available, using fallback implementation');
+    DebugManager.addLog('AgentEditor not available, using fallback implementation', 'warning');
+
     // Set the editing node
     this.editingNode = node;
 
@@ -2674,9 +2687,10 @@ AgentNodes.createPayloadsModal = function() {
   });
 
   DebugManager.addLog(`Viewing API payloads for agent node ${this.editingNode.id}`, 'info');
-};
 
-  const responsePayloadContent = document.getElementById('responsePayloadContent');
+  // These variables are already declared above
+  // const requestPayloadContent = document.getElementById('requestPayloadContent');
+  // const responsePayloadContent = document.getElementById('responsePayloadContent');
   const apiLogCounter = document.getElementById('apiLogCounter');
   const prevApiLogBtn = document.getElementById('prevApiLog');
   const nextApiLogBtn = document.getElementById('nextApiLog');
@@ -2770,10 +2784,10 @@ AgentNodes.createPayloadsModal = function() {
       responsePayloadContent.textContent = "No API logs available. Process the agent node to generate real API logs.";
     }
   }
-},
+};
 
 // Main method to update the payloads display
-updatePayloadsDisplay: function() {
+AgentNodes.updatePayloadsDisplay = function() {
   // Check if we have an editing node
   if (!this.editingNode) {
     console.warn('No editing node available for updatePayloadsDisplay');
@@ -3514,31 +3528,98 @@ updateToolsList: function() {
 // Extend the App object to handle agent node editing
 document.addEventListener('DOMContentLoaded', function() {
   if (window.App) {
+    console.log('Extending App.openNodeEditor to handle agent nodes');
+
     // Store the original openNodeEditor method
     const originalOpenNodeEditor = App.openNodeEditor;
 
     // Override the openNodeEditor method to use our custom editor for agent nodes
     App.openNodeEditor = function(node) {
+      console.log(`App.openNodeEditor called for node ${node.id}, type: ${node.nodeType || node._nodeType || 'unknown'}`);
+
       // Check if this is an agent node in multiple ways
       const isAgentNode = node && (
         node.nodeType === 'agent' ||
         node._nodeType === 'agent' ||
-        node.isAgentNode === true
+        node.isAgentNode === true ||
+        (node.title && node.title.toLowerCase().includes('agent'))
       );
 
       if (isAgentNode) {
+        console.log(`Node ${node.id} is an agent node, using agent node editor`);
+        DebugManager.addLog(`Node ${node.id} is an agent node, using agent node editor`, 'info');
+
+        // Ensure the node has the agent type set
+        node.nodeType = 'agent';
+        node._nodeType = 'agent';
+        if (!node.isAgentNode) {
+          Object.defineProperty(node, 'isAgentNode', {
+            value: true,
+            writable: false,
+            enumerable: true,
+            configurable: false
+          });
+        }
+
         // Check if we should use the agent node editor modal or style the regular node editor
-        const useAgentNodeEditorModal = document.getElementById('agentNodeEditor') !== null;
+        const agentNodeEditor = document.getElementById('agentNodeEditor');
+        const useAgentNodeEditorModal = agentNodeEditor !== null;
 
         if (useAgentNodeEditorModal) {
-          // Use our custom agent node editor
-          AgentNodes.openAgentNodeEditor(node);
+          console.log('Agent node editor modal found, using it');
+
+          // Check if AgentEditor is available first (preferred implementation)
+          if (window.AgentEditor && typeof AgentEditor.openAgentNodeEditor === 'function') {
+            console.log('Using AgentEditor.openAgentNodeEditor');
+            try {
+              AgentEditor.openAgentNodeEditor(node);
+              return; // Important: return here to prevent calling the original method
+            } catch (error) {
+              console.error('Error opening agent node editor:', error);
+              DebugManager.addLog(`Error opening agent node editor: ${error.message}`, 'error');
+              // Continue to fallback methods
+            }
+          }
+
+          // Fallback to AgentNodes implementation
+          console.log('Using AgentNodes.openAgentNodeEditor');
+          try {
+            AgentNodes.openAgentNodeEditor(node);
+            return; // Important: return here to prevent calling the original method
+          } catch (error) {
+            console.error('Error using AgentNodes.openAgentNodeEditor:', error);
+            DebugManager.addLog(`Error using AgentNodes.openAgentNodeEditor: ${error.message}`, 'error');
+            // Continue to fallback methods
+          }
+
+          // If we're here, try to show the modal directly
+          console.log('Trying to show agent node editor modal directly');
+          try {
+            // Show the modal directly
+            agentNodeEditor.style.display = 'block';
+            agentNodeEditor.classList.add('active');
+            agentNodeEditor.setAttribute('style', 'display: block !important; z-index: 1000 !important;');
+
+            // Use ModalManager if available
+            if (window.ModalManager && typeof ModalManager.openModal === 'function') {
+              ModalManager.openModal('agentNodeEditor');
+            }
+
+            return; // Important: return here to prevent calling the original method
+          } catch (error) {
+            console.error('Error showing agent node editor modal directly:', error);
+            DebugManager.addLog(`Error showing agent node editor modal directly: ${error.message}`, 'error');
+            // Fall through to styling the regular node editor
+          }
         } else {
+          console.log('Agent node editor modal not found, styling regular node editor');
+
           // Apply agent styling to the regular node editor
           const nodeEditor = document.getElementById('nodeEditor');
           if (nodeEditor) {
             // Add agent-node-editor class to the node editor
             nodeEditor.classList.add('agent-node-editor');
+            console.log('Added agent-node-editor class to regular node editor');
 
             // Store the original saveNodeEditor method
             const originalSaveNodeEditor = App.saveNodeEditor;
@@ -3550,6 +3631,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
               // Remove the agent-node-editor class
               nodeEditor.classList.remove('agent-node-editor');
+              console.log('Removed agent-node-editor class from regular node editor');
 
               // Restore the original saveNodeEditor method
               App.saveNodeEditor = originalSaveNodeEditor;
@@ -3568,6 +3650,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Remove the agent-node-editor class
                 nodeEditor.classList.remove('agent-node-editor');
+                console.log('Removed agent-node-editor class from regular node editor (cancel)');
 
                 // Restore the original cancelNodeEditor method
                 App.cancelNodeEditor = originalCancelNodeEditor;
@@ -3580,22 +3663,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const modalTitle = nodeEditor.querySelector('h2');
             if (modalTitle) {
               modalTitle.innerHTML = '🤖 Agent Node Editor';
+              console.log('Updated modal title to Agent Node Editor');
             }
 
             // Call the original method with the styled node editor
             originalOpenNodeEditor.call(App, node);
           } else {
             // Fall back to the original method if node editor not found
+            console.log('Node editor not found, falling back to original method');
             originalOpenNodeEditor.call(App, node);
           }
         }
       } else {
         // Call the original method for regular nodes
+        console.log(`Node ${node.id} is not an agent node, using regular node editor`);
         originalOpenNodeEditor.call(App, node);
       }
     };
 
     // Initialize the agent node editor
+    console.log('Initializing agent node editor');
     AgentNodes.initAgentNodeEditor();
   }
 });

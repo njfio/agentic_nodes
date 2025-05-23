@@ -274,7 +274,11 @@ const server = startServer();
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
   // Close server & exit process
-  server.close(() => process.exit(1));
+  if (server && typeof server.close === 'function') {
+    server.close(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });
 
 module.exports = server; // Export for testing

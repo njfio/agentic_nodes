@@ -24,7 +24,7 @@ const AgentTools = {
       name: 'Summarize Text',
       description: 'Summarize the input text to a shorter version',
       category: 'text-processing',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { text, maxLength } = params;
         if (!text) {
           throw new Error('No text provided for summarization');
@@ -75,7 +75,7 @@ const AgentTools = {
       name: 'Extract Entities',
       description: 'Extract named entities (people, places, organizations, etc.) from text',
       category: 'text-processing',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { text } = params;
         if (!text) {
           throw new Error('No text provided for entity extraction');
@@ -126,7 +126,7 @@ const AgentTools = {
       name: 'Analyze Image',
       description: 'Analyze and describe the content of an image',
       category: 'image-processing',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { imageUrl } = params;
         if (!imageUrl) {
           throw new Error('No image URL provided for analysis');
@@ -183,7 +183,7 @@ const AgentTools = {
       name: 'Parse JSON',
       description: 'Parse a JSON string into a structured object',
       category: 'data-manipulation',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { jsonString } = params;
         if (!jsonString) {
           throw new Error('No JSON string provided for parsing');
@@ -203,7 +203,7 @@ const AgentTools = {
       name: 'Get Node Content',
       description: 'Get the content of another node in the workflow',
       category: 'workflow',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { nodeId } = params;
         if (!nodeId) {
           throw new Error('No node ID provided');
@@ -224,7 +224,7 @@ const AgentTools = {
       name: 'Search with Perplexity',
       description: 'Perform a general search query to get comprehensive information on any topic',
       category: 'mcp-search',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { query, detail_level } = params;
         if (!query) {
           throw new Error('No search query provided');
@@ -241,10 +241,15 @@ const AgentTools = {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              tool: 'search_perplexity-server',
+              server: 'github.com.pashpashpash/perplexity-mcp',
+              method: 'search',
               params: {
                 query,
                 detail_level: detail_level || 'normal'
+              },
+              autoApprove: true,
+              env: {
+                PERPLEXITY_API_KEY: localStorage.getItem('perplexity_api_key') || ''
               }
             })
           });
@@ -268,7 +273,7 @@ const AgentTools = {
       name: 'Get Documentation',
       description: 'Get documentation and usage examples for a specific technology, library, or API',
       category: 'mcp-documentation',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { query, context } = params;
         if (!query) {
           throw new Error('No query provided for documentation');
@@ -312,7 +317,7 @@ const AgentTools = {
       name: 'Chat with Perplexity',
       description: 'Maintains ongoing conversations with Perplexity AI. Creates new chats or continues existing ones with full history context.',
       category: 'mcp-search',
-      async execute(params, node) {
+      async execute(params, _node) {
         const { message, chat_id } = params;
         if (!message) {
           throw new Error('No message provided for chat');
@@ -329,10 +334,15 @@ const AgentTools = {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              tool: 'chat_perplexity_perplexity-server',
+              server: 'github.com.pashpashpash/perplexity-mcp',
+              method: 'chat',
               params: {
                 message,
                 chat_id: chat_id || undefined
+              },
+              autoApprove: true,
+              env: {
+                PERPLEXITY_API_KEY: localStorage.getItem('perplexity_api_key') || ''
               }
             })
           });
@@ -344,9 +354,9 @@ const AgentTools = {
 
           const data = await response.json();
 
-          // Store the chat ID for future use
-          if (node && data.chat_id) {
-            node.chatId = data.chat_id;
+          // Store the chat ID for future use if node parameter provided
+          if (_node && data.chat_id) {
+            _node.chatId = data.chat_id;
           }
 
           return data.result;
@@ -359,30 +369,86 @@ const AgentTools = {
     // OpenAI Browser Search tool
     {
       id: 'browser.search',
-      name: 'OpenAI Browser Search',
-      description: "Use OpenAI's built-in browser tool to search the web",
-      category: 'openai',
-      async execute(params) {
+      name: 'Web Search',
+      description: 'Search the web for current information',
+      category: 'external-api',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query'
+          }
+        },
+        required: ['query']
+      },
+      async execute(params, node) {
         const { query } = params;
         if (!query) {
           throw new Error('No search query provided');
         }
-        const response = await fetch('/api/openai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [{ role: 'user', content: query }],
-            tools: [{ type: 'function', function: { name: 'browser.search', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } } }],
-            tool_choice: { type: 'function', function: { name: 'browser.search' } }
-          })
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`OpenAI search failed: ${errorData.error?.message || response.statusText}`);
+        
+        try {
+          console.log(`Executing web search for: ${query}`);
+          
+          // First, try to use MCP Perplexity search if available
+          if (window.MCPTools && window.MCPTools.executeTool) {
+            try {
+              console.log('Attempting to use MCP Perplexity search...');
+              const perplexityResult = await window.MCPTools.executeTool('mcp-perplexity-search', { query }, node);
+              if (perplexityResult) {
+                console.log('Successfully used MCP Perplexity search');
+                return perplexityResult;
+              }
+            } catch (mcpError) {
+              console.warn('MCP Perplexity search failed:', mcpError);
+              // Fall through to other methods
+            }
+          }
+          
+          // If MCP search is not available, use the OpenAI web search function
+          const config = window.ApiService?.openai?.getConfig?.() || {};
+          if (!config.apiKey) {
+            throw new Error('No API key available for web search');
+          }
+          
+          console.log('Using OpenAI function calling for web search...');
+          const response = await fetch('/api/openai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-openai-api-key': config.apiKey
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a helpful assistant that searches the web for information. Provide detailed, factual information based on current events and data.'
+                },
+                {
+                  role: 'user',
+                  content: `Search for current information about: ${query}`
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 2000
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Web search API failed: ${errorData.error?.message || response.statusText}`);
+          }
+          
+          const data = await response.json();
+          const result = data.choices?.[0]?.message?.content || 'No results found';
+          
+          return result;
+        } catch (error) {
+          console.error('Web search error:', error);
+          throw new Error(`Web search failed: ${error.message}`);
         }
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
       }
     },
     // OpenAI Computer tool

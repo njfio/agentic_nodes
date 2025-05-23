@@ -1,7 +1,7 @@
 /**
  * Workflow versioning service for managing workflow versions and history
  */
-const mongoose = require('mongoose');
+// const mongoose = require('mongoose');
 const Workflow = require('../models/Workflow');
 const { logger } = require('./loggingService');
 const { v4: uuidv4 } = require('uuid');

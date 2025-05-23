@@ -91,6 +91,15 @@ maxTokensInput.value = openAIConfig.maxTokens;
 
 // Show configuration modal
 configBtn.addEventListener('click', () => {
+  // Load Perplexity API key if saved
+  const perplexityApiKeyInput = document.getElementById('perplexityApiKey');
+  if (perplexityApiKeyInput) {
+    const savedPerplexityKey = localStorage.getItem('perplexity_api_key');
+    if (savedPerplexityKey) {
+      perplexityApiKeyInput.value = savedPerplexityKey;
+    }
+  }
+  
   configModal.style.display = 'block';
 });
 
@@ -104,6 +113,13 @@ saveConfigBtn.addEventListener('click', () => {
   };
   
   localStorage.setItem('openAIConfig', JSON.stringify(openAIConfig));
+  
+  // Also save Perplexity API key
+  const perplexityApiKeyInput = document.getElementById('perplexityApiKey');
+  if (perplexityApiKeyInput && perplexityApiKeyInput.value) {
+    localStorage.setItem('perplexity_api_key', perplexityApiKeyInput.value);
+  }
+  
   configModal.style.display = 'none';
   showStatus('Configuration saved successfully');
 });

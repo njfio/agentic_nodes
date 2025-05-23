@@ -122,6 +122,20 @@ class OpenAIService {
     const timeout = this.getTimeout(headers, 300000);
     logger.debug(`Using timeout of ${timeout}ms for OpenAI chat request`);
 
+    // Convert old format to new format if needed
+    if (payload.functions && !payload.tools) {
+      logger.info('Converting legacy functions format to tools format');
+      payload.tools = payload.functions;
+      delete payload.functions;
+    }
+
+    // Convert old function_call to tool_choice
+    if (payload.function_call && !payload.tool_choice) {
+      logger.info('Converting legacy function_call to tool_choice');
+      payload.tool_choice = payload.function_call;
+      delete payload.function_call;
+    }
+
     if (payload.tools && payload.tools.length > 0) {
       payload = this.validateTools(payload);
     }

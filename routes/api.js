@@ -145,40 +145,21 @@ router.post('/openai/chat', async (req, res) => {
     }
 
     // Log the request payload for debugging
-    if (req.body.tools && req.body.tools.length > 0) {
-      console.log(`[API] Request includes ${req.body.tools.length} tools`);
-      console.log(`[API] Tool names: ${req.body.tools.map(t => t.function?.name).filter(Boolean).join(', ')}`);
-
-      // Validate the tools format
-      const validTools = req.body.tools.filter(tool => {
-        if (!tool.type || tool.type !== 'function') {
-          console.log(`[API] Invalid tool type: ${tool.type}`);
-          return false;
-        }
-        if (!tool.function || !tool.function.name) {
-          console.log('[API] Tool missing function name');
-          return false;
-        }
-        if (!tool.function.parameters) {
-          console.log(`[API] Tool ${tool.function.name} missing parameters`);
-          return false;
-        }
-        return true;
-      });
-
-      // If some tools were invalid, replace with valid ones
-      if (validTools.length !== req.body.tools.length) {
-        console.log(`[API] Filtered out ${req.body.tools.length - validTools.length} invalid tools`);
-        req.body.tools = validTools;
-      }
-
-      // If tool_choice is not set, set it to auto
-      if (!req.body.tool_choice) {
+    // Support OpenAI function-calling via 'functions' parameter (legacy format)
+    if (Array.isArray(req.body.functions) && req.body.functions.length > 0) {
+      console.log(`[API] Converting legacy 'functions' format to 'tools' format (${req.body.functions.length} functions)`);
+      // Convert functions to tools format
+      req.body.tools = req.body.functions;
+      delete req.body.functions;
+      
+      // Convert function_call to tool_choice
+      if (req.body.function_call) {
+        req.body.tool_choice = req.body.function_call;
+        delete req.body.function_call;
+      } else {
         console.log('[API] Setting tool_choice to auto');
         req.body.tool_choice = 'auto';
       }
-    } else {
-      console.log('[API] Request does not include any tools');
     }
 
     // Check if OpenAI API key is set
@@ -356,5 +337,9 @@ router.delete('/images/:id', optionalAuth, imageController.deleteImage);
 
 // MCP routes
 router.use('/mcp', mcpRoutes);
+
+// MCP proxy routes
+const mcpProxyRoutes = require('../server/api/mcp-proxy');
+router.use('/mcp-proxy', mcpProxyRoutes);
 
 module.exports = router;

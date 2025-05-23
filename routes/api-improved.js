@@ -22,7 +22,7 @@ const dataMigration = require('../utils/data-migration');
 // Import middleware
 const { auth, optionalAuth } = require('../middleware/auth');
 const { authRateLimiter, apiRateLimiter } = require('../middleware/security/rateLimiter');
-const { validateRequest } = require('../middleware/security/validator');
+// const { validateRequest } = require('../middleware/security/validator');
 const { requestIdMiddleware } = require('../services/loggingService');
 
 // Apply request ID middleware to all routes

@@ -23,6 +23,16 @@
         return;
       }
 
+      // Ensure App and AgentProcessor are available before proceeding
+      if (!window.App) {
+        console.log('AgentIntegration.init: App not available, deferring initialization');
+        return; // Defer initialization until App is available
+      }
+      if (!window.AgentProcessor || typeof AgentProcessor.createAgentNode !== 'function') {
+        console.log('AgentIntegration.init: AgentProcessor not available, deferring initialization');
+        return; // Defer initialization until AgentProcessor is available
+      }
+
       console.log('Initializing AgentIntegration');
 
       // Register node types with the application
@@ -182,68 +192,9 @@
   // Export the AgentIntegration object to the global scope
   window.AgentIntegration = AgentIntegration;
 
-  // Initialize when the document is ready
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing AgentIntegration');
+  // Listen for AgentProcessor readiness to initialize integration
+  document.addEventListener('agent-processor-ready', function() {
+    console.log('AgentIntegration: agent-processor-ready event received, initializing');
     AgentIntegration.init();
   });
-
-  // Listen for app initialization complete event
-  document.addEventListener('app-initialization-complete', function() {
-    console.log('App initialization complete event received by AgentIntegration');
-
-    // Initialize again after app initialization
-    if (!AgentIntegration.initialized) {
-      console.log('Initializing AgentIntegration after app initialization');
-      AgentIntegration.init();
-    } else {
-      // Even if already initialized, register node types again
-      // This ensures that the App object is available
-      console.log('AgentIntegration already initialized, registering node types again');
-      AgentIntegration.registerNodeTypes();
-    }
-  });
-
-  // Listen for app-available event
-  document.addEventListener('app-available', function() {
-    console.log('app-available event received by AgentIntegration');
-
-    // Check if App is now available
-    if (window.App && typeof window.App === 'object') {
-      console.log('App object is now available in AgentIntegration');
-
-      // Initialize or register node types
-      if (!AgentIntegration.initialized) {
-        console.log('Initializing AgentIntegration after App became available');
-        AgentIntegration.init();
-      } else {
-        console.log('AgentIntegration already initialized, registering node types after App became available');
-        AgentIntegration.registerNodeTypes();
-      }
-    }
-  });
-
-  // Set up a retry mechanism to wait for the App object
-  let retryCount = 0;
-  const maxRetries = 10;
-  const retryInterval = 300; // ms
-
-  const checkApp = () => {
-    if (window.App && typeof window.App === 'object') {
-      console.log('App object found, initializing AgentIntegration');
-      AgentIntegration.init();
-    } else if (retryCount < maxRetries) {
-      retryCount++;
-      console.log(`Retry ${retryCount}/${maxRetries} waiting for App object in AgentIntegration`);
-      setTimeout(checkApp, retryInterval);
-    } else {
-      console.error('Failed to find App object after multiple retries in AgentIntegration');
-
-      // Even after retries, we'll wait for the app-available event
-      console.log('Waiting for app-available event as a last resort');
-    }
-  };
-
-  // Start the retry process
-  setTimeout(checkApp, retryInterval);
 })();

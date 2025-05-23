@@ -7,7 +7,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+// const { spawn } = require('child_process');
 const axios = require('axios');
 
 // Get MCP configuration
@@ -16,39 +16,11 @@ router.get('/config', async (req, res) => {
     // Check if we're running in Docker
     const isDocker = process.env.DOCKER_ENV === 'true' || process.env.NODE_ENV === 'production';
 
-    // If we're in Docker, always return the default configuration
+    // If we're in Docker, return empty MCP configuration
     if (isDocker) {
-      console.log('Running in Docker environment, using default MCP configuration');
+      console.log('Running in Docker environment, MCP servers not available');
       return res.json({
-        mcpServers: {
-          "github.com/modelcontextprotocol/servers/tree/main/src/memory": {
-            "autoApprove": [
-              "create_entities",
-              "create_relations",
-              "add_observations",
-              "delete_entities",
-              "delete_observations",
-              "delete_relations",
-              "read_graph",
-              "search_nodes",
-              "open_nodes"
-            ],
-            "disabled": false
-          },
-          "github.com/upstash/context7-mcp": {
-            "autoApprove": [],
-            "disabled": false
-          },
-          "github.com.pashpashpash/perplexity-mcp": {
-            "autoApprove": [
-              "search",
-              "get_documentation",
-              "find_apis",
-              "check_deprecated_code"
-            ],
-            "disabled": false
-          }
-        }
+        mcpServers: {}
       });
     }
 
@@ -225,12 +197,19 @@ router.post('/execute', async (req, res) => {
     }
 
     // Get the server configuration
-    const serverConfig = mcpConfig.mcpServers[server];
+    const serverConfig = {...mcpConfig.mcpServers[server]};
 
     // Add environment variables if provided
     if (env) {
-      serverConfig.env = env;
+      serverConfig.env = {...(serverConfig.env || {}), ...env};
     }
+    
+    console.log(`Executing MCP tool with config:`, {
+      server,
+      method,
+      hasEnv: !!serverConfig.env,
+      hasApiKey: !!(serverConfig.env?.PERPLEXITY_API_KEY)
+    });
 
     // Execute the MCP tool
     const result = await executeMCPTool(server, method, params, serverConfig);
@@ -239,7 +218,13 @@ router.post('/execute', async (req, res) => {
     return res.json({ result });
   } catch (error) {
     console.error('Error executing MCP tool:', error);
-    res.status(500).json({ error: 'Failed to execute MCP tool' });
+    console.error('Full error details:', error.message, error.stack);
+    res.status(500).json({ 
+      error: 'Failed to execute MCP tool',
+      details: error.message,
+      server: req.body.server,
+      method: req.body.method
+    });
   }
 });
 
@@ -269,77 +254,8 @@ async function executeMCPTool(server, method, params, serverConfig) {
       return await executeMemoryTool(method, params, serverConfig);
     }
 
-    // For other servers, use a mock implementation
-    console.log(`Using mock implementation for server ${server}`);
-
-    // Mock data based on the server and method
-    if (server.includes('memory')) {
-      if (method === 'create_entities') {
-        return {
-          success: true,
-          entities: params.entities || []
-        };
-      } else if (method === 'read_graph') {
-        return {
-          entities: [
-            { id: '1', type: 'person', name: 'John Doe' },
-            { id: '2', type: 'person', name: 'Jane Smith' }
-          ],
-          relations: [
-            { id: '1', type: 'friend', source: '1', target: '2' }
-          ]
-        };
-      } else if (method === 'search_nodes') {
-        return {
-          nodes: [
-            { id: '1', type: 'person', name: 'John Doe' }
-          ]
-        };
-      }
-    } else if (server.includes('perplexity')) {
-      if (method === 'search') {
-        return {
-          query: params.query,
-          results: [
-            {
-              title: 'Example Search Result 1',
-              url: 'https://example.com/1',
-              snippet: 'This is an example search result snippet.'
-            },
-            {
-              title: 'Example Search Result 2',
-              url: 'https://example.com/2',
-              snippet: 'This is another example search result snippet.'
-            }
-          ]
-        };
-      } else if (method === 'get_documentation') {
-        return {
-          query: params.query,
-          documentation: `# ${params.query} Documentation\n\nThis is example documentation for ${params.query}.`
-        };
-      }
-    } else if (server.includes('context7')) {
-      if (method === 'resolve-library-id') {
-        return {
-          libraryName: params.libraryName,
-          libraryId: `${params.libraryName.toLowerCase().replace(/[^a-z0-9]/g, '-')}/docs`
-        };
-      } else if (method === 'get-library-docs') {
-        return {
-          libraryId: params.context7CompatibleLibraryID,
-          documentation: `# ${params.context7CompatibleLibraryID} Documentation\n\nThis is example documentation for ${params.context7CompatibleLibraryID}.`
-        };
-      }
-    }
-
-    // Default response for unknown server/method
-    return {
-      server,
-      method,
-      params,
-      message: 'This is a mock response. In a real implementation, this would be the result from the MCP server.'
-    };
+    // No mock implementations - throw error for unconfigured servers
+    throw new Error(`MCP server ${server} not configured or method ${method} not available in Docker environment`);
   } catch (error) {
     console.error(`Error executing MCP tool: ${error.message}`);
     throw error;
@@ -350,16 +266,70 @@ async function executeMCPTool(server, method, params, serverConfig) {
 async function executePerplexityTool(method, params, serverConfig) {
   try {
     console.log(`Executing Perplexity tool: ${method}`);
+    console.log('Server config:', JSON.stringify(serverConfig, null, 2));
 
     // Check if we have the necessary configuration
-    if (!serverConfig.env || !serverConfig.env.PERPLEXITY_API_KEY) {
-      throw new Error('Perplexity API key not configured');
+    let apiKey = serverConfig.env?.PERPLEXITY_API_KEY;
+    
+    // If not in env, check if it's in the server config directly
+    if (!apiKey && serverConfig.PERPLEXITY_API_KEY) {
+      apiKey = serverConfig.PERPLEXITY_API_KEY;
+    }
+    
+    // If still no API key, check environment variables
+    if (!apiKey) {
+      apiKey = process.env.PERPLEXITY_API_KEY;
+    }
+    
+    if (!apiKey) {
+      throw new Error('Perplexity API key not configured. Please set PERPLEXITY_API_KEY in environment or pass it in the request.');
     }
 
-    // Get the API key
-    const apiKey = serverConfig.env.PERPLEXITY_API_KEY;
-
-    // Create the request payload
+    // For the search method, use Perplexity's chat completions API
+    if (method === 'search') {
+      console.log('Using Perplexity chat completions for search...');
+      
+      const searchQuery = params.query || params.q || params.search;
+      if (!searchQuery) {
+        throw new Error('No search query provided');
+      }
+      
+      const payload = {
+        model: 'sonar-pro',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful search assistant. Provide accurate, up-to-date information based on web search results.'
+          },
+          {
+            role: 'user',
+            content: searchQuery
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 2000
+      };
+      
+      console.log('Perplexity search payload:', JSON.stringify(payload));
+      
+      const response = await axios.post('https://api.perplexity.ai/chat/completions', payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+      
+      if (response.data && response.data.choices && response.data.choices[0]) {
+        return {
+          result: response.data.choices[0].message.content,
+          sources: response.data.citations || []
+        };
+      }
+      
+      throw new Error('Invalid response from Perplexity API');
+    }
+    
+    // For other methods, try the standard MCP approach (though it may not work)
     const payload = {
       jsonrpc: '2.0',
       method: 'CallTool',
@@ -370,7 +340,7 @@ async function executePerplexityTool(method, params, serverConfig) {
       id: 1
     };
 
-    console.log('Perplexity payload:', JSON.stringify(payload));
+    console.log('Perplexity MCP payload:', JSON.stringify(payload));
 
     // Make the API request
     const response = await axios.post('https://api.perplexity.ai/mcp', payload, {
@@ -395,7 +365,15 @@ async function executePerplexityTool(method, params, serverConfig) {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
       console.error(`Perplexity API error: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
-      throw new Error(`Perplexity API error: ${error.response.status} - ${error.response.data.error || error.response.statusText}`);
+      
+      // Check for specific error types
+      if (error.response.status === 401) {
+        throw new Error('Perplexity API key is invalid or not authorized');
+      } else if (error.response.status === 429) {
+        throw new Error('Perplexity API rate limit exceeded');
+      } else {
+        throw new Error(`Perplexity API error: ${error.response.status} - ${error.response.data?.error?.message || error.response.statusText}`);
+      }
     } else if (error.request) {
       // The request was made but no response was received
       console.error('No response received from Perplexity API');
@@ -408,64 +386,63 @@ async function executePerplexityTool(method, params, serverConfig) {
 }
 
 // Execute a Context7 MCP tool
-async function executeContext7Tool(method, params, serverConfig) {
-  try {
-    console.log(`Executing Context7 tool: ${method}`);
-
-    // For now, return mock data
-    if (method === 'resolve-library-id') {
-      return {
-        libraryName: params.libraryName,
-        libraryId: `${params.libraryName.toLowerCase().replace(/[^a-z0-9]/g, '-')}/docs`
-      };
-    } else if (method === 'get-library-docs') {
-      return {
-        libraryId: params.context7CompatibleLibraryID,
-        documentation: `# ${params.context7CompatibleLibraryID} Documentation\n\nThis is example documentation for ${params.context7CompatibleLibraryID}.`
-      };
-    }
-
-    throw new Error(`Unknown Context7 method: ${method}`);
-  } catch (error) {
-    console.error(`Error executing Context7 tool: ${error.message}`);
-    throw error;
-  }
+async function executeContext7Tool(method, params, _serverConfig) {
+  // No implementation in Docker - real MCP server required
+  throw new Error(`Context7 MCP server not available in Docker environment. Method ${method} cannot be executed.`);
 }
 
 // Execute a Memory MCP tool
-async function executeMemoryTool(method, params, serverConfig) {
-  try {
-    console.log(`Executing Memory tool: ${method}`);
-
-    // For now, return mock data
-    if (method === 'create_entities') {
-      return {
-        success: true,
-        entities: params.entities || []
-      };
-    } else if (method === 'read_graph') {
-      return {
-        entities: [
-          { id: '1', type: 'person', name: 'John Doe' },
-          { id: '2', type: 'person', name: 'Jane Smith' }
-        ],
-        relations: [
-          { id: '1', type: 'friend', source: '1', target: '2' }
-        ]
-      };
-    } else if (method === 'search_nodes') {
-      return {
-        nodes: [
-          { id: '1', type: 'person', name: 'John Doe' }
-        ]
-      };
-    }
-
-    throw new Error(`Unknown Memory method: ${method}`);
-  } catch (error) {
-    console.error(`Error executing Memory tool: ${error.message}`);
-    throw error;
-  }
+async function executeMemoryTool(method, params, _serverConfig) {
+  // No implementation in Docker - real MCP server required
+  throw new Error(`Memory MCP server not available in Docker environment. Method ${method} cannot be executed.`);
 }
+
+// Execute a tool endpoint
+router.post('/tools/:server/:method', async (req, res) => {
+  try {
+    const { server, method } = req.params;
+    const { params = {} } = req.body;
+    
+    console.log(`Executing MCP tool: ${server}/${method}`);
+    console.log('Parameters:', params);
+    
+    // Get server configuration
+    const serverConfig = await getMCPConfig();
+    
+    // Handle both server-based and direct tool names
+    let actualServer = server;
+    let actualMethod = method;
+    
+    // Check if this is a direct tool name (e.g., web_search, perplexity_search)
+    if (server === 'mcp' || server === 'tool') {
+      // Direct tool call - find which server provides this tool
+      for (const [serverName, serverInfo] of Object.entries(serverConfig.mcpServers)) {
+        if (serverInfo.tools) {
+          const tool = serverInfo.tools.find(t => t.name === method);
+          if (tool) {
+            actualServer = serverName;
+            actualMethod = method;
+            break;
+          }
+        }
+      }
+    }
+    
+    
+    const serverInfo = serverConfig.mcpServers[actualServer];
+    
+    if (!serverInfo || serverInfo.disabled) {
+      return res.status(404).json({ error: 'Server not found or disabled' });
+    }
+    
+    // Execute the tool based on the server
+    const result = await executeMCPTool(actualServer, actualMethod, params, serverConfig);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error executing MCP tool:', error);
+    res.status(500).json({ error: error.message || 'Tool execution failed' });
+  }
+});
 
 module.exports = router;

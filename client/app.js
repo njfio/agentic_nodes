@@ -728,14 +728,20 @@ class Node {
 
   // Process a node asynchronously
   processNodeAsync(node) {
-    // Skip if the node is already processing
-    if (node.processing) {
+    // Check if this is an agent node
+    const isAgentNode = node.nodeType === 'agent' ||
+                         node._nodeType === 'agent' ||
+                         node.isAgentNode === true;
+
+    // For regular nodes: Skip if already processing
+    if (!isAgentNode && node.processing) {
       DebugManager.addLog(`Node ${node.id} is already processing, skipping async processing`, 'info');
       return;
     }
 
-    // Skip if the node has already been processed and we don't support retriggering yet
-    if (node.hasBeenProcessed) {
+    // For regular nodes: Skip if already processed
+    // BUT allow agent nodes to be processed multiple times to support iterations
+    if (!isAgentNode && node.hasBeenProcessed) {
       DebugManager.addLog(`Node ${node.id} has already been processed, skipping async processing (retriggering not supported yet)`, 'info');
       return;
     }
@@ -743,14 +749,16 @@ class Node {
     // Use setTimeout with 0 delay to process in the next event loop iteration
     // This allows multiple nodes to start processing in parallel
     setTimeout(() => {
-      // Skip if the node started processing in the meantime
-      if (node.processing) {
+      // For regular nodes: Skip if already processing
+      // BUT allow agent nodes to continue their iterative processing
+      if (!isAgentNode && node.processing) {
         DebugManager.addLog(`Node ${node.id} started processing since scheduling, skipping async processing`, 'info');
         return;
       }
 
-      // Skip if the node has been processed in the meantime
-      if (node.hasBeenProcessed) {
+      // For regular nodes: Skip if already processed
+      // BUT allow agent nodes to be processed multiple times (for iterations)
+      if (!isAgentNode && node.hasBeenProcessed) {
         DebugManager.addLog(`Node ${node.id} has been processed since scheduling, skipping async processing`, 'info');
         return;
       }
@@ -4767,32 +4775,103 @@ const App = {
       });
       DebugManager.addLog(`Selected node: ${clickedNode.id} (double-click)`, 'info');
 
-      // Check if this is an agent node
+      // Check if this is an agent node in multiple ways
       const isAgentNode = clickedNode.nodeType === 'agent' ||
                          clickedNode._nodeType === 'agent' ||
-                         clickedNode.isAgentNode === true;
+                         clickedNode.isAgentNode === true ||
+                         (clickedNode.title && clickedNode.title.toLowerCase().includes('agent'));
 
-      if (isAgentNode && window.AgentNodes) {
+      console.log(`Node ${clickedNode.id} isAgentNode: ${isAgentNode}`);
+
+      if (isAgentNode) {
+        // Ensure the node has the agent type set
+        clickedNode.nodeType = 'agent';
+        clickedNode._nodeType = 'agent';
+        if (!clickedNode.isAgentNode) {
+          Object.defineProperty(clickedNode, 'isAgentNode', {
+            value: true,
+            writable: false,
+            enumerable: true,
+            configurable: false
+          });
+        }
+
         // Use the agent node editor
         DebugManager.addLog(`Opening agent node editor for node ${clickedNode.id}`, 'info');
+        console.log(`Opening agent node editor for node ${clickedNode.id}`);
 
-        // Check if we have the handleAgentNodeDoubleClick method
-        if (typeof window.AgentNodes.handleAgentNodeDoubleClick === 'function') {
-          window.AgentNodes.handleAgentNodeDoubleClick(clickedNode);
+        // Get the agent node editor modal directly
+        const agentNodeEditor = document.getElementById('agentNodeEditor');
+
+        if (agentNodeEditor) {
+          console.log('Agent node editor modal found, opening it directly');
+
+          // Try using AgentEditor first
+          if (window.AgentEditor && typeof window.AgentEditor.openAgentNodeEditor === 'function') {
+            try {
+              console.log('Using AgentEditor.openAgentNodeEditor');
+              window.AgentEditor.openAgentNodeEditor(clickedNode);
+              return;
+            } catch (error) {
+              console.error('Error using AgentEditor.openAgentNodeEditor:', error);
+            }
+          }
+
+          // Try using AgentNodes as fallback
+          if (window.AgentNodes && typeof window.AgentNodes.openAgentNodeEditor === 'function') {
+            try {
+              console.log('Using AgentNodes.openAgentNodeEditor');
+              window.AgentNodes.openAgentNodeEditor(clickedNode);
+              return;
+            } catch (error) {
+              console.error('Error using AgentNodes.openAgentNodeEditor:', error);
+            }
+          }
+
+          // Direct fallback - open the modal directly
+          try {
+            console.log('Opening agent node editor modal directly');
+
+            // Set the editing node
+            this.editingNode = clickedNode;
+            if (window.AgentNodes) {
+              window.AgentNodes.editingNode = clickedNode;
+            }
+
+            // Set form values
+            const titleInput = document.getElementById('agentNodeTitle');
+            if (titleInput) {
+              titleInput.value = clickedNode.title || '';
+            }
+
+            const systemPromptInput = document.getElementById('agentSystemPrompt');
+            if (systemPromptInput) {
+              systemPromptInput.value = clickedNode.systemPrompt || '';
+            }
+
+            // Show the modal
+            agentNodeEditor.style.display = 'block';
+            agentNodeEditor.classList.add('active');
+
+            // Force the modal to be visible with !important style
+            agentNodeEditor.setAttribute('style', 'display: block !important; z-index: 1000 !important;');
+
+            // Use ModalManager if available
+            if (window.ModalManager && typeof ModalManager.openModal === 'function') {
+              ModalManager.openModal('agentNodeEditor');
+            }
+
+            return;
+          } catch (error) {
+            console.error('Error opening agent node editor modal directly:', error);
+          }
+        } else {
+          console.warn('Agent node editor modal not found, falling back to regular editor');
         }
-        // Fallback to openAgentNodeEditor if available
-        else if (typeof window.AgentNodes.openAgentNodeEditor === 'function') {
-          window.AgentNodes.openAgentNodeEditor(clickedNode);
-        }
-        // Fallback to regular node editor if neither is available
-        else {
-          console.warn(`Agent node editor methods not available for node ${clickedNode.id}, falling back to regular editor`);
-          this.openNodeEditor(clickedNode);
-        }
-      } else {
-        // Use the regular node editor
-        this.openNodeEditor(clickedNode);
       }
+
+      // Fallback to regular node editor
+      this.openNodeEditor(clickedNode);
     }
   },
 
@@ -6400,6 +6479,15 @@ const App = {
   async processNodeAndConnections(node, input, sourceNode = null) {
     if (!node) return;
 
+    // Check if this is an agent node
+    const isAgentNode = node.nodeType === 'agent' ||
+                         node._nodeType === 'agent' ||
+                         node.isAgentNode === true;
+    
+    if (isAgentNode) {
+      DebugManager.addLog(`Agent node "${node.title}" (ID: ${node.id}) detected, using special processing flow`, 'info');
+    }
+
     // If this is a direct node execution (no source node), reset the node's input state
     if (!sourceNode) {
       // Reset the node's input state to clear any previous inputs
@@ -6432,8 +6520,22 @@ const App = {
     const processInput = node.inputSources.size > 0 ? node.combineInputs() : (input || node.inputContent);
 
     try {
-      // Process the current node
-      const output = await node.process(processInput);
+      // For agent nodes, we'll use the agent processor directly to get full iterative execution
+      let output;
+      if (isAgentNode && window.AgentProcessor && typeof window.AgentProcessor.processAgentNode === 'function') {
+        DebugManager.addLog(`Processing agent node "${node.title}" (ID: ${node.id}) with AgentProcessor`, 'info');
+        output = await window.AgentProcessor.processAgentNode(node, processInput);
+        
+        // For agent nodes, we don't mark as processed here, as they might need to process again
+        // Just mark that this round of processing is complete
+        node.processing = false;
+        
+        // Log completion
+        DebugManager.addLog(`Agent node "${node.title}" (ID: ${node.id}) completed processing through AgentProcessor`, 'success');
+      } else {
+        // Process regular nodes normally
+        output = await node.process(processInput);
+      }
 
       // Store the output in the node's content using our updateNodeContent method
       if (output) {
@@ -6901,8 +7003,9 @@ const App = {
     document.head.appendChild(style);
     document.body.appendChild(loadingIndicator);
 
-    // Start loading workflow images if this is a server workflow
-    if (state._id) {
+    try {
+      // Start loading workflow images if this is a server workflow
+      if (state._id) {
       try {
         DebugManager.addLog('Loading workflow images...', 'info');
 
@@ -7098,19 +7201,24 @@ const App = {
     // Redraw the canvas
     this.draw();
 
-    // Remove the loading indicator
-    const loadingElement = document.getElementById('workflow-loading-indicator');
-    if (loadingElement) {
-      // Fade out the loading indicator
-      loadingElement.style.transition = 'opacity 0.5s';
-      loadingElement.style.opacity = '0';
+    } catch (error) {
+      console.error('Error loading workflow state:', error);
+      DebugManager.addLog(`Error loading workflow state: ${error.message}`, 'error');
+    } finally {
+      // Remove the loading indicator
+      const loadingElement = document.getElementById('workflow-loading-indicator');
+      if (loadingElement) {
+        // Fade out the loading indicator
+        loadingElement.style.transition = 'opacity 0.5s';
+        loadingElement.style.opacity = '0';
 
-      // Remove after animation completes
-      setTimeout(() => {
-        if (loadingElement.parentNode) {
-          loadingElement.parentNode.removeChild(loadingElement);
-        }
-      }, 500);
+        // Remove after animation completes
+        setTimeout(() => {
+          if (loadingElement.parentNode) {
+            loadingElement.parentNode.removeChild(loadingElement);
+          }
+        }, 500);
+      }
     }
 
     // Force another redraw after a longer delay to ensure images are properly loaded

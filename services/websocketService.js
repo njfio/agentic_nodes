@@ -24,7 +24,7 @@ class WebSocketService {
     this.wss = new WebSocket.Server({ 
       server,
       // Custom headers verification if needed
-      verifyClient: (info) => {
+      verifyClient: (_info) => {
         // Can verify auth tokens, origin, etc.
         return true; // Allow all connections by default
       }
@@ -443,7 +443,7 @@ class WebSocketService {
     for (const client of this.clients.values()) {
       try {
         client.ws.terminate();
-      } catch (error) {
+      } catch {
         // Ignore errors during shutdown
       }
     }

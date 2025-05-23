@@ -106,6 +106,25 @@
           
           if (nodeType === 'agent') {
             console.log('Creating agent node');
+            // Check if AgentProcessor is available
+            if (!window.AgentProcessor) {
+              console.error('AgentProcessor not available');
+              if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                DebugManager.addLog('AgentProcessor not available when trying to create agent node', 'error');
+              }
+              // Fallback to creating a basic node
+              const node = originalAddNode.call(App, 'text');
+              if (node) {
+                node.nodeType = 'agent';
+                node._nodeType = 'agent';
+                node.isAgentNode = true;
+                node.title = 'Agent Node (Fallback)';
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog('Created fallback agent node', 'warning');
+                }
+              }
+              return node;
+            }
             const agentNode = window.AgentProcessor.createAgentNode();
             console.log('Created agent node with nodeType:', agentNode.nodeType);
             return agentNode;
@@ -143,6 +162,13 @@
               this.processing = true;
               
               // Process the node using the agent processor
+              if (!window.AgentProcessor) {
+                console.error('AgentProcessor not available for processing');
+                if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+                  DebugManager.addLog('AgentProcessor not available for processing agent node', 'error');
+                }
+                throw new Error('AgentProcessor not available');
+              }
               const result = await window.AgentProcessor.processAgentNode(this, input);
               
               // Mark the node as processed
@@ -371,6 +397,19 @@
       } else {
         console.warn('AgentProcessor not available, cannot update tools list');
         return [];
+      }
+    },
+    
+    // Create an agent node (delegate to AgentProcessor)
+    createAgentNode: function() {
+      if (window.AgentProcessor && typeof AgentProcessor.createAgentNode === 'function') {
+        return AgentProcessor.createAgentNode();
+      } else {
+        console.error('AgentProcessor not available, cannot create agent node');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('AgentProcessor not available, cannot create agent node', 'error');
+        }
+        throw new Error('AgentProcessor not available');
       }
     }
   };

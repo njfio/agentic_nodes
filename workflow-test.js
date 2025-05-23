@@ -86,7 +86,7 @@ const WorkflowTest = {
     select.id = 'workflowSelector';
     
     // Add options for each workflow
-    for (const [key, workflow] of Object.entries(this.workflows)) {
+    for (const [key, _workflow] of Object.entries(this.workflows)) {
       const option = document.createElement('option');
       option.value = key;
       option.textContent = this.formatWorkflowName(key);
@@ -396,7 +396,7 @@ const WorkflowTest = {
         // Do nothing, just wait
         break;
         
-      case 'fillInput':
+      case 'fillInput': {
         const input = document.getElementById(step.inputId);
         if (input) {
           input.value = step.value;
@@ -410,8 +410,9 @@ const WorkflowTest = {
           throw new Error(`Input not found: ${step.inputId}`);
         }
         break;
+      }
         
-      case 'clickButton':
+      case 'clickButton': {
         const button = document.getElementById(step.buttonId);
         if (button) {
           button.click();
@@ -419,6 +420,7 @@ const WorkflowTest = {
           throw new Error(`Button not found: ${step.buttonId}`);
         }
         break;
+      }
         
       case 'addNode':
         if (typeof App !== 'undefined') {

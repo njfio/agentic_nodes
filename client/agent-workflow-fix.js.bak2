@@ -1,0 +1,205 @@
+/**
+ * Agent Workflow Fix
+ * Ensures agent nodes are properly configured in workflows
+ */
+
+(function() {
+  console.log('🔧 Agent Workflow Fix loading...');
+  
+  // Store original functions
+  let originalAddNode = null;
+  let originalNodeProcess = null;
+  
+  // Wait for App to be available
+  const waitForApp = setInterval(() => {
+    if (window.App && window.App.addNode) {
+      clearInterval(waitForApp);
+      applyFixes();
+    }
+  }, 100);
+  
+  function applyFixes() {
+    console.log('🔧 Applying agent workflow fixes...');
+    
+    // Override App.addNode to ensure agent nodes are properly configured
+    originalAddNode = window.App.addNode;
+    window.App.addNode = function(nodeType) {
+      console.log(`Creating node of type: ${nodeType}`);
+      
+      const node = originalAddNode.call(this, nodeType);
+      
+      // If it's an agent node, ensure it's properly configured
+      if (nodeType === 'agent' && node) {
+        console.log('🤖 Configuring agent node...');
+        
+        // Ensure all agent properties are set
+        node._nodeType = 'agent';
+        node.nodeType = 'agent';
+        node.isAgentNode = true;
+        node.autoIterate = true;
+        node.maxIterations = node.maxIterations || 5;
+        node.enableReasoning = true;
+        node.useMCPTools = true;
+        
+        // Set a proper system prompt if not already set
+        if (!node.systemPrompt || node.systemPrompt.length < 50) {
+          node.systemPrompt = "You are an autonomous AI agent with access to tools including browser.search for web searches. " +
+            "When asked about current events or real-time information, you MUST use the available search tools. " +
+            "Break down complex tasks into steps and use tools to gather information. " +
+            "Don't say you cannot access real-time information - instead, use the search tools available to you.";
+        }
+        
+        console.log('✅ Agent node configured:', {
+          id: node.id,
+          nodeType: node.nodeType,
+          isAgentNode: node.isAgentNode,
+          autoIterate: node.autoIterate,
+          maxIterations: node.maxIterations
+        });
+      }
+      
+      return node;
+    };
+    
+    // Override Node.prototype.process to ensure agent nodes use AgentProcessor
+    if (window.Node && window.Node.prototype) {
+      originalNodeProcess = window.Node.prototype.process;
+      
+      window.Node.prototype.process = async function(input) {
+        // Check if this is an agent node
+        const isAgent = this.nodeType === 'agent' || this._nodeType === 'agent' || this.isAgentNode === true;
+        
+        if (isAgent) {
+          console.log(`🤖 Processing agent node ${this.id} with AgentProcessor`);
+          
+          // Ensure AgentProcessor is available
+          if (!window.AgentProcessor) {
+            console.error('❌ AgentProcessor not available!');
+            
+            // Try to load it
+            if (window.AgentNodes && window.AgentNodes.loadAgentProcessor) {
+              console.log('Attempting to load AgentProcessor...');
+              await window.AgentNodes.loadAgentProcessor();
+            }
+          }
+          
+          // Use AgentProcessor if available
+          if (window.AgentProcessor && window.AgentProcessor.processAgentNode) {
+            try {
+              // Ensure the node has the right properties
+              this.autoIterate = true;
+              this.maxIterations = this.maxIterations || 5;
+              
+              const result = await window.AgentProcessor.processAgentNode(this, input);
+              return result;
+            } catch (error) {
+              console.error('❌ Error in AgentProcessor:', error);
+              throw error;
+            }
+          } else {
+            console.error('❌ AgentProcessor.processAgentNode not available');
+            // Fall back to original processing
+            return originalNodeProcess.call(this, input);
+          }
+        } else {
+          // Not an agent node, use original processing
+          return originalNodeProcess.call(this, input);
+        }
+      };
+    }
+    
+    console.log('✅ Agent workflow fixes applied');
+  }
+  
+  // Fix existing nodes in the workflow
+  window.fixExistingAgentNodes = function() {
+    if (!window.App || !window.App.nodes) {
+      console.error('No workflow loaded');
+      return;
+    }
+    
+    let fixedCount = 0;
+    window.App.nodes.forEach(node => {
+      // Check if it should be an agent node
+      if (node.title && node.title.toLowerCase().includes('agent')) {
+        console.log(`Fixing node ${node.id} (${node.title})`);
+        
+        node._nodeType = 'agent';
+        node.nodeType = 'agent';
+        node.isAgentNode = true;
+        node.autoIterate = true;
+        node.maxIterations = node.maxIterations || 5;
+        node.enableReasoning = true;
+        node.useMCPTools = true;
+        
+        if (!node.systemPrompt || node.systemPrompt.length < 50) {
+          node.systemPrompt = "You are an autonomous AI agent with access to tools including browser.search for web searches. " +
+            "When asked about current events or real-time information, you MUST use the available search tools. " +
+            "Break down complex tasks into steps and use tools to gather information. " +
+            "Don't say you cannot access real-time information - instead, use the search tools available to you.";
+        }
+        
+        fixedCount++;
+      }
+    });
+    
+    console.log(`✅ Fixed ${fixedCount} agent nodes`);
+    return fixedCount;
+  };
+  
+  // Add a helper to create a proper agent workflow
+  window.createProperAgentWorkflow = function() {
+    console.log('Creating proper agent workflow...');
+    
+    // Clear existing nodes
+    if (window.App && window.App.nodes) {
+      window.App.nodes = [];
+      window.App.connections = [];
+    }
+    
+    // Create two agent nodes
+    const node1 = window.App.addNode('agent');
+    const node2 = window.App.addNode('agent');
+    
+    // Position them
+    if (node1) {
+      node1.x = 200;
+      node1.y = 200;
+      node1.title = 'Agent Node 1';
+      node1.workflowRole = 'input';
+    }
+    
+    if (node2) {
+      node2.x = 500;
+      node2.y = 200;
+      node2.title = 'Agent Node 2';
+      node2.workflowRole = 'output';
+    }
+    
+    // Connect them
+    if (window.App.connectNodes && node1 && node2) {
+      window.App.connectNodes(node1, node2);
+    }
+    
+    // Force a redraw
+    if (window.App.draw) {
+      window.App.draw();
+    }
+    
+    console.log('✅ Agent workflow created');
+    return { node1, node2 };
+  };
+  
+  // Auto-fix on load
+  setTimeout(() => {
+    const fixed = window.fixExistingAgentNodes();
+    if (fixed > 0) {
+      console.log(`🔧 Auto-fixed ${fixed} agent nodes on load`);
+    }
+  }, 2000);
+  
+})();
+
+console.log('🔧 Agent Workflow Fix loaded. Commands:');
+console.log('  fixExistingAgentNodes() - Fix nodes in current workflow');
+console.log('  createProperAgentWorkflow() - Create a new agent workflow');

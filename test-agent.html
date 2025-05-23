@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Node Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        #logs {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        .log-info { color: #2196F3; }
+        .log-success { color: #4CAF50; }
+        .log-warning { color: #FF9800; }
+        .log-error { color: #F44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Agent Node Test</h1>
+        
+        <div class="test-section">
+            <h2>Test Agent Node Processing</h2>
+            <p>This test will create an agent node and process a request that should trigger tool usage and multiple iterations.</p>
+            
+            <button onclick="testAgentNode()">Run Agent Node Test</button>
+            <button onclick="testSimpleQuestion()">Test Simple Question</button>
+            <button onclick="testToolUsage()">Test Tool Usage</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+        
+        <div id="output"></div>
+        <div id="logs"></div>
+    </div>
+
+    <script>
+        // Simple mock implementations for testing
+        window.DebugManager = {
+            addLog: function(message, level) {
+                const logsDiv = document.getElementById('logs');
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${level}`;
+                entry.textContent = `[${level.toUpperCase()}] ${message}`;
+                logsDiv.appendChild(entry);
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+        };
+
+        window.ApiService = {
+            openai: {
+                getConfig: function() {
+                    return {
+                        apiKey: 'test-key',
+                        model: 'gpt-4o'
+                    };
+                }
+            }
+        };
+
+        // Mock tools for testing
+        window.AgentTools = {
+            tools: [
+                {
+                    id: 'search',
+                    name: 'Web Search',
+                    description: 'Search the web for information',
+                    category: 'search',
+                    execute: async function(params) {
+                        return `Searched for "${params.query}" and found: This is a mock search result about ${params.query}.`;
+                    }
+                },
+                {
+                    id: 'calculate',
+                    name: 'Calculator',
+                    description: 'Perform mathematical calculations',
+                    category: 'math',
+                    execute: async function(params) {
+                        try {
+                            const result = eval(params.expression);
+                            return `Calculation result: ${params.expression} = ${result}`;
+                        } catch (e) {
+                            return `Error calculating: ${e.message}`;
+                        }
+                    }
+                }
+            ],
+            getAllTools: function() {
+                return this.tools;
+            },
+            executeTool: async function(toolId, params, node) {
+                const tool = this.tools.find(t => t.id === toolId);
+                if (tool) {
+                    return await tool.execute(params, node);
+                }
+                throw new Error(`Tool ${toolId} not found`);
+            }
+        };
+
+        window.AgentMemory = {
+            initMemory: function(node) {
+                if (!node.memory) {
+                    node.memory = { context: [], history: [] };
+                }
+            },
+            addToContext: function(node, content) {
+                if (!node.memory) this.initMemory(node);
+                node.memory.context.push({ content, timestamp: new Date() });
+            },
+            addToHistory: function(node, action, result) {
+                if (!node.memory) this.initMemory(node);
+                node.memory.history.push({ action, result, timestamp: new Date() });
+            },
+            getContext: function(node) {
+                return node.memory ? node.memory.context : [];
+            }
+        };
+
+        window.AgentLogger = {
+            addLog: function(node, message, level) {
+                DebugManager.addLog(`[Node ${node.id}] ${message}`, level);
+            },
+            initNodeLogger: function(node) {
+                if (!node.logs) {
+                    node.logs = [];
+                }
+            },
+            logInput: function(node, input) {
+                this.addLog(node, `Input: ${input}`, 'info');
+            },
+            logError: function(node, error) {
+                this.addLog(node, `Error: ${error.message}`, 'error');
+            }
+        };
+
+        window.AgentNodes = {
+            getToolParameters: function(tool) {
+                // Return mock parameters based on tool ID
+                if (tool.id === 'search') {
+                    return { query: { type: 'string', description: 'The search query' } };
+                } else if (tool.id === 'calculate') {
+                    return { expression: { type: 'string', description: 'The mathematical expression' } };
+                }
+                return {};
+            },
+            getToolRequiredParameters: function(tool) {
+                if (tool.id === 'search') return ['query'];
+                if (tool.id === 'calculate') return ['expression'];
+                return [];
+            }
+        };
+
+        // Load the agent processor script
+        const script = document.createElement('script');
+        script.src = '/client/agent/agent-processor.js';
+        document.head.appendChild(script);
+
+        function displayOutput(content) {
+            const outputDiv = document.getElementById('output');
+            outputDiv.textContent = content;
+        }
+
+        async function testAgentNode() {
+            try {
+                displayOutput('Creating agent node...');
+                
+                // Wait for AgentProcessor to be available
+                if (!window.AgentProcessor) {
+                    displayOutput('Error: AgentProcessor not loaded yet. Please wait and try again.');
+                    return;
+                }
+
+                // Create a mock node
+                const node = {
+                    id: 1,
+                    nodeType: 'agent',
+                    systemPrompt: "You are an AI assistant with access to tools. Use them to help answer questions thoroughly.",
+                    maxIterations: 5,
+                    enableReasoning: true,
+                    reasoningStyle: 'cot',
+                    tools: ['search', 'calculate']
+                };
+
+                displayOutput('Processing complex question that should trigger tool usage...');
+                
+                // Mock the API response
+                window.fetch = async function(url, options) {
+                    if (url === '/api/openai/chat') {
+                        const requestBody = JSON.parse(options.body);
+                        
+                        // Simulate different responses based on iteration
+                        if (requestBody.messages.length === 2) {
+                            // First iteration - return tool calls
+                            return {
+                                ok: true,
+                                json: async () => ({
+                                    choices: [{
+                                        message: {
+                                            role: 'assistant',
+                                            content: 'I need to search for information about Paris and calculate the population density.',
+                                            tool_calls: [
+                                                {
+                                                    id: 'call_1',
+                                                    type: 'function',
+                                                    function: {
+                                                        name: 'search',
+                                                        arguments: JSON.stringify({ query: 'Paris France population area' })
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }]
+                                })
+                            };
+                        } else if (requestBody.messages.find(m => m.role === 'tool')) {
+                            // Second iteration after tool results
+                            return {
+                                ok: true,
+                                json: async () => ({
+                                    choices: [{
+                                        message: {
+                                            role: 'assistant',
+                                            content: 'Based on the search results, I can see that Paris has a population of about 2.2 million. Let me calculate the population density.',
+                                            tool_calls: [
+                                                {
+                                                    id: 'call_2',
+                                                    type: 'function',
+                                                    function: {
+                                                        name: 'calculate',
+                                                        arguments: JSON.stringify({ expression: '2200000 / 105' })
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }]
+                                })
+                            };
+                        } else {
+                            // Final iteration
+                            return {
+                                ok: true,
+                                json: async () => ({
+                                    choices: [{
+                                        message: {
+                                            role: 'assistant',
+                                            content: 'Based on my search and calculations, Paris has a population of approximately 2.2 million people in an area of 105 square kilometers, giving it a population density of about 20,952 people per square kilometer. This makes Paris one of the most densely populated cities in Europe.'
+                                        }
+                                    }]
+                                })
+                            };
+                        }
+                    }
+                };
+
+                const result = await AgentProcessor.processAgentNode(
+                    node,
+                    "What is the population density of Paris, France? Search for the information and calculate it."
+                );
+
+                displayOutput(`Agent Response:\n${result}`);
+            } catch (error) {
+                displayOutput(`Error: ${error.message}\n${error.stack}`);
+            }
+        }
+
+        async function testSimpleQuestion() {
+            try {
+                if (!window.AgentProcessor) {
+                    displayOutput('Error: AgentProcessor not loaded yet. Please wait and try again.');
+                    return;
+                }
+
+                const node = {
+                    id: 2,
+                    nodeType: 'agent',
+                    maxIterations: 3
+                };
+
+                // Mock simple response
+                window.fetch = async function(url, options) {
+                    if (url === '/api/openai/chat') {
+                        return {
+                            ok: true,
+                            json: async () => ({
+                                choices: [{
+                                    message: {
+                                        role: 'assistant',
+                                        content: 'The capital of France is Paris.'
+                                    }
+                                }]
+                            })
+                        };
+                    }
+                };
+
+                const result = await AgentProcessor.processAgentNode(node, "What is the capital of France?");
+                displayOutput(`Agent Response:\n${result}`);
+            } catch (error) {
+                displayOutput(`Error: ${error.message}`);
+            }
+        }
+
+        async function testToolUsage() {
+            try {
+                if (!window.AgentProcessor) {
+                    displayOutput('Error: AgentProcessor not loaded yet. Please wait and try again.');
+                    return;
+                }
+
+                const node = {
+                    id: 3,
+                    nodeType: 'agent',
+                    maxIterations: 5
+                };
+
+                // Mock response with tool usage
+                window.fetch = async function(url, options) {
+                    if (url === '/api/openai/chat') {
+                        return {
+                            ok: true,
+                            json: async () => ({
+                                choices: [{
+                                    message: {
+                                        role: 'assistant',
+                                        content: 'I\'ll calculate that for you.',
+                                        tool_calls: [
+                                            {
+                                                id: 'calc_1',
+                                                type: 'function',
+                                                function: {
+                                                    name: 'calculate',
+                                                    arguments: JSON.stringify({ expression: '15 * 24 + 7' })
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }]
+                            })
+                        };
+                    }
+                };
+
+                const result = await AgentProcessor.processAgentNode(node, "Calculate 15 * 24 + 7");
+                displayOutput(`Agent Response:\n${result}`);
+            } catch (error) {
+                displayOutput(`Error: ${error.message}`);
+            }
+        }
+
+        function clearOutput() {
+            document.getElementById('output').textContent = '';
+            document.getElementById('logs').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

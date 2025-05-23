@@ -268,6 +268,14 @@
         <input type="number" id="timeout" value="300" min="30" max="1800" step="30">
         <div class="tooltip">Longer timeouts are useful for complex requests and image generation. For image generation, the actual timeout will be doubled.</div>
       </div>
+      
+      <!-- Perplexity API Configuration -->
+      <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #444;">
+        <h3 style="margin-bottom: 10px;">Perplexity Configuration</h3>
+        <label for="perplexityApiKey">Perplexity API Key:</label>
+        <input type="password" id="perplexityApiKey" placeholder="pplx-...">
+        <div class="tooltip">Optional: Used for real-time web search in agent nodes</div>
+      </div>
 
       <!-- API Test Section -->
       <div class="test-section">
@@ -871,15 +879,91 @@
 
   <!-- Load MCP tools -->
   <script src="mcp-tools.js"></script>
+  
+  <!-- Fix tool names for OpenAI -->
+  <script src="fix-tool-names.js"></script>
+  <script src="fix-mcp-tools.js"></script>
+  <script src="fix-mcp-execution.js"></script>
+  <script src="fix-browser-search-tool.js"></script>
 
   <!-- Load the new modular agent nodes implementation -->
+  <script src="agent/agent-editor.js"></script>
+  <script src="agent/agent-modals.js"></script>
   <script src="agent/agent-processor.js"></script>
   <script src="agent/agent-integration.js"></script>
-  <script src="agent/agent-modals.js"></script>
-  <script src="agent/agent-editor.js"></script>
   <script src="agent/agent-ui.js"></script>
   <script src="agent-draw.js"></script>
+  <!-- Load agent-nodes.js last as it depends on all other modules -->
   <script src="agent/agent-nodes.js"></script>
+  
+  <!-- Fix browser search execution -->
+  <script src="fix-browser-search-execution.js"></script>
+  
+  <!-- Capture all agent iterations -->
+  <script src="capture-all-iterations.js"></script>
+  
+  <!-- Enhanced iteration display -->
+  <script src="enhance-iteration-display.js"></script>
+  
+  <!-- Capture full agent history with all iterations -->
+  <script src="capture-full-agent-history.js"></script>
+  
+  <!-- Force agents to use tools when appropriate -->
+  <script src="force-agent-tool-usage.js"></script>
+  
+  <!-- Fix agent nodes to use original query -->
+  <script src="fix-agent-original-query.js"></script>
+  
+  <!-- Fix duplicate tools -->
+  <script src="fix-duplicate-tools.js"></script>
+  
+  <!-- Fix API base URL first -->
+  <script src="fix-api-base-url.js"></script>
+  
+  <!-- Add network resilience -->
+  <script src="fix-network-resilience.js"></script>
+  
+  <!-- Fix agent timeouts -->
+  <script src="fix-agent-timeouts.js"></script>
+  
+  <!-- Fix Docker network issues -->
+  <script src="fix-docker-network.js"></script>
+  
+  <!-- Ultimate fallback for network failures -->
+  <script src="fix-ultimate-fallback.js"></script>
+  
+  <!-- Fix agent iterations and tool errors -->
+  <script src="fix-agent-iterations.js"></script>
+  
+  <!-- Improve agent completion detection -->
+  <script src="fix-agent-completion.js"></script>
+  
+  <!-- Check Perplexity key configuration -->
+  <script src="check-perplexity-key.js"></script>
+  
+  <!-- Fix Perplexity key passing -->
+  <script src="fix-perplexity-key-passing.js"></script>
+  
+  <!-- Fix MCP tool schemas -->
+  <script src="fix-mcp-tool-schemas.js"></script>
+  
+  <!-- Disable problematic tools -->
+  <script src="disable-problematic-tools.js"></script>
+  
+  <!-- Fix Perplexity API key saving -->
+  <script src="fix-perplexity-save.js"></script>
+  
+  <!-- Fix agent iterations UI -->
+  <script src="fix-agent-iterations-ui.js"></script>
+  
+  <!-- Restore agent reasoning and reflection -->
+  <script src="restore-agent-reasoning.js"></script>
+  
+  <!-- Enhance agent planner with reasoning -->
+  <script src="enhance-agent-planner.js"></script>
+  
+  <!-- Agent features summary -->
+  <script src="agent-features-summary.js"></script>
 
   <!-- Global initialization system -->
   <script>
@@ -1077,5 +1161,15 @@
   <script src="theme-switcher.js" type="module"></script>
   <script src="mobile-menu.js" type="module"></script>
   <script src="onboarding-tutorial.js" type="module"></script>
+  <script src="debug-agent-processing.js" defer></script>
+  <script src="clean-agent-fix.js" defer></script>
+  <script src="test-agent-immediate.js" defer></script>
+  <script src="force-tools-fix.js" defer></script>
+  <script src="ultimate-agent-fix.js" defer></script>
+  <!-- Disable MCP client to avoid conflicts -->
+  <script src="disable-mcp-client.js"></script>
+  
+  <!-- <script src="mcp-client-integration.js" defer></script> -->
+  <script src="intercept-node-processing.js"></script>
 </body>
 </html>

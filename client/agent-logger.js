@@ -97,7 +97,7 @@ const AgentLogger = {
     let sanitized;
     try {
       sanitized = JSON.parse(JSON.stringify(payload));
-    } catch (error) {
+    } catch {
       // If the payload can't be stringified, return a simple representation
       return {
         _note: 'Payload could not be stringified',

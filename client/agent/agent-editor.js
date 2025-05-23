@@ -11,6 +11,20 @@
     init: function() {
       console.log('Initializing AgentEditor');
 
+      // Check if the agent node editor modal exists in the DOM
+      const agentNodeEditor = document.getElementById('agentNodeEditor');
+      if (agentNodeEditor) {
+        console.log('Agent node editor modal found during initialization');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Agent node editor modal found during initialization', 'info');
+        }
+      } else {
+        console.warn('Agent node editor modal not found during initialization');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Agent node editor modal not found during initialization', 'warning');
+        }
+      }
+
       // Initialize the agent node editor
       this.initAgentNodeEditor();
 
@@ -19,8 +33,20 @@
 
     // Initialize the agent node editor
     initAgentNodeEditor: function() {
+      console.log('AgentEditor.initAgentNodeEditor called');
+
       // Get the agent node editor elements
       const agentNodeEditor = document.getElementById('agentNodeEditor');
+      if (!agentNodeEditor) {
+        console.error('Agent node editor modal not found in the DOM');
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Agent node editor modal not found in the DOM', 'error');
+        }
+        return;
+      }
+
+      console.log('Agent node editor modal found in the DOM');
+
       const saveAgentNodeBtn = document.getElementById('saveAgentNode');
       const cancelAgentNodeBtn = document.getElementById('cancelAgentNode');
       const agentTypeSelect = document.getElementById('agentType');
@@ -48,8 +74,28 @@
       // Cancel button
       if (cancelAgentNodeBtn) {
         cancelAgentNodeBtn.addEventListener('click', () => {
+          console.log('Cancel agent node button clicked');
+
           if (agentNodeEditor) {
+            // Hide the modal
             agentNodeEditor.style.display = 'none';
+            console.log('Set agentNodeEditor.style.display to none');
+
+            // Remove the active class
+            agentNodeEditor.classList.remove('active');
+            console.log('Removed active class from agentNodeEditor');
+
+            // Remove any inline styles
+            agentNodeEditor.removeAttribute('style');
+            console.log('Removed inline styles from agentNodeEditor');
+
+            // Use ModalManager if available
+            if (window.ModalManager && typeof ModalManager.closeModal === 'function') {
+              console.log('Using ModalManager.closeModal to close agentNodeEditor');
+              ModalManager.closeModal('agentNodeEditor');
+            } else {
+              console.warn('ModalManager not available or closeModal method missing');
+            }
           }
         });
       }
@@ -91,8 +137,12 @@
     openAgentNodeEditor: function(node) {
       console.log(`Opening agent node editor for node ${node.id}`);
 
-      // Set the editing node
+      // Set the editing node in both places to ensure consistency
       window.AgentNodes.editingNode = node;
+      if (window.App) {
+        App.editingNode = node;
+        App.selectedNode = node;
+      }
 
       // Get the agent node editor modal
       const agentNodeEditor = document.getElementById('agentNodeEditor');
@@ -104,9 +154,26 @@
 
         // Fall back to the regular node editor
         if (window.App && typeof window.App.openNodeEditor === 'function') {
+          const originalOpenNodeEditor = window.App.openNodeEditor;
           window.App.openNodeEditor(node);
         }
         return;
+      }
+
+      // Ensure the node has the agent type set
+      if (node.nodeType !== 'agent' && node._nodeType !== 'agent' && !node.isAgentNode) {
+        node.nodeType = 'agent';
+        node._nodeType = 'agent';
+        Object.defineProperty(node, 'isAgentNode', {
+          value: true,
+          writable: false,
+          enumerable: true,
+          configurable: false
+        });
+        console.log(`Set node ${node.id} type to agent`);
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog(`Set node ${node.id} type to agent`, 'info');
+        }
       }
 
       // Set the values in the form
@@ -159,10 +226,43 @@
         window.AgentNodes.updateMCPToolsList();
       }
 
+      // Set reasoning settings
+      const enableReasoningInput = document.getElementById('enableReasoning');
+      if (enableReasoningInput) {
+        enableReasoningInput.checked = node.enableReasoning !== false;
+
+        // Update the visibility of the reasoning section
+        const reasoningSection = document.getElementById('reasoningSection');
+        if (reasoningSection) {
+          reasoningSection.style.display = enableReasoningInput.checked ? 'block' : 'none';
+        }
+      }
+
+      const reasoningStyleSelect = document.getElementById('reasoningStyle');
+      if (reasoningStyleSelect) {
+        reasoningStyleSelect.value = node.reasoningStyle || 'cot';
+      }
+
+      const reasoningDepthSelect = document.getElementById('reasoningDepth');
+      if (reasoningDepthSelect) {
+        reasoningDepthSelect.value = node.reasoningDepth || '3';
+      }
+
+      const showReasoningInput = document.getElementById('showReasoning');
+      if (showReasoningInput) {
+        showReasoningInput.checked = node.showReasoning !== false;
+      }
+
       // Set reflection settings
       const enableReflectionInput = document.getElementById('enableReflection');
       if (enableReflectionInput) {
         enableReflectionInput.checked = node.enableReflection !== false;
+
+        // Update the visibility of the reflection section
+        const reflectionSection = document.getElementById('reflectionSection');
+        if (reflectionSection) {
+          reflectionSection.style.display = enableReflectionInput.checked ? 'block' : 'none';
+        }
       }
 
       const reflectionFrequencySelect = document.getElementById('reflectionFrequency');
@@ -195,11 +295,23 @@
 
       // Show the modal
       agentNodeEditor.style.display = 'block';
+      console.log('Set agentNodeEditor.style.display to block');
+
+      // Add a class to make it visible
+      agentNodeEditor.classList.add('active');
+      console.log('Added active class to agentNodeEditor');
 
       // Use ModalManager if available
       if (window.ModalManager && typeof ModalManager.openModal === 'function') {
+        console.log('Using ModalManager.openModal to open agentNodeEditor');
         ModalManager.openModal('agentNodeEditor');
+      } else {
+        console.warn('ModalManager not available or openModal method missing');
       }
+
+      // Force the modal to be visible with !important style
+      agentNodeEditor.setAttribute('style', 'display: block !important; z-index: 1000 !important;');
+      console.log('Set !important style on agentNodeEditor');
 
       if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
         DebugManager.addLog(`Editing agent node ${node.id}`, 'info');
@@ -261,6 +373,33 @@
           }
         }
 
+        // Get reasoning settings
+        const enableReasoningCheckbox = document.getElementById('enableReasoning');
+        if (enableReasoningCheckbox) {
+          node.enableReasoning = enableReasoningCheckbox.checked;
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Reasoning ${node.enableReasoning ? 'enabled' : 'disabled'}`, 'info');
+          }
+        }
+
+        const reasoningStyleSelect = document.getElementById('reasoningStyle');
+        if (reasoningStyleSelect) {
+          node.reasoningStyle = reasoningStyleSelect.value;
+          if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+            DebugManager.addLog(`Reasoning style set to: ${node.reasoningStyle}`, 'info');
+          }
+        }
+
+        const reasoningDepthSelect = document.getElementById('reasoningDepth');
+        if (reasoningDepthSelect) {
+          node.reasoningDepth = reasoningDepthSelect.value;
+        }
+
+        const showReasoningCheckbox = document.getElementById('showReasoning');
+        if (showReasoningCheckbox) {
+          node.showReasoning = showReasoningCheckbox.checked;
+        }
+
         // Get reflection settings
         const enableReflectionCheckbox = document.getElementById('enableReflection');
         if (enableReflectionCheckbox) {
@@ -319,11 +458,23 @@
         const agentNodeEditor = document.getElementById('agentNodeEditor');
         if (agentNodeEditor) {
           agentNodeEditor.style.display = 'none';
+          console.log('Set agentNodeEditor.style.display to none');
+
+          // Remove the active class
+          agentNodeEditor.classList.remove('active');
+          console.log('Removed active class from agentNodeEditor');
+
+          // Remove any inline styles
+          agentNodeEditor.removeAttribute('style');
+          console.log('Removed inline styles from agentNodeEditor');
         }
 
         // Use ModalManager if available
         if (window.ModalManager && typeof ModalManager.closeModal === 'function') {
+          console.log('Using ModalManager.closeModal to close agentNodeEditor');
           ModalManager.closeModal('agentNodeEditor');
+        } else {
+          console.warn('ModalManager not available or closeModal method missing');
         }
 
         // Force a redraw of the canvas
@@ -434,12 +585,27 @@
   // Add the openAgentNodeEditor method to the global AgentNodes object
   function addMethodToAgentNodes() {
     if (window.AgentNodes) {
-      window.AgentNodes.openAgentNodeEditor = AgentEditor.openAgentNodeEditor.bind(AgentEditor);
-      console.log('Added openAgentNodeEditor method to AgentNodes');
+      // Check if the method already exists to avoid overriding it
+      if (typeof window.AgentNodes.openAgentNodeEditor !== 'function') {
+        window.AgentNodes.openAgentNodeEditor = AgentEditor.openAgentNodeEditor.bind(AgentEditor);
+        console.log('Added openAgentNodeEditor method to AgentNodes');
 
-      // Log to debug panel if available
-      if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
-        DebugManager.addLog('Added openAgentNodeEditor method to AgentNodes', 'success');
+        // Log to debug panel if available
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Added openAgentNodeEditor method to AgentNodes', 'success');
+        }
+      } else {
+        // If the method already exists, replace it to ensure we're using the correct implementation
+        const originalMethod = window.AgentNodes.openAgentNodeEditor;
+        window.AgentNodes.openAgentNodeEditor = function(node) {
+          console.log('Using agent-editor.js implementation of openAgentNodeEditor');
+          return AgentEditor.openAgentNodeEditor.call(AgentEditor, node);
+        };
+        console.log('Replaced existing openAgentNodeEditor method with AgentEditor implementation');
+
+        if (typeof DebugManager !== 'undefined' && DebugManager.addLog) {
+          DebugManager.addLog('Replaced existing openAgentNodeEditor method with AgentEditor implementation', 'info');
+        }
       }
     } else {
       console.warn('AgentNodes object not available, will retry in 500ms');
@@ -454,5 +620,22 @@
   document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, initializing AgentEditor');
     AgentEditor.init();
+
+    // Add the method to AgentNodes again to ensure it's available
+    addMethodToAgentNodes();
+
+    // Also add a handler for app initialization complete
+    document.addEventListener('app-initialization-complete', function() {
+      console.log('App initialization complete event received by AgentEditor');
+
+      // Add the method to AgentNodes one more time to be absolutely sure
+      addMethodToAgentNodes();
+
+      // Force initialization of the agent node editor
+      if (typeof AgentNodes.initAgentNodeEditor === 'function') {
+        console.log('Initializing agent node editor after app initialization');
+        AgentNodes.initAgentNodeEditor();
+      }
+    });
   });
 })();
