@@ -54,7 +54,7 @@ const MCPTools = {
   async loadMCPConfig() {
     try {
       // Fetch MCP configuration from the server
-      const response = await fetch('/api/mcp/config');
+      const response = await fetch('/api/v2/mcp/config');
 
       if (!response.ok) {
         console.error(`Failed to load MCP configuration: ${response.statusText}`);
@@ -396,7 +396,7 @@ const MCPTools = {
       }
 
       // Call the MCP API
-      const response = await fetch('/api/mcp/execute', {
+      const response = await fetch('/api/v2/mcp/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

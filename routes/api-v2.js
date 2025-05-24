@@ -12,6 +12,9 @@ const openaiService = require('../services/openaiService');
 const imageService = require('../services/imageService');
 const { logger } = require('../services/loggingService');
 
+// Import MCP routes
+const mcpRoutes = require('../server/api/mcp');
+
 // Import middleware
 const { auth: authenticate } = require('../middleware/auth');
 const {
@@ -396,6 +399,9 @@ router.post('/openai/images',
   }
 );
 
+// MCP routes - Model Context Protocol integration
+router.use('/mcp', mcpRoutes);
+
 // Admin routes (if user is admin)
 router.get('/admin/users',
   authenticate,
@@ -482,7 +488,9 @@ router.use('*', (req, res) => {
       'GET /api/v2/tools',
       'POST /api/v2/chat',
       'POST /api/v2/openai/chat',
-      'POST /api/v2/openai/images'
+      'POST /api/v2/openai/images',
+      'GET /api/v2/mcp/config',
+      'POST /api/v2/mcp/execute'
     ]
   });
 });
