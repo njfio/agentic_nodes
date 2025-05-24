@@ -46,6 +46,9 @@
                 // 7. Fix Perplexity configuration
                 this.fixPerplexityConfiguration();
 
+                // 8. Add localStorage quota management
+                this.addLocalStorageQuotaManagement();
+
                 this.initialized = true;
                 console.log('[UnifiedAgentSystem] Initialization complete');
 
@@ -64,21 +67,38 @@
 
             // Override fetch to handle Docker environment
             window.fetch = function(url, options = {}) {
-                // Fix v2 API endpoints that don't exist - redirect to v1 FIRST
+                let originalUrl = url;
+
+                // Comprehensive URL fixing
                 if (typeof url === 'string') {
+                    // Fix v2 API endpoints that don't exist - redirect to v1 FIRST
                     if (url.includes('/api/v2/openai/chat')) {
                         url = url.replace('/api/v2/openai/chat', '/api/openai/chat');
                         console.log('[UnifiedAgentSystem] Redirected v2 OpenAI chat endpoint to v1');
                     }
+
+                    // Fix v2 workflows endpoint to v1
+                    if (url.includes('/api/v2/workflows/')) {
+                        url = url.replace('/api/v2/workflows/', '/api/workflows/');
+                        console.log('[UnifiedAgentSystem] Redirected v2 workflows endpoint to v1');
+                    }
+
                     if (url.includes('/api/v2/mcp/')) {
                         // For now, disable MCP v2 endpoints that cause SSL errors
                         console.warn('[UnifiedAgentSystem] Blocking v2 MCP endpoint to prevent SSL errors:', url);
                         return Promise.reject(new Error('MCP v2 endpoints temporarily disabled to prevent SSL errors'));
                     }
+
                     // Fix double API path issue (e.g., /api/v2/api/images -> /api/images)
                     if (url.includes('/api/v2/api/')) {
                         url = url.replace('/api/v2/api/', '/api/');
                         console.log('[UnifiedAgentSystem] Fixed double API path in URL');
+                    }
+
+                    // Fix any HTTPS localhost URLs to HTTP BEFORE adding base URL
+                    if (url.startsWith('https://localhost')) {
+                        url = url.replace('https://localhost', 'http://localhost');
+                        console.log('[UnifiedAgentSystem] Fixed HTTPS localhost URL to HTTP');
                     }
                 }
 
@@ -90,10 +110,15 @@
                     url = baseUrl + url;
                 }
 
-                // Fix any remaining HTTPS localhost URLs
-                if (typeof url === 'string' && url.startsWith('https://localhost')) {
+                // Final check for any remaining HTTPS localhost URLs
+                if (typeof url === 'string' && url.includes('https://localhost')) {
                     url = url.replace('https://localhost', 'http://localhost');
-                    console.log('[UnifiedAgentSystem] Fixed HTTPS localhost URL to HTTP');
+                    console.log('[UnifiedAgentSystem] Final fix: HTTPS localhost URL to HTTP');
+                }
+
+                // Log URL transformation if it changed
+                if (url !== originalUrl) {
+                    console.log(`[UnifiedAgentSystem] URL transformed: ${originalUrl} -> ${url}`);
                 }
 
                 // Add timeout handling
@@ -493,6 +518,143 @@
                     window.MCPTools.updatePerplexityKey(savedPerplexityKey);
                 }
             }
+        },
+
+        // Add localStorage quota management
+        addLocalStorageQuotaManagement() {
+            console.log('[UnifiedAgentSystem] Adding localStorage quota management');
+
+            // Override localStorage.setItem to handle quota exceeded errors
+            const originalSetItem = localStorage.setItem;
+            localStorage.setItem = function(key, value) {
+                try {
+                    originalSetItem.call(this, key, value);
+                } catch (error) {
+                    if (error.name === 'QuotaExceededError' || error.message.includes('quota exceeded')) {
+                        console.warn('[UnifiedAgentSystem] localStorage quota exceeded, attempting cleanup');
+
+                        // Clear old workflow data and image cache
+                        const keysToRemove = [];
+                        for (let i = 0; i < localStorage.length; i++) {
+                            const storageKey = localStorage.key(i);
+                            if (storageKey && (
+                                storageKey.startsWith('workflow_') ||
+                                storageKey.startsWith('image_') ||
+                                storageKey.startsWith('cache_') ||
+                                storageKey.includes('_old') ||
+                                storageKey.includes('_backup')
+                            )) {
+                                keysToRemove.push(storageKey);
+                            }
+                        }
+
+                        // Remove old data
+                        keysToRemove.forEach(key => {
+                            try {
+                                localStorage.removeItem(key);
+                            } catch (e) {
+                                console.warn('Error removing localStorage key:', key, e);
+                            }
+                        });
+
+                        console.log(`[UnifiedAgentSystem] Cleaned up ${keysToRemove.length} localStorage items`);
+
+                        // Try to save again after cleanup
+                        try {
+                            originalSetItem.call(this, key, value);
+                            console.log('[UnifiedAgentSystem] Successfully saved after cleanup');
+                        } catch (retryError) {
+                            console.error('[UnifiedAgentSystem] Still unable to save after cleanup:', retryError);
+                            // Truncate the value if it's too large
+                            if (typeof value === 'string' && value.length > 1000000) {
+                                const truncatedValue = value.substring(0, 1000000);
+                                try {
+                                    originalSetItem.call(this, key, truncatedValue);
+                                    console.log('[UnifiedAgentSystem] Saved truncated value');
+                                } catch (truncateError) {
+                                    console.error('[UnifiedAgentSystem] Unable to save even truncated value:', truncateError);
+                                }
+                            }
+                        }
+                    } else {
+                        throw error;
+                    }
+                }
+            };
+
+            // Add periodic cleanup
+            setInterval(() => {
+                try {
+                    const usage = this.getLocalStorageUsage();
+                    if (usage.percentage > 80) {
+                        console.log(`[UnifiedAgentSystem] localStorage usage at ${usage.percentage}%, performing cleanup`);
+                        this.cleanupOldData();
+                    }
+                } catch (error) {
+                    console.warn('[UnifiedAgentSystem] Error during periodic cleanup:', error);
+                }
+            }, 300000); // Check every 5 minutes
+        },
+
+        // Get localStorage usage information
+        getLocalStorageUsage() {
+            let totalSize = 0;
+            for (let key in localStorage) {
+                if (localStorage.hasOwnProperty(key)) {
+                    totalSize += localStorage[key].length + key.length;
+                }
+            }
+
+            // Estimate quota (usually 5-10MB)
+            const estimatedQuota = 5 * 1024 * 1024; // 5MB
+            const percentage = Math.round((totalSize / estimatedQuota) * 100);
+
+            return {
+                used: totalSize,
+                estimated: estimatedQuota,
+                percentage: percentage
+            };
+        },
+
+        // Clean up old data from localStorage
+        cleanupOldData() {
+            const keysToRemove = [];
+            const now = Date.now();
+            const oneWeekAgo = now - (7 * 24 * 60 * 60 * 1000);
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (
+                    key.startsWith('workflow_') ||
+                    key.startsWith('image_') ||
+                    key.startsWith('cache_') ||
+                    key.includes('_temp') ||
+                    key.includes('_backup')
+                )) {
+                    try {
+                        const item = localStorage.getItem(key);
+                        if (item) {
+                            const parsed = JSON.parse(item);
+                            if (parsed.timestamp && parsed.timestamp < oneWeekAgo) {
+                                keysToRemove.push(key);
+                            }
+                        }
+                    } catch (e) {
+                        // If we can't parse it, it might be old data
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+
+            keysToRemove.forEach(key => {
+                try {
+                    localStorage.removeItem(key);
+                } catch (e) {
+                    console.warn('Error removing old localStorage key:', key, e);
+                }
+            });
+
+            console.log(`[UnifiedAgentSystem] Cleaned up ${keysToRemove.length} old localStorage items`);
         }
     };
 
