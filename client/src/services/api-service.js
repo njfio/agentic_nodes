@@ -9,8 +9,8 @@ import { EventBus } from '../core/event-bus.js';
 
 class ApiServiceClass {
   constructor() {
-    this.baseUrl = '/api/v2'; // Use latest API version
-    this.version = '2.0.0';
+    this.baseUrl = '/api'; // Use v1 API version to match server
+    this.version = '1.0.0';
     this.headers = {
       'Content-Type': 'application/json'
     };
@@ -86,12 +86,12 @@ class ApiServiceClass {
 
       const duration = performance.now() - startTime;
       Logger.debug('api', `${finalOptions.method || 'GET'} ${finalUrl} completed in ${duration.toFixed(2)}ms`);
-      
-      EventBus.emit('api:request-complete', { 
-        url: finalUrl, 
-        options: finalOptions, 
-        response, 
-        duration 
+
+      EventBus.emit('api:request-complete', {
+        url: finalUrl,
+        options: finalOptions,
+        response,
+        duration
       });
 
       // Check for errors
@@ -105,12 +105,12 @@ class ApiServiceClass {
     } catch (error) {
       const duration = performance.now() - startTime;
       Logger.error('api', `${finalOptions.method || 'GET'} ${finalUrl} failed after ${duration.toFixed(2)}ms: ${error.message}`);
-      
-      EventBus.emit('api:request-error', { 
-        url: finalUrl, 
-        options: finalOptions, 
-        error, 
-        duration 
+
+      EventBus.emit('api:request-error', {
+        url: finalUrl,
+        options: finalOptions,
+        error,
+        duration
       });
 
       throw error;
@@ -122,7 +122,7 @@ class ApiServiceClass {
    */
   async handleErrorResponse(response) {
     let errorMessage = `API Error: ${response.status} ${response.statusText}`;
-    
+
     try {
       const errorData = await response.json();
       errorMessage = errorData.message || errorData.error?.message || errorMessage;
@@ -133,7 +133,7 @@ class ApiServiceClass {
     const error = new Error(errorMessage);
     error.status = response.status;
     error.response = response;
-    
+
     return error;
   }
 
@@ -188,10 +188,10 @@ class ApiServiceClass {
       method: 'POST',
       body: formData
     };
-    
+
     // Remove Content-Type to let browser set it with boundary
     delete uploadOptions.headers['Content-Type'];
-    
+
     return this.request(url, uploadOptions);
   }
 }
@@ -208,7 +208,7 @@ ApiService.openai = {
    */
   async createChatCompletion(params) {
     const config = ConfigManager.get('openai');
-    
+
     if (!config.apiKey) {
       throw new Error('OpenAI API key not configured');
     }
@@ -227,7 +227,7 @@ ApiService.openai = {
    */
   async createImage(params) {
     const config = ConfigManager.get('openai');
-    
+
     if (!config.apiKey) {
       throw new Error('OpenAI API key not configured');
     }
@@ -246,7 +246,7 @@ ApiService.openai = {
    */
   async createImageVariation(formData) {
     const config = ConfigManager.get('openai');
-    
+
     if (!config.apiKey) {
       throw new Error('OpenAI API key not configured');
     }
@@ -316,13 +316,13 @@ ApiService.users = {
   async login(credentials) {
     const response = await ApiService.post('/api/users/login', credentials);
     const data = await response.json();
-    
+
     // Store token if provided
     if (data.token) {
       localStorage.setItem('auth_token', data.token);
       ApiService.headers['Authorization'] = `Bearer ${data.token}`;
     }
-    
+
     return data;
   },
 
@@ -339,11 +339,11 @@ ApiService.users = {
    */
   async logout() {
     const response = await ApiService.post('/api/users/logout');
-    
+
     // Clear token
     localStorage.removeItem('auth_token');
     delete ApiService.headers['Authorization'];
-    
+
     return await response.json();
   },
 
@@ -368,7 +368,7 @@ ApiService.users = {
 if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     ApiService.init();
-    
+
     // Check for existing auth token
     const token = localStorage.getItem('auth_token');
     if (token) {

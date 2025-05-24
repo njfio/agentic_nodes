@@ -158,14 +158,14 @@ app.use('/api/v1', apiLimiter, apiRoutes);
 app.use('/api/v1.5', apiLimiter, apiImprovedRoutes);
 app.use('/api/v2', apiLimiter, apiV2Routes);
 
-// Backwards compatibility - redirect /api to latest version
+// Backwards compatibility - redirect /api to v1 (stable version)
 app.use('/api', (req, res, next) => {
   if (req.path.startsWith('/v')) {
     // Already versioned, continue
     next();
   } else {
-    // Redirect to v2 (latest)
-    res.redirect(301, `/api/v2${req.path}`);
+    // Redirect to v1 (stable)
+    res.redirect(301, `/api/v1${req.path}`);
   }
 });
 
