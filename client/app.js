@@ -284,6 +284,15 @@ class Node {
     this.waitForAllInputs = true;  // Whether to wait for all inputs before processing
     this.waitingForInputs = true;  // Default to waiting for inputs until all are ready
 
+    // Initialize arrays that might be used for push operations
+    this.imageInputIds = []; // Array to store image input IDs
+    this.additionalImageIds = []; // Array to store additional image IDs
+    this.sourceNodeToImageId = new Map(); // Map from source node ID to image ID
+
+    // Initialize connection arrays for compatibility with connection manager
+    this.inputs = []; // Array to store input connection IDs
+    this.outputs = []; // Array to store output connection IDs
+
     this.stats = {
       inputTokens: 0,
       outputTokens: 0,
@@ -318,11 +327,15 @@ class Node {
     // Clear input sources
     this.inputSources = new Map();
 
-    // Clear image inputs array
+    // Initialize arrays if they don't exist and clear them
     this.imageInputs = [];
-
-    // Clear additional images
     this.additionalImages = [];
+    this.imageInputIds = [];
+    this.additionalImageIds = [];
+
+    // Initialize connection arrays if they don't exist
+    if (!this.inputs) this.inputs = [];
+    if (!this.outputs) this.outputs = [];
 
     // Clear any cached image objects
     this.inputImage = null;
@@ -1901,6 +1914,12 @@ class Node {
 
   // Add an input from a source node
   addInput(sourceNode, input) {
+    // Ensure arrays are initialized
+    if (!this.imageInputIds) this.imageInputIds = [];
+    if (!this.additionalImageIds) this.additionalImageIds = [];
+    if (!this.inputs) this.inputs = [];
+    if (!this.outputs) this.outputs = [];
+
     // Check if we already have input from this source node
     if (this.inputSources.has(sourceNode.id)) {
       DebugManager.addLog(`Node ${this.id} already has input from node ${sourceNode.id}, updating it`, 'info');
