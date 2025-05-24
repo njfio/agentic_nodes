@@ -168,9 +168,15 @@
         async initializeAgentNodes() {
             console.log('[UnifiedAgentSystem] Initializing agent nodes');
 
-            // Create AgentNodes if it doesn't exist
+            // Create AgentNodes if it doesn't exist, or extend existing one
             if (!window.AgentNodes) {
+                console.log('[UnifiedAgentSystem] Creating new AgentNodes object');
                 window.AgentNodes = this.createAgentNodesSystem();
+            } else {
+                console.log('[UnifiedAgentSystem] Extending existing AgentNodes object');
+                // Extend existing AgentNodes with our methods
+                const agentNodesSystem = this.createAgentNodesSystem();
+                Object.assign(window.AgentNodes, agentNodesSystem);
             }
 
             // Initialize agent nodes
@@ -289,24 +295,38 @@
 
                 addAgentNodeButton() {
                     const btn = document.getElementById('addAgentNodeBtn');
-                    if (!btn) return;
+                    if (!btn) {
+                        console.warn('[AgentNodes] Agent node button not found');
+                        return;
+                    }
 
                     btn.addEventListener('click', () => {
+                        console.log('[AgentNodes] Agent node button clicked');
                         if (window.App && window.App.addNode) {
                             const node = window.App.addNode();
                             if (node) {
+                                // Set all the agent node properties
                                 node.type = 'agent';
+                                node.nodeType = 'agent';
+                                node._nodeType = 'agent';
+                                node.isAgentNode = true;
                                 node.title = 'Agent Node';
                                 node.systemPrompt = 'You are a helpful AI assistant with access to various tools.';
                                 node.content = '';
                                 node.maxIterations = 5;
                                 node.color = '#9c27b0';
 
-                                // Redraw the node
-                                if (window.App.drawNode) {
-                                    window.App.drawNode(node);
+                                console.log(`[AgentNodes] Created agent node ${node.id} with type: ${node.type}, nodeType: ${node.nodeType}, isAgentNode: ${node.isAgentNode}`);
+
+                                // Force a redraw of the canvas
+                                if (window.App && window.App.draw) {
+                                    window.App.draw();
                                 }
+                            } else {
+                                console.error('[AgentNodes] Failed to create node');
                             }
+                        } else {
+                            console.error('[AgentNodes] App or App.addNode not available');
                         }
                     });
                 }
