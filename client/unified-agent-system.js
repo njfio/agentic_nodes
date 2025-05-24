@@ -303,7 +303,21 @@
                     btn.addEventListener('click', () => {
                         console.log('[AgentNodes] Agent node button clicked');
                         if (window.App && window.App.addNode) {
-                            const node = window.App.addNode();
+                            // Try calling addNode with 'agent' parameter first
+                            let node = null;
+                            try {
+                                console.log('[AgentNodes] Trying to create agent node with type parameter');
+                                node = window.App.addNode('agent');
+                            } catch (error) {
+                                console.warn('[AgentNodes] Failed to create agent node with type parameter, trying without:', error);
+                                // Fallback to calling without parameters
+                                try {
+                                    node = window.App.addNode();
+                                } catch (fallbackError) {
+                                    console.error('[AgentNodes] Failed to create node even without parameters:', fallbackError);
+                                }
+                            }
+
                             if (node) {
                                 // Set all the agent node properties
                                 node.type = 'agent';
