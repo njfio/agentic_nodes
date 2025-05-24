@@ -3849,6 +3849,23 @@ const App = {
   // UI state
   hoveredButton: null,
 
+  // Enhanced connection detection methods
+  isPointNearOutputConnector(node, x, y) {
+    const connectorX = node.x + node.width;
+    const connectorY = node.y + node.height/2;
+    const distance = Math.sqrt((x - connectorX) ** 2 + (y - connectorY) ** 2);
+    const hitRadius = this.hoveredNode === node ? this.CONNECTOR_HOVER_RADIUS + 5 : this.CONNECTOR_RADIUS + 5;
+    return distance <= hitRadius;
+  },
+
+  isPointNearInputConnector(node, x, y) {
+    const connectorX = node.x;
+    const connectorY = node.y + node.height/2;
+    const distance = Math.sqrt((x - connectorX) ** 2 + (y - connectorY) ** 2);
+    const hitRadius = this.hoveredNode === node ? this.CONNECTOR_HOVER_RADIUS + 5 : this.CONNECTOR_RADIUS + 5;
+    return distance <= hitRadius;
+  },
+
   init() {
     this.canvas = document.getElementById('canvas');
     this.ctx = this.canvas.getContext('2d');
@@ -4566,12 +4583,15 @@ const App = {
       return;
     }
 
-    // We don't need to check for toolbar buttons here since they're handled in handleClick
-
+    // Enhanced connection detection with larger hit area
     for (const node of this.nodes) {
-      if (node.outputConnectorContainsPoint(canvasX, canvasY)) {
+      // Check output connector with enhanced hit detection
+      if (this.isPointNearOutputConnector(node, canvasX, canvasY)) {
         this.connectingNode = node;
+        this.connectionStartPoint = { x: canvasX, y: canvasY };
+        this.canvas.style.cursor = 'crosshair';
         DebugManager.addLog(`Starting connection from node ${node.id}`, 'info');
+        e.preventDefault();
         return;
       }
     }
@@ -4635,22 +4655,48 @@ const App = {
       this.dragNode.y = canvasY - this.dragOffsetY;
       this.draw();
     } else if (this.connectingNode) {
+      // Enhanced connection drawing with magnetic snapping
       this.draw();
 
-      const isHoveringValidInput = this.hoveredNode &&
-                                 this.hoveredNode !== this.connectingNode &&
-                                 this.hoveredConnector === 'input';
+      // Find the closest valid input connector with magnetic snapping
+      let closestNode = null;
+      let closestDistance = Infinity;
+      const MAGNETIC_DISTANCE = 50; // Pixels for magnetic attraction
+
+      for (const node of this.nodes) {
+        if (node !== this.connectingNode && node.canAcceptInput(this.connectingNode)) {
+          const inputX = node.x;
+          const inputY = node.y + node.height/2;
+          const distance = Math.sqrt((canvasX - inputX) ** 2 + (canvasY - inputY) ** 2);
+
+          if (distance < MAGNETIC_DISTANCE && distance < closestDistance) {
+            closestNode = node;
+            closestDistance = distance;
+          }
+        }
+      }
+
+      const isHoveringValidInput = closestNode !== null;
+      this.hoveredNode = closestNode;
+      this.hoveredConnector = isHoveringValidInput ? 'input' : null;
 
       const startX = this.connectingNode.x + this.connectingNode.width;
       const startY = this.connectingNode.y + this.connectingNode.height/2;
-      const endX = isHoveringValidInput ? this.hoveredNode.x : canvasX;
-      const endY = isHoveringValidInput ?
-                  this.hoveredNode.y + this.hoveredNode.height/2 : canvasY;
+      const endX = isHoveringValidInput ? closestNode.x : canvasX;
+      const endY = isHoveringValidInput ? closestNode.y + closestNode.height/2 : canvasY;
 
       // Save context to apply transformations
       this.ctx.save();
       this.ctx.translate(this.offsetX, this.offsetY);
       this.ctx.scale(this.scale, this.scale);
+
+      // Draw connection with enhanced visual feedback
+      const connectionColor = isHoveringValidInput ? '#50c878' : '#4a90e2';
+      const lineWidth = isHoveringValidInput ? 4 : 3;
+
+      this.ctx.strokeStyle = connectionColor;
+      this.ctx.lineWidth = lineWidth;
+      this.ctx.setLineDash(isHoveringValidInput ? [] : [5, 5]);
 
       Utils.drawConnection(
         this.ctx,
@@ -4658,22 +4704,25 @@ const App = {
         startY,
         endX,
         endY,
-        isHoveringValidInput ? '#50c878' : '#4a90e2',
+        connectionColor,
         isHoveringValidInput
       );
+
+      this.ctx.setLineDash([]); // Reset line dash
+
+      // Draw magnetic attraction indicator
+      if (isHoveringValidInput) {
+        this.ctx.beginPath();
+        this.ctx.arc(endX, endY, 15, 0, Math.PI * 2);
+        this.ctx.strokeStyle = '#50c878';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+      }
 
       // Restore context
       this.ctx.restore();
 
-      for (const node of this.nodes) {
-        if (node !== this.connectingNode && node.inputConnectorContainsPoint(canvasX, canvasY)) {
-          this.hoveredNode = node;
-          this.hoveredConnector = 'input';
-          this.canvas.style.cursor = 'pointer';
-          this.draw();
-          return;
-        }
-      }
+      this.canvas.style.cursor = isHoveringValidInput ? 'pointer' : 'crosshair';
     } else {
       // Check for hovering over toolbar buttons first
       for (const node of this.nodes) {
@@ -4720,16 +4769,16 @@ const App = {
         }
       }
 
-      // Then check node connectors and body
+      // Then check node connectors and body with enhanced detection
       for (const node of this.nodes) {
-        if (node.outputConnectorContainsPoint(canvasX, canvasY)) {
+        if (this.isPointNearOutputConnector(node, canvasX, canvasY)) {
           this.hoveredNode = node;
           this.hoveredConnector = 'output';
-          this.canvas.style.cursor = 'pointer';
+          this.canvas.style.cursor = 'crosshair';
           this.draw();
           return;
         }
-        if (node.inputConnectorContainsPoint(canvasX, canvasY)) {
+        if (this.isPointNearInputConnector(node, canvasX, canvasY)) {
           this.hoveredNode = node;
           this.hoveredConnector = 'input';
           this.canvas.style.cursor = 'pointer';
@@ -4765,48 +4814,69 @@ const App = {
     }
 
     if (this.connectingNode) {
+      // Enhanced connection completion with magnetic snapping
+      let targetNode = null;
+      const MAGNETIC_DISTANCE = 50;
+
+      // Find the closest valid input connector
+      let closestDistance = Infinity;
       for (const node of this.nodes) {
-        if (node !== this.connectingNode && node.inputConnectorContainsPoint(canvasX, canvasY)) {
-          if (node.canAcceptInput(this.connectingNode)) {
-            const connection = new Connection(this.connectingNode, node);
-            this.connections.push(connection);
-            DebugManager.addLog(`Connected node "${this.connectingNode.title}" (ID: ${this.connectingNode.id}) to node "${node.title}" (ID: ${node.id})`, 'success');
+        if (node !== this.connectingNode && node.canAcceptInput(this.connectingNode)) {
+          const inputX = node.x;
+          const inputY = node.y + node.height/2;
+          const distance = Math.sqrt((canvasX - inputX) ** 2 + (canvasY - inputY) ** 2);
 
-            // Check if the connecting node has been processed
-            if (this.connectingNode.hasBeenProcessed) {
-              // Process the node with the new connection
-              // Pass the connecting node as the source node
-              this.processNodeAndConnections(node, this.connectingNode.content, this.connectingNode).catch(err => {
-                DebugManager.addLog(`Failed to process node: ${err.message}`, 'error');
-              });
-            } else {
-              // If the connecting node hasn't been processed yet, just mark the target node as waiting
-              node.waitingForInputs = true;
-              DebugManager.addLog(`Node "${node.title}" (ID: ${node.id}) is waiting for input from "${this.connectingNode.title}"`, 'info');
-              this.draw();
-            }
-          } else {
-            DebugManager.addLog(
-              `Incompatible types: ${this.connectingNode.outputType} → ${node.inputType}`,
-              'error'
-            );
-            const startX = this.connectingNode.x + this.connectingNode.width;
-            const startY = this.connectingNode.y + this.connectingNode.height/2;
-            const endX = node.x;
-            const endY = node.y + node.height/2;
-
-            this.ctx.save();
-            this.ctx.translate(this.offsetX, this.offsetY);
-            this.ctx.scale(this.scale, this.scale);
-            Utils.drawConnection(this.ctx, startX, startY, endX, endY, '#e74c3c', true);
-            this.ctx.restore();
-
-            setTimeout(() => this.draw(), 1000);
+          if (distance < MAGNETIC_DISTANCE && distance < closestDistance) {
+            targetNode = node;
+            closestDistance = distance;
           }
-          break;
         }
       }
+
+      // Also check direct click on input connector
+      if (!targetNode) {
+        for (const node of this.nodes) {
+          if (node !== this.connectingNode && this.isPointNearInputConnector(node, canvasX, canvasY)) {
+            if (node.canAcceptInput(this.connectingNode)) {
+              targetNode = node;
+              break;
+            }
+          }
+        }
+      }
+
+      if (targetNode) {
+        // Check if connection already exists
+        const existingConnection = this.connections.find(conn =>
+          conn.fromNode === this.connectingNode && conn.toNode === targetNode
+        );
+
+        if (!existingConnection) {
+          const connection = new Connection(this.connectingNode, targetNode);
+          this.connections.push(connection);
+          DebugManager.addLog(`Connected node "${this.connectingNode.title}" (ID: ${this.connectingNode.id}) to node "${targetNode.title}" (ID: ${targetNode.id})`, 'success');
+
+          // Check if the connecting node has been processed
+          if (this.connectingNode.hasBeenProcessed) {
+            // Process the node with the new connection
+            this.processNodeAndConnections(targetNode, this.connectingNode.content, this.connectingNode).catch(err => {
+              DebugManager.addLog(`Failed to process node: ${err.message}`, 'error');
+            });
+          } else {
+            // If the connecting node hasn't been processed yet, just mark the target node as waiting
+            targetNode.waitingForInputs = true;
+            DebugManager.addLog(`Node "${targetNode.title}" (ID: ${targetNode.id}) is waiting for input from "${this.connectingNode.title}"`, 'info');
+          }
+        } else {
+          DebugManager.addLog(`Connection already exists between node ${this.connectingNode.id} and node ${targetNode.id}`, 'warning');
+        }
+      } else {
+        DebugManager.addLog(`Connection cancelled - no valid target found`, 'info');
+      }
+
       this.connectingNode = null;
+      this.connectionStartPoint = null;
+      this.canvas.style.cursor = 'default';
       this.draw();
     }
 
