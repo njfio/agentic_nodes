@@ -302,47 +302,80 @@
 
                     btn.addEventListener('click', () => {
                         console.log('[AgentNodes] Agent node button clicked');
-                        if (window.App && window.App.addNode) {
-                            // Try calling addNode with 'agent' parameter first
-                            let node = null;
+
+                        // Use AgentProcessor to create the agent node
+                        if (window.AgentProcessor && typeof window.AgentProcessor.createAgentNode === 'function') {
                             try {
-                                console.log('[AgentNodes] Trying to create agent node with type parameter');
-                                node = window.App.addNode('agent');
+                                console.log('[AgentNodes] Using AgentProcessor to create agent node');
+                                const node = window.AgentProcessor.createAgentNode();
+
+                                if (node) {
+                                    console.log(`[AgentNodes] Successfully created agent node ${node.id} with type: ${node.type || node.nodeType}, isAgentNode: ${node.isAgentNode}`);
+
+                                    // Force a redraw of the canvas
+                                    if (window.App && window.App.draw) {
+                                        window.App.draw();
+                                    }
+                                } else {
+                                    console.error('[AgentNodes] AgentProcessor.createAgentNode returned null');
+                                }
                             } catch (error) {
-                                console.warn('[AgentNodes] Failed to create agent node with type parameter, trying without:', error);
-                                // Fallback to calling without parameters
-                                try {
-                                    node = window.App.addNode();
-                                } catch (fallbackError) {
-                                    console.error('[AgentNodes] Failed to create node even without parameters:', fallbackError);
-                                }
-                            }
+                                console.error('[AgentNodes] Error using AgentProcessor:', error);
 
-                            if (node) {
-                                // Set all the agent node properties
-                                node.type = 'agent';
-                                node.nodeType = 'agent';
-                                node._nodeType = 'agent';
-                                node.isAgentNode = true;
-                                node.title = 'Agent Node';
-                                node.systemPrompt = 'You are a helpful AI assistant with access to various tools.';
-                                node.content = '';
-                                node.maxIterations = 5;
-                                node.color = '#9c27b0';
-
-                                console.log(`[AgentNodes] Created agent node ${node.id} with type: ${node.type}, nodeType: ${node.nodeType}, isAgentNode: ${node.isAgentNode}`);
-
-                                // Force a redraw of the canvas
-                                if (window.App && window.App.draw) {
-                                    window.App.draw();
-                                }
-                            } else {
-                                console.error('[AgentNodes] Failed to create node');
+                                // Fallback to the old method
+                                this.fallbackCreateAgentNode();
                             }
                         } else {
-                            console.error('[AgentNodes] App or App.addNode not available');
+                            console.warn('[AgentNodes] AgentProcessor not available, using fallback method');
+                            this.fallbackCreateAgentNode();
                         }
                     });
+                },
+
+                // Fallback method for creating agent nodes when AgentProcessor is not available
+                fallbackCreateAgentNode() {
+                    console.log('[AgentNodes] Using fallback agent node creation method');
+
+                    if (window.App && window.App.addNode) {
+                        // Try calling addNode with 'agent' parameter first
+                        let node = null;
+                        try {
+                            console.log('[AgentNodes] Trying to create agent node with type parameter');
+                            node = window.App.addNode('agent');
+                        } catch (error) {
+                            console.warn('[AgentNodes] Failed to create agent node with type parameter, trying without:', error);
+                            // Fallback to calling without parameters
+                            try {
+                                node = window.App.addNode();
+                            } catch (fallbackError) {
+                                console.error('[AgentNodes] Failed to create node even without parameters:', fallbackError);
+                            }
+                        }
+
+                        if (node) {
+                            // Set all the agent node properties
+                            node.type = 'agent';
+                            node.nodeType = 'agent';
+                            node._nodeType = 'agent';
+                            node.isAgentNode = true;
+                            node.title = 'Agent Node';
+                            node.systemPrompt = 'You are a helpful AI assistant with access to various tools.';
+                            node.content = '';
+                            node.maxIterations = 5;
+                            node.color = '#9c27b0';
+
+                            console.log(`[AgentNodes] Created fallback agent node ${node.id} with type: ${node.type}, nodeType: ${node.nodeType}, isAgentNode: ${node.isAgentNode}`);
+
+                            // Force a redraw of the canvas
+                            if (window.App && window.App.draw) {
+                                window.App.draw();
+                            }
+                        } else {
+                            console.error('[AgentNodes] Failed to create node using fallback method');
+                        }
+                    } else {
+                        console.error('[AgentNodes] App or App.addNode not available for fallback');
+                    }
                 }
             };
         },
