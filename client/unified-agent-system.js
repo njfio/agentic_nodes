@@ -64,15 +64,7 @@
 
             // Override fetch to handle Docker environment
             window.fetch = function(url, options = {}) {
-                // Convert relative URLs to absolute and fix protocol issues
-                if (typeof url === 'string' && url.startsWith('/')) {
-                    // Always use HTTP for localhost to avoid SSL issues
-                    const protocol = 'http:';
-                    const baseUrl = `${protocol}//${window.location.host}`;
-                    url = baseUrl + url;
-                }
-
-                // Fix v2 API endpoints that don't exist - redirect to v1
+                // Fix v2 API endpoints that don't exist - redirect to v1 FIRST
                 if (typeof url === 'string') {
                     if (url.includes('/api/v2/openai/chat')) {
                         url = url.replace('/api/v2/openai/chat', '/api/openai/chat');
@@ -83,6 +75,25 @@
                         console.warn('[UnifiedAgentSystem] Blocking v2 MCP endpoint to prevent SSL errors:', url);
                         return Promise.reject(new Error('MCP v2 endpoints temporarily disabled to prevent SSL errors'));
                     }
+                    // Fix double API path issue (e.g., /api/v2/api/images -> /api/images)
+                    if (url.includes('/api/v2/api/')) {
+                        url = url.replace('/api/v2/api/', '/api/');
+                        console.log('[UnifiedAgentSystem] Fixed double API path in URL');
+                    }
+                }
+
+                // Convert relative URLs to absolute and fix protocol issues
+                if (typeof url === 'string' && url.startsWith('/')) {
+                    // Always use HTTP for localhost to avoid SSL issues
+                    const protocol = 'http:';
+                    const baseUrl = `${protocol}//${window.location.host}`;
+                    url = baseUrl + url;
+                }
+
+                // Fix any remaining HTTPS localhost URLs
+                if (typeof url === 'string' && url.startsWith('https://localhost')) {
+                    url = url.replace('https://localhost', 'http://localhost');
+                    console.log('[UnifiedAgentSystem] Fixed HTTPS localhost URL to HTTP');
                 }
 
                 // Add timeout handling
