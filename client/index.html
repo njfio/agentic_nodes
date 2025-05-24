@@ -115,6 +115,9 @@
       <button id="testWorkflowBtn" type="button" title="Test current workflow">
         <span class="toolbar-icon">▶️</span> Test
       </button>
+      <button id="documentViewBtn" type="button" title="View document with all node outputs">
+        <span class="toolbar-icon">📋</span> Document
+      </button>
     </div>
 
     <!-- File Operations Group -->
@@ -781,6 +784,18 @@
         </div>
 
         <div class="form-group">
+          <label for="reasoningPattern">Reasoning Pattern:</label>
+          <select id="reasoningPattern" class="form-control">
+            <option value="chain-of-thought">Chain of Thought</option>
+            <option value="tree-of-thought">Tree of Thought</option>
+            <option value="react">ReAct</option>
+            <option value="reflection">Reflection</option>
+            <option value="planning">Planning</option>
+            <option value="reflective">Reflective</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label for="maxIterations">Maximum Iterations:</label>
           <input type="number" id="maxIterations" class="form-control" min="1" max="20" value="5">
         </div>
@@ -964,6 +979,7 @@
   <script src="agent-tools.js"></script>
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
+  <script src="reasoning-patterns.js"></script>
   <script src="mcp-tools.js"></script>
 
   <!-- Agent draw functionality -->

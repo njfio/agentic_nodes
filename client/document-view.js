@@ -33,8 +33,11 @@ const DocumentView = {
           <div class="document-view-toolbar">
             <div class="document-view-actions">
               <button id="refreshDocumentBtn" class="secondary-btn" type="button">Refresh</button>
-              <button id="exportDocumentBtn" class="secondary-btn" type="button">Export</button>
+              <button id="exportDocumentBtn" class="secondary-btn" type="button">Export HTML</button>
+              <button id="exportMarkdownBtn" class="secondary-btn" type="button">Export Markdown</button>
+              <button id="exportPdfBtn" class="secondary-btn" type="button">Export PDF</button>
               <button id="copyDocumentBtn" class="secondary-btn" type="button">Copy</button>
+              <button id="reorderModeBtn" class="secondary-btn" type="button">Reorder Mode</button>
             </div>
             <div class="document-view-options">
               <div class="checkbox-group">
@@ -48,6 +51,10 @@ const DocumentView = {
               <div class="checkbox-group">
                 <input type="checkbox" id="includeImages" checked>
                 <label for="includeImages">Include Images</label>
+              </div>
+              <div class="checkbox-group">
+                <input type="checkbox" id="autoSort" checked>
+                <label for="autoSort">Auto Sort by Position</label>
               </div>
             </div>
           </div>
@@ -77,14 +84,27 @@ const DocumentView = {
       this.refreshDocument();
     });
 
-    // Export button
+    // Export buttons
     document.getElementById('exportDocumentBtn').addEventListener('click', () => {
-      this.exportDocument();
+      this.exportDocument('html');
+    });
+
+    document.getElementById('exportMarkdownBtn').addEventListener('click', () => {
+      this.exportDocument('markdown');
+    });
+
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+      this.exportDocument('pdf');
     });
 
     // Copy button
     document.getElementById('copyDocumentBtn').addEventListener('click', () => {
       this.copyDocument();
+    });
+
+    // Reorder mode button
+    document.getElementById('reorderModeBtn').addEventListener('click', () => {
+      this.toggleReorderMode();
     });
 
     // Document view options
@@ -97,6 +117,10 @@ const DocumentView = {
     });
 
     document.getElementById('includeImages').addEventListener('change', () => {
+      this.refreshDocument();
+    });
+
+    document.getElementById('autoSort').addEventListener('change', () => {
       this.refreshDocument();
     });
   },
@@ -186,6 +210,7 @@ const DocumentView = {
     const showNodeTitles = document.getElementById('showNodeTitles').checked;
     const showNodeIds = document.getElementById('showNodeIds').checked;
     const includeImages = document.getElementById('includeImages').checked;
+    const autoSort = document.getElementById('autoSort').checked;
 
     // Get all nodes that have been processed and are included in the document
     const includedNodes = App.nodes.filter(node =>
@@ -193,15 +218,37 @@ const DocumentView = {
       (node.includeInDocument === undefined || node.includeInDocument === true)
     );
 
-    // Sort nodes by their position (top to bottom, left to right)
-    includedNodes.sort((a, b) => {
-      // First sort by y position (top to bottom)
-      if (Math.abs(a.y - b.y) > 50) {
-        return a.y - b.y;
-      }
-      // If y positions are similar, sort by x position (left to right)
-      return a.x - b.x;
-    });
+    // Sort nodes based on auto-sort setting
+    if (autoSort) {
+      // Sort nodes by their position (top to bottom, left to right)
+      includedNodes.sort((a, b) => {
+        // First sort by y position (top to bottom)
+        if (Math.abs(a.y - b.y) > 50) {
+          return a.y - b.y;
+        }
+        // If y positions are similar, sort by x position (left to right)
+        return a.x - b.x;
+      });
+    } else if (this.customOrder && this.customOrder.length > 0) {
+      // Use custom order if available
+      includedNodes.sort((a, b) => {
+        const indexA = this.customOrder.indexOf(a.id);
+        const indexB = this.customOrder.indexOf(b.id);
+
+        // If both nodes are in custom order, use that order
+        if (indexA !== -1 && indexB !== -1) {
+          return indexA - indexB;
+        }
+        // If only one is in custom order, prioritize it
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        // If neither is in custom order, use position-based sorting
+        if (Math.abs(a.y - b.y) > 50) {
+          return a.y - b.y;
+        }
+        return a.x - b.x;
+      });
+    }
 
     // If no nodes are included, show a message
     if (includedNodes.length === 0) {
@@ -213,10 +260,38 @@ const DocumentView = {
     const fragment = document.createDocumentFragment();
 
     // Add each node's content to the document
-    includedNodes.forEach(node => {
+    includedNodes.forEach((node, index) => {
       // Create a section for the node
       const section = document.createElement('div');
       section.className = 'document-section';
+      section.dataset.nodeId = node.id;
+
+      // Add reorder controls if in reorder mode
+      if (this.reorderMode) {
+        const reorderControls = document.createElement('div');
+        reorderControls.className = 'reorder-controls';
+
+        const upBtn = document.createElement('button');
+        upBtn.className = 'reorder-btn';
+        upBtn.innerHTML = '↑';
+        upBtn.title = 'Move up';
+        upBtn.onclick = () => this.moveNodeUp(node.id);
+
+        const downBtn = document.createElement('button');
+        downBtn.className = 'reorder-btn';
+        downBtn.innerHTML = '↓';
+        downBtn.title = 'Move down';
+        downBtn.onclick = () => this.moveNodeDown(node.id);
+
+        const orderNumber = document.createElement('span');
+        orderNumber.className = 'order-number';
+        orderNumber.textContent = index + 1;
+
+        reorderControls.appendChild(upBtn);
+        reorderControls.appendChild(orderNumber);
+        reorderControls.appendChild(downBtn);
+        section.appendChild(reorderControls);
+      }
 
       // Add the node header if titles or IDs are shown
       if (showNodeTitles || showNodeIds) {
@@ -276,11 +351,31 @@ const DocumentView = {
     documentContent.appendChild(fragment);
   },
 
-  // Export the document as HTML
-  exportDocument() {
+  // Export the document in different formats
+  exportDocument(format = 'html') {
     // Get the document content
     const documentContent = document.getElementById('documentContent');
     if (!documentContent) return;
+
+    switch (format) {
+      case 'html':
+        this.exportAsHTML(documentContent);
+        break;
+      case 'markdown':
+        this.exportAsMarkdown(documentContent);
+        break;
+      case 'pdf':
+        this.exportAsPDF(documentContent);
+        break;
+      default:
+        this.exportAsHTML(documentContent);
+    }
+  },
+
+  // Export as HTML
+  exportAsHTML(documentContent) {
+    // Create a clean version without reorder controls
+    const cleanContent = this.getCleanContent(documentContent);
 
     // Create a new HTML document
     const html = `
@@ -328,7 +423,7 @@ const DocumentView = {
       <body>
         <h1>Exported Document</h1>
         <div class="document-content">
-          ${documentContent.innerHTML}
+          ${cleanContent}
         </div>
       </body>
       </html>
@@ -348,6 +443,99 @@ const DocumentView = {
     document.body.removeChild(downloadLink);
 
     DebugManager.addLog('Document exported as HTML', 'success');
+  },
+
+  // Export as Markdown
+  exportAsMarkdown(documentContent) {
+    const markdown = this.convertToMarkdown(documentContent);
+
+    // Create a blob with the Markdown content
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+
+    // Create a download link
+    const downloadLink = document.createElement('a');
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.download = `document-${new Date().toISOString().slice(0, 10)}.md`;
+
+    // Trigger the download
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+
+    DebugManager.addLog('Document exported as Markdown', 'success');
+  },
+
+  // Export as PDF (using browser print functionality)
+  exportAsPDF(documentContent) {
+    // Create a new window with the document content
+    const printWindow = window.open('', '_blank');
+    const cleanContent = this.getCleanContent(documentContent);
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document Export</title>
+        <style>
+          @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+          }
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .document-section {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+            page-break-inside: avoid;
+          }
+          .document-section:last-child {
+            border-bottom: none;
+          }
+          .document-section-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #4a90e2;
+          }
+          .document-section-content {
+            white-space: pre-wrap;
+          }
+          .document-image {
+            max-width: 100%;
+            height: auto;
+            margin: 10px 0;
+            border-radius: 4px;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Exported Document</h1>
+        <div class="document-content">
+          ${cleanContent}
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(() => window.close(), 1000);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    DebugManager.addLog('Document opened for PDF export (use browser print to save as PDF)', 'success');
   },
 
   // Copy the document content to clipboard
@@ -410,6 +598,100 @@ const DocumentView = {
     });
 
     return text;
+  },
+
+  // Toggle reorder mode
+  toggleReorderMode() {
+    this.reorderMode = !this.reorderMode;
+    const reorderBtn = document.getElementById('reorderModeBtn');
+    const autoSortCheckbox = document.getElementById('autoSort');
+
+    if (this.reorderMode) {
+      reorderBtn.textContent = 'Exit Reorder';
+      reorderBtn.classList.add('active');
+      autoSortCheckbox.checked = false;
+      autoSortCheckbox.disabled = true;
+
+      // Initialize custom order if not exists
+      if (!this.customOrder) {
+        const includedNodes = App.nodes.filter(node =>
+          node.hasBeenProcessed &&
+          (node.includeInDocument === undefined || node.includeInDocument === true)
+        );
+        this.customOrder = includedNodes.map(node => node.id);
+      }
+    } else {
+      reorderBtn.textContent = 'Reorder Mode';
+      reorderBtn.classList.remove('active');
+      autoSortCheckbox.disabled = false;
+    }
+
+    this.refreshDocument();
+  },
+
+  // Move node up in custom order
+  moveNodeUp(nodeId) {
+    if (!this.customOrder) return;
+
+    const index = this.customOrder.indexOf(nodeId);
+    if (index > 0) {
+      // Swap with previous item
+      [this.customOrder[index - 1], this.customOrder[index]] =
+      [this.customOrder[index], this.customOrder[index - 1]];
+      this.refreshDocument();
+    }
+  },
+
+  // Move node down in custom order
+  moveNodeDown(nodeId) {
+    if (!this.customOrder) return;
+
+    const index = this.customOrder.indexOf(nodeId);
+    if (index >= 0 && index < this.customOrder.length - 1) {
+      // Swap with next item
+      [this.customOrder[index], this.customOrder[index + 1]] =
+      [this.customOrder[index + 1], this.customOrder[index]];
+      this.refreshDocument();
+    }
+  },
+
+  // Get clean content without reorder controls
+  getCleanContent(documentContent) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = documentContent.innerHTML;
+
+    // Remove all reorder controls
+    const reorderControls = tempDiv.querySelectorAll('.reorder-controls');
+    reorderControls.forEach(control => control.remove());
+
+    return tempDiv.innerHTML;
+  },
+
+  // Convert content to Markdown
+  convertToMarkdown(documentContent) {
+    const sections = documentContent.querySelectorAll('.document-section');
+    let markdown = '# Exported Document\n\n';
+
+    sections.forEach(section => {
+      // Add header
+      const header = section.querySelector('.document-section-header');
+      if (header) {
+        markdown += `## ${header.textContent}\n\n`;
+      }
+
+      // Add content
+      const content = section.querySelector('.document-section-content');
+      if (content) {
+        const img = content.querySelector('.document-image');
+        if (img) {
+          markdown += `![${img.alt || 'Image'}](${img.src})\n\n`;
+        } else {
+          markdown += `${content.textContent}\n\n`;
+        }
+      }
+    });
+
+    return markdown;
   }
 };
 

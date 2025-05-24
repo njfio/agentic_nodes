@@ -23,6 +23,14 @@
 .document-view-options {
   display: flex;
   gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Reorder mode button active state */
+.document-view-actions button.active {
+  background-color: #4a90e2;
+  color: white;
 }
 
 .document-view-container {
@@ -44,6 +52,7 @@
   margin-bottom: 30px;
   border-bottom: 1px solid #444;
   padding-bottom: 20px;
+  position: relative;
 }
 
 .document-section:last-child {
@@ -91,4 +100,70 @@
 
 #documentViewBtn:hover {
   background-color: #219653;
+}
+
+/* Reorder controls */
+.reorder-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #333;
+  padding: 5px 10px;
+  border-radius: 15px;
+  border: 1px solid #555;
+}
+
+.reorder-btn {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.reorder-btn:hover {
+  background-color: #357abd;
+}
+
+.reorder-btn:disabled {
+  background-color: #666;
+  cursor: not-allowed;
+}
+
+.order-number {
+  color: #ccc;
+  font-size: 12px;
+  font-weight: bold;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .document-view-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .document-view-actions,
+  .document-view-options {
+    justify-content: center;
+  }
+
+  .reorder-controls {
+    position: static;
+    margin-bottom: 10px;
+    justify-content: center;
+  }
 }
