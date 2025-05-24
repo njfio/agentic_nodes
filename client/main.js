@@ -167,6 +167,9 @@ class Node {
     this.inputs = [];
     this.selected = false;
     this.processed = false;
+
+    // Reasoning pattern for AI processing
+    this.reasoningPattern = 'chain-of-thought';
   }
 
   async processContent(inputContent, inputModality) {
