@@ -5,8 +5,8 @@
 const Config = {
   // API base URL
   apiBaseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8732/api/v2'
-    : '/api/v2',
+    ? 'http://localhost:8732/api'
+    : '/api',
 
   // Default OpenAI settings
   defaultOpenAIConfig: {
