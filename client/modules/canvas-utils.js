@@ -3,7 +3,7 @@
  * Provides drawing and rendering utilities for the canvas
  */
 
-export const CanvasUtils = {
+window.CanvasUtils = {
   /**
    * Draw a bezier connection between two points
    */

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Multimodal AI Agent - Workflow Editor v2.0</title>
+  
+  <!-- Core CSS -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="dark-theme.css" />
+  <link rel="stylesheet" href="responsive.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  
+  <!-- Modular CSS will be loaded by Vite -->
+  
+  <style>
+    /* Loading screen styles */
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    
+    .loading-progress {
+      width: 300px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .loading-progress-bar {
+      height: 100%;
+      background: white;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .version-info {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      font-size: 12px;
+      opacity: 0.7;
+    }
+    
+    /* Error display styles */
+    .error-display {
+      background: #ff4757;
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      max-width: 500px;
+      text-align: left;
+    }
+    
+    .error-display h3 {
+      margin: 0 0 10px 0;
+    }
+    
+    .error-display pre {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+    
+    .retry-button {
+      background: white;
+      color: #ff4757;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    
+    .retry-button:hover {
+      background: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">Initializing Workflow Engine...</div>
+    <div class="loading-progress">
+      <div class="loading-progress-bar" id="loading-progress-bar"></div>
+    </div>
+    <div class="version-info">v2.0.0 - Modular Architecture</div>
+  </div>
+
+  <!-- Main Application Container -->
+  <div id="app" style="display: none;">
+    <!-- Toolbar -->
+    <div id="toolbar" class="toolbar">
+      <div class="toolbar-left">
+        <button id="menu-button" class="toolbar-button" title="Menu">
+          <span class="icon">☰</span>
+        </button>
+        <div class="logo">
+          <span class="icon">🤖</span>
+          <span class="text">AI Workflow</span>
+        </div>
+      </div>
+      
+      <div class="toolbar-center">
+        <button id="play-button" class="toolbar-button primary" title="Run Workflow (F5)">
+          <span class="icon">▶</span>
+          <span class="text">Run</span>
+        </button>
+        <button id="pause-button" class="toolbar-button" title="Pause" style="display: none;">
+          <span class="icon">⏸</span>
+        </button>
+        <button id="stop-button" class="toolbar-button" title="Stop" style="display: none;">
+          <span class="icon">⏹</span>
+        </button>
+        <div class="toolbar-separator"></div>
+        <button id="save-button" class="toolbar-button" title="Save (Ctrl+S)">
+          <span class="icon">💾</span>
+        </button>
+        <button id="load-button" class="toolbar-button" title="Load (Ctrl+O)">
+          <span class="icon">📁</span>
+        </button>
+      </div>
+      
+      <div class="toolbar-right">
+        <div id="user-menu" class="user-menu">
+          <button class="user-button">
+            <span class="user-avatar">👤</span>
+            <span class="user-name">User</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div id="main-content" class="main-content">
+      <!-- Sidebar -->
+      <div id="sidebar" class="sidebar">
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab active" data-tab="nodes">Nodes</button>
+          <button class="sidebar-tab" data-tab="properties">Properties</button>
+          <button class="sidebar-tab" data-tab="console">Console</button>
+        </div>
+        
+        <div class="sidebar-content">
+          <div id="nodes-panel" class="sidebar-panel active">
+            <div class="node-categories"></div>
+          </div>
+          
+          <div id="properties-panel" class="sidebar-panel">
+            <div class="properties-content">
+              <p>Select a node to edit its properties</p>
+            </div>
+          </div>
+          
+          <div id="console-panel" class="sidebar-panel">
+            <div class="console-content">
+              <div class="console-output" id="console-output"></div>
+              <div class="console-input">
+                <input type="text" id="console-input" placeholder="Enter command...">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div id="canvas-container" class="canvas-container">
+        <canvas id="main-canvas" class="main-canvas"></canvas>
+        
+        <!-- Canvas Overlay (for UI elements) -->
+        <div id="canvas-overlay" class="canvas-overlay">
+          <!-- Minimap -->
+          <div id="minimap" class="minimap">
+            <canvas id="minimap-canvas"></canvas>
+          </div>
+          
+          <!-- Canvas Controls -->
+          <div id="canvas-controls" class="canvas-controls">
+            <button id="zoom-in" class="control-button" title="Zoom In">+</button>
+            <button id="zoom-out" class="control-button" title="Zoom Out">-</button>
+            <button id="fit-to-content" class="control-button" title="Fit to Content">⊡</button>
+            <button id="reset-view" class="control-button" title="Reset View">🏠</button>
+          </div>
+          
+          <!-- Grid Toggle -->
+          <div id="grid-controls" class="grid-controls">
+            <label class="grid-toggle">
+              <input type="checkbox" id="grid-toggle" checked>
+              <span>Grid</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div id="status-bar" class="status-bar">
+      <div class="status-left">
+        <span id="status-text">Ready</span>
+      </div>
+      <div class="status-right">
+        <span id="zoom-level">100%</span>
+        <span class="separator">|</span>
+        <span id="cursor-position">0, 0</span>
+        <span class="separator">|</span>
+        <span id="node-count">0 nodes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Development Mode Script Loading -->
+  <script type="module">
+    // Progressive loading with error handling
+    class AppLoader {
+      constructor() {
+        this.loadingSteps = [
+          { name: 'Loading core modules...', progress: 10 },
+          { name: 'Initializing state management...', progress: 20 },
+          { name: 'Setting up canvas renderer...', progress: 40 },
+          { name: 'Loading node types...', progress: 60 },
+          { name: 'Configuring workflow engine...', progress: 80 },
+          { name: 'Starting application...', progress: 100 }
+        ];
+        this.currentStep = 0;
+        this.loadingText = document.getElementById('loading-text');
+        this.progressBar = document.getElementById('loading-progress-bar');
+      }
+
+      async load() {
+        try {
+          for (const step of this.loadingSteps) {
+            this.updateProgress(step.name, step.progress);
+            await this.delay(200); // Simulate loading time
+          }
+
+          // Check if we're in development mode with Vite
+          if (window.location.port === '5173' || window.location.hostname === 'localhost') {
+            await this.loadViteApp();
+          } else {
+            await this.loadProductionApp();
+          }
+
+          this.hideLoading();
+        } catch (error) {
+          this.showError(error);
+        }
+      }
+
+      async loadViteApp() {
+        // Development mode - load with Vite
+        this.updateProgress('Loading development modules...', 90);
+        const { App } = await import('./src/app.js');
+        
+        this.updateProgress('Initializing application...', 95);
+        window.app = new App();
+        await window.app.init();
+      }
+
+      async loadProductionApp() {
+        // Production mode - load bundled files
+        this.updateProgress('Loading bundled application...', 90);
+        
+        // In production, the bundled files would be loaded here
+        // For now, fallback to the old app.js
+        await this.loadScript('./app.js');
+        
+        this.updateProgress('Initializing legacy application...', 95);
+        // Legacy initialization would happen here
+      }
+
+      loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      updateProgress(text, progress) {
+        this.loadingText.textContent = text;
+        this.progressBar.style.width = progress + '%';
+      }
+
+      delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      hideLoading() {
+        const loadingScreen = document.getElementById('loading-screen');
+        const app = document.getElementById('app');
+        
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+          loadingScreen.style.display = 'none';
+          app.style.display = 'block';
+          app.style.opacity = '0';
+          app.style.transition = 'opacity 0.5s ease';
+          setTimeout(() => {
+            app.style.opacity = '1';
+          }, 50);
+        }, 300);
+      }
+
+      showError(error) {
+        console.error('Application loading failed:', error);
+        
+        const loadingScreen = document.getElementById('loading-screen');
+        const errorHtml = `
+          <div class="error-display">
+            <h3>Failed to Load Application</h3>
+            <p>${error.message}</p>
+            <details>
+              <summary>Technical Details</summary>
+              <pre>${error.stack || 'No stack trace available'}</pre>
+            </details>
+            <button class="retry-button" onclick="location.reload()">
+              Retry
+            </button>
+          </div>
+        `;
+        
+        loadingScreen.innerHTML = `
+          <div class="loading-spinner" style="border-top-color: #ff4757;"></div>
+          <div class="loading-text">Application Loading Failed</div>
+          ${errorHtml}
+          <div class="version-info">v2.0.0 - Error State</div>
+        `;
+      }
+    }
+
+    // Start loading
+    const loader = new AppLoader();
+    loader.load();
+
+    // Global error handler
+    window.addEventListener('error', (event) => {
+      console.error('Global error:', event.error);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+    });
+  </script>
+</body>
+</html>

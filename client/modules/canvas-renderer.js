@@ -3,13 +3,11 @@
  * Optimized rendering with dirty rectangles and layers
  */
 
-import { CanvasUtils } from './canvas-utils.js';
-
-export class CanvasRenderer {
+window.CanvasRenderer = class CanvasRenderer {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    
+
     // Rendering options
     this.options = {
       enableDirtyRects: true,
@@ -101,7 +99,7 @@ export class CanvasRenderer {
 
     // Clear cache
     this.nodeCache.clear();
-    
+
     // Force full redraw
     this.fullRedraw = true;
     this.requestRender();
@@ -111,7 +109,7 @@ export class CanvasRenderer {
    * Set view state
    */
   setViewState(offsetX, offsetY, zoom) {
-    const changed = 
+    const changed =
       this.viewState.offsetX !== offsetX ||
       this.viewState.offsetY !== offsetY ||
       this.viewState.zoom !== zoom;
@@ -142,7 +140,7 @@ export class CanvasRenderer {
 
     // Convert to screen coordinates
     const screenRect = this.worldToScreenRect(x, y, width, height);
-    
+
     // Add some padding
     const padding = 5;
     this.dirtyRects.push({
@@ -263,12 +261,12 @@ export class CanvasRenderer {
 
     // Grid
     if (this.options.showGrid) {
-      CanvasUtils.drawGrid(this.ctx, offsetX, offsetY, zoom, this.options.gridSize);
+      window.CanvasUtils.drawGrid(this.ctx, offsetX, offsetY, zoom, this.options.gridSize);
     }
 
     // Apply transform
     this.ctx.save();
-    CanvasUtils.applyTransform(this.ctx, offsetX, offsetY, zoom);
+    window.CanvasUtils.applyTransform(this.ctx, offsetX, offsetY, zoom);
 
     // Render content (to be implemented by subclass)
     this.renderContent();
@@ -292,9 +290,9 @@ export class CanvasRenderer {
   renderGridLayer() {
     const ctx = this.layers.grid.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    
+
     if (this.options.showGrid) {
-      CanvasUtils.drawGrid(
+      window.CanvasUtils.drawGrid(
         ctx,
         this.viewState.offsetX,
         this.viewState.offsetY,
@@ -302,7 +300,7 @@ export class CanvasRenderer {
         this.options.gridSize
       );
     }
-    
+
     this.layers.grid.dirty = false;
   }
 
@@ -312,7 +310,7 @@ export class CanvasRenderer {
   composeLayers() {
     // Draw layers in order
     const layerOrder = ['background', 'grid', 'connections', 'nodes', 'overlay'];
-    
+
     for (const layerName of layerOrder) {
       const layer = this.layers[layerName];
       if (layer && layer.canvas) {
@@ -357,13 +355,13 @@ export class CanvasRenderer {
     this.ctx.save();
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     this.ctx.fillRect(10, 10, 150, info.length * 20 + 10);
-    
+
     this.ctx.fillStyle = '#0f0';
     this.ctx.font = '12px monospace';
     info.forEach((line, i) => {
       this.ctx.fillText(line, 15, 25 + i * 20);
     });
-    
+
     this.ctx.restore();
 
     // Draw dirty rectangles
@@ -371,11 +369,11 @@ export class CanvasRenderer {
       this.ctx.save();
       this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
       this.ctx.lineWidth = 1;
-      
+
       for (const rect of this.dirtyRects) {
         this.ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
       }
-      
+
       this.ctx.restore();
     }
   }
@@ -457,7 +455,7 @@ export class CanvasRenderer {
    */
   clearCaches() {
     this.nodeCache.clear();
-    
+
     // Mark all layers as dirty
     for (const layer in this.layers) {
       if (this.layers[layer]) {

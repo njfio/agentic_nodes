@@ -7,6 +7,9 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Multimodal AI Agent - Endless Canvas</title>
+  <!-- Tailwind CSS (Production Build) -->
+  <link rel="stylesheet" href="dist/styles.css" />
+  <!-- Custom CSS Files -->
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="modal-edit.css" />
   <link rel="stylesheet" href="image-editor.css" />
@@ -25,29 +28,49 @@
   <link rel="stylesheet" href="responsive.css" />
   <link rel="stylesheet" href="improved-toolbar.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
-  
-  <!-- Error Boundary and Logging Systems - Load Early -->
-  <script src="error-boundary.js"></script>
-  <script src="centralized-logger.js"></script>
-  
+
+  <!-- Prevent any CDN loading of Tailwind CSS -->
+  <script>
+    // Block any attempts to load Tailwind CSS from CDN
+    const originalCreateElement = document.createElement;
+    document.createElement = function(tagName) {
+      const element = originalCreateElement.call(this, tagName);
+      if (tagName.toLowerCase() === 'script' || tagName.toLowerCase() === 'link') {
+        const originalSetAttribute = element.setAttribute;
+        element.setAttribute = function(name, value) {
+          if ((name === 'src' || name === 'href') &&
+              (value.includes('tailwindcss') ||
+               value.includes('cdn.jsdelivr.net') ||
+               value.includes('unpkg.com'))) {
+            console.warn('Blocked attempt to load Tailwind CSS from CDN:', value);
+            return;
+          }
+          originalSetAttribute.call(this, name, value);
+        };
+      }
+      return element;
+    };
+
+    // Log that we're using production Tailwind CSS
+    console.log('Using production Tailwind CSS build from dist/styles.css');
+  </script>
+
+  <!-- Temporarily disable debug scripts to prevent hanging -->
+  <!-- <script src="debug-tailwind.js"></script> -->
+  <!-- <script src="error-boundary.js"></script> -->
+  <!-- <script src="centralized-logger.js"></script> -->
+  <!-- <script src="performance-monitor.js"></script> -->
+  <!-- <script src="startup-diagnostics.js"></script> -->
+
   <!-- Core Architecture Modules -->
   <script src="state-manager.js"></script>
   <script src="config-manager.js"></script>
-  
-  <!-- Canvas and Node Modules -->
-  <script type="module">
-    // Import ES6 modules
-    import { CanvasUtils } from './modules/canvas-utils.js';
-    import { NodeManager } from './modules/node-manager.js';
-    import { ConnectionManager } from './modules/connection-manager.js';
-    import { CanvasRenderer } from './modules/canvas-renderer.js';
-    
-    // Make them available globally for now (will refactor later)
-    window.CanvasUtils = CanvasUtils;
-    window.NodeManager = NodeManager;
-    window.ConnectionManager = ConnectionManager;
-    window.CanvasRenderer = CanvasRenderer;
-  </script>
+
+  <!-- Canvas and Node Modules - Temporarily disabled to prevent hanging -->
+  <!-- <script src="modules/canvas-utils.js"></script> -->
+  <!-- <script src="modules/node-manager.js"></script> -->
+  <!-- <script src="modules/connection-manager.js"></script> -->
+  <!-- <script src="modules/canvas-renderer.js"></script> -->
 </head>
 <body>
   <div id="toolbar">
@@ -336,7 +359,7 @@
         <input type="number" id="timeout" value="300" min="30" max="1800" step="30">
         <div class="tooltip">Longer timeouts are useful for complex requests and image generation. For image generation, the actual timeout will be doubled.</div>
       </div>
-      
+
       <!-- Perplexity API Configuration -->
       <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #444;">
         <h3 style="margin-bottom: 10px;">Perplexity Configuration</h3>
@@ -942,10 +965,10 @@
   <script src="agent-planner.js"></script>
   <script src="agent-logger.js"></script>
   <script src="mcp-tools.js"></script>
-  
+
   <!-- Agent draw functionality -->
   <script src="agent-draw.js"></script>
-  
+
   <!-- Unified agent system - replaces all fix scripts -->
   <script src="unified-agent-system.js"></script>
 
@@ -955,12 +978,12 @@
     window.AppInitSystem = {
       init: function() {
         console.log('Initializing unified agent system');
-        
+
         // Initialize unified agent system
         if (window.UnifiedAgentSystem && typeof UnifiedAgentSystem.init === 'function') {
           UnifiedAgentSystem.init().then(() => {
             console.log('Unified agent system initialized successfully');
-            
+
             // Dispatch initialization complete event
             const event = new CustomEvent('app-initialization-complete');
             document.dispatchEvent(event);
@@ -982,10 +1005,10 @@
   </script>
 
   <script src="app-global.js"></script>
-  <script src="keyboard-config.js" type="module"></script>
-  <script src="theme-switcher.js" type="module"></script>
-  <script src="mobile-menu.js" type="module"></script>
-  <script src="onboarding-tutorial.js" type="module"></script>
+  <script src="keyboard-config.js"></script>
+  <script src="theme-switcher.js"></script>
+  <script src="mobile-menu.js"></script>
+  <script src="onboarding-tutorial.js"></script>
   <!-- MCP client integration (commented out to avoid conflicts) -->
   <!-- <script src="mcp-client-integration.js" defer></script> -->
 </body>

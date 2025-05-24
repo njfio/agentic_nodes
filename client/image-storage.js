@@ -364,52 +364,69 @@ class ImageStorage {
   static async loadRemainingImagesProgressively(workflowId) {
     if (!this.pendingImages) return;
 
-    // Count how many images are still pending
-    const pendingCount = this.pendingImages.filter(img => !img.loaded).length;
-
-    if (pendingCount === 0) {
-      if (typeof DebugManager !== 'undefined') {
-        DebugManager.addLog(`All images loaded for workflow ${workflowId}`, 'success');
-      }
+    // Prevent multiple concurrent progressive loading sessions
+    if (this._progressiveLoadingActive) {
       return;
     }
+    this._progressiveLoadingActive = true;
 
-    // Update loading status
-    if (typeof DebugManager !== 'undefined') {
-      DebugManager.addLog(`Loading remaining images: ${pendingCount} left`, 'info');
+    try {
+      // Count how many images are still pending
+      const pendingCount = this.pendingImages.filter(img => !img.loaded && img.retries < 3).length;
+
+      if (pendingCount === 0) {
+        if (typeof DebugManager !== 'undefined') {
+          DebugManager.addLog(`All images loaded for workflow ${workflowId}`, 'success');
+        }
+        this._progressiveLoadingActive = false;
+        return;
+      }
+
+      // Update loading status
+      if (typeof DebugManager !== 'undefined') {
+        DebugManager.addLog(`Loading remaining images: ${pendingCount} left`, 'info');
+      }
+
+      // Calculate batch size based on remaining count and system performance
+      // Use smaller batches for large numbers of images or if previous loads failed
+      let batchSize = 2; // Conservative default
+      if (pendingCount > 50) {
+        batchSize = 1; // Very conservative for large batches
+      } else if (pendingCount > 20) {
+        batchSize = 2;
+      } else if (pendingCount > 10) {
+        batchSize = 3;
+      } else {
+        batchSize = Math.min(4, pendingCount); // Don't exceed remaining count
+      }
+
+      // Load the next batch
+      const loadedCount = await this.loadNextImageBatch(workflowId, batchSize);
+
+      // Calculate delay based on success rate and system load
+      let delay = 1000; // Conservative default delay
+
+      if (loadedCount === 0) {
+        // If no images loaded successfully, significantly increase delay
+        delay = 5000;
+      } else if (loadedCount < batchSize / 2) {
+        // If less than half loaded successfully, use longer delay
+        delay = 3000;
+      } else {
+        // If most loaded successfully, use shorter delay
+        delay = 1500;
+      }
+
+      // Schedule the next batch with a delay to allow the browser to breathe
+      setTimeout(() => {
+        this._progressiveLoadingActive = false;
+        this.loadRemainingImagesProgressively(workflowId);
+      }, delay);
+
+    } catch (error) {
+      console.error('Error in progressive image loading:', error);
+      this._progressiveLoadingActive = false;
     }
-
-    // Calculate batch size based on remaining count
-    // Use smaller batches for large numbers of images
-    let batchSize = 3;
-    if (pendingCount > 50) {
-      batchSize = 2;
-    } else if (pendingCount > 20) {
-      batchSize = 3;
-    } else if (pendingCount > 10) {
-      batchSize = 4;
-    } else {
-      batchSize = 5;
-    }
-
-    // Load the next batch
-    const loadedCount = await this.loadNextImageBatch(workflowId, batchSize);
-
-    // Calculate delay based on success rate
-    let delay = 500; // Default delay
-
-    if (loadedCount === 0) {
-      // If no images loaded successfully, increase delay
-      delay = 2000;
-    } else if (loadedCount < batchSize / 2) {
-      // If less than half loaded successfully, use medium delay
-      delay = 1000;
-    }
-
-    // Schedule the next batch with a delay to allow the browser to breathe
-    setTimeout(() => {
-      this.loadRemainingImagesProgressively(workflowId);
-    }, delay);
   }
 
   // Load a single image with error handling

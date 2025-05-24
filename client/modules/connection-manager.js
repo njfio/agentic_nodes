@@ -3,7 +3,7 @@
  * Handles connections between nodes
  */
 
-export class ConnectionManager {
+window.ConnectionManager = class ConnectionManager {
   constructor(nodeManager) {
     this.nodeManager = nodeManager;
     this.connections = [];
@@ -36,7 +36,7 @@ export class ConnectionManager {
     // Check connection rules
     const key = `${fromNode.type}->${toNode.type}`;
     const rule = this.connectionRules.get(key);
-    
+
     if (rule) {
       return rule.validator(fromNode, toNode);
     }
@@ -93,7 +93,7 @@ export class ConnectionManager {
     toNode.inputs.push(connection.id);
 
     this.emitEvent('connection:created', connection);
-    
+
     return connection;
   }
 
@@ -120,7 +120,7 @@ export class ConnectionManager {
     }
 
     this.emitEvent('connection:deleted', connection);
-    
+
     return true;
   }
 
@@ -128,12 +128,12 @@ export class ConnectionManager {
    * Delete all connections for a node
    */
   deleteNodeConnections(nodeId) {
-    const toDelete = this.connections.filter(c => 
+    const toDelete = this.connections.filter(c =>
       c.from === nodeId || c.to === nodeId
     ).map(c => c.id);
 
     toDelete.forEach(id => this.deleteConnection(id));
-    
+
     return toDelete.length;
   }
 
@@ -155,7 +155,7 @@ export class ConnectionManager {
    * Get connections for a node
    */
   getNodeConnections(nodeId) {
-    return this.connections.filter(c => 
+    return this.connections.filter(c =>
       c.from === nodeId || c.to === nodeId
     );
   }
@@ -178,7 +178,7 @@ export class ConnectionManager {
    * Check if two nodes are connected
    */
   isConnected(fromNodeId, toNodeId) {
-    return this.connections.some(c => 
+    return this.connections.some(c =>
       c.from === fromNodeId && c.to === toNodeId
     );
   }
@@ -204,12 +204,12 @@ export class ConnectionManager {
    */
   findPath(fromNodeId, toNodeId, visited = new Set()) {
     if (fromNodeId === toNodeId) return [fromNodeId];
-    
+
     if (visited.has(fromNodeId)) return null;
     visited.add(fromNodeId);
 
     const connections = this.getOutputConnections(fromNodeId);
-    
+
     for (const connection of connections) {
       const path = this.findPath(connection.to, toNodeId, visited);
       if (path) {
@@ -224,7 +224,7 @@ export class ConnectionManager {
    * Check for cycles
    */
   hasCycle(startNodeId = null) {
-    const nodes = startNodeId 
+    const nodes = startNodeId
       ? [this.nodeManager.getNode(startNodeId)]
       : this.nodeManager.getAllNodes();
 
@@ -245,10 +245,10 @@ export class ConnectionManager {
     recursionStack.add(nodeId);
 
     const connections = this.getOutputConnections(nodeId);
-    
+
     for (const connection of connections) {
       const nextNodeId = connection.to;
-      
+
       if (!visited.has(nextNodeId)) {
         if (this.hasCycleFrom(nextNodeId, visited, recursionStack)) {
           return true;
@@ -272,14 +272,14 @@ export class ConnectionManager {
 
     const visit = (nodeId) => {
       visited.add(nodeId);
-      
+
       const connections = this.getOutputConnections(nodeId);
       for (const connection of connections) {
         if (!visited.has(connection.to)) {
           visit(connection.to);
         }
       }
-      
+
       stack.push(nodeId);
     };
 
@@ -360,7 +360,7 @@ export class ConnectionManager {
     connection.updatedAt = Date.now();
 
     this.emitEvent('connection:updated', connection);
-    
+
     return connection;
   }
 
@@ -378,7 +378,7 @@ export class ConnectionManager {
    */
   deserialize(data) {
     this.connections = [];
-    
+
     data.forEach(connectionData => {
       const connection = {
         ...connectionData,
@@ -414,7 +414,7 @@ export class ConnectionManager {
 
     this.connections = [];
     this.tempConnection = null;
-    
+
     this.emitEvent('connections:cleared');
   }
 

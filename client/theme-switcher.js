@@ -11,10 +11,10 @@ class ThemeSwitcher {
   init() {
     // Apply the saved theme on page load
     this.applyTheme(this.currentTheme);
-    
+
     // Create the theme toggle button
     this.createThemeToggle();
-    
+
     // Listen for system theme changes
     this.listenForSystemThemeChanges();
   }
@@ -23,23 +23,23 @@ class ThemeSwitcher {
     // Create the theme toggle container
     const container = document.createElement('div');
     container.className = 'theme-toggle-container';
-    
+
     // Create the toggle button
     const toggle = document.createElement('button');
     toggle.className = 'theme-toggle';
     toggle.setAttribute('aria-label', 'Toggle theme');
-    toggle.innerHTML = this.currentTheme === 'dark' 
-      ? '<i class="fas fa-sun"></i>' 
+    toggle.innerHTML = this.currentTheme === 'dark'
+      ? '<i class="fas fa-sun"></i>'
       : '<i class="fas fa-moon"></i>';
-    
+
     // Add click event listener
     toggle.addEventListener('click', () => {
       this.toggleTheme();
     });
-    
+
     // Append toggle to container
     container.appendChild(toggle);
-    
+
     // Add the container to the DOM
     const header = document.querySelector('.header') || document.querySelector('header');
     if (header) {
@@ -58,18 +58,18 @@ class ThemeSwitcher {
     this.applyTheme(newTheme);
     this.currentTheme = newTheme;
     localStorage.setItem('theme', newTheme);
-    
+
     // Update the toggle button icon
     const toggle = document.querySelector('.theme-toggle');
     if (toggle) {
-      toggle.innerHTML = this.currentTheme === 'dark' 
-        ? '<i class="fas fa-sun"></i>' 
+      toggle.innerHTML = this.currentTheme === 'dark'
+        ? '<i class="fas fa-sun"></i>'
         : '<i class="fas fa-moon"></i>';
     }
-    
+
     // Dispatch a theme change event
-    window.dispatchEvent(new CustomEvent('themechange', { 
-      detail: { theme: this.currentTheme } 
+    window.dispatchEvent(new CustomEvent('themechange', {
+      detail: { theme: this.currentTheme }
     }));
   }
 
@@ -84,13 +84,13 @@ class ThemeSwitcher {
   listenForSystemThemeChanges() {
     // Check if the user has a system preference
     const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
-    
+
     // If the user hasn't manually set a theme, use the system preference
     if (!localStorage.getItem('theme')) {
       this.applyTheme(prefersDarkScheme.matches ? 'dark' : 'light');
       this.currentTheme = prefersDarkScheme.matches ? 'dark' : 'light';
     }
-    
+
     // Listen for changes to the system preference
     prefersDarkScheme.addEventListener('change', (e) => {
       // Only apply if the user hasn't manually set a theme
@@ -98,12 +98,12 @@ class ThemeSwitcher {
         const newTheme = e.matches ? 'dark' : 'light';
         this.applyTheme(newTheme);
         this.currentTheme = newTheme;
-        
+
         // Update the toggle button icon
         const toggle = document.querySelector('.theme-toggle');
         if (toggle) {
-          toggle.innerHTML = this.currentTheme === 'dark' 
-            ? '<i class="fas fa-sun"></i>' 
+          toggle.innerHTML = this.currentTheme === 'dark'
+            ? '<i class="fas fa-sun"></i>'
             : '<i class="fas fa-moon"></i>';
         }
       }
@@ -118,7 +118,7 @@ style.textContent = `
     margin-left: auto;
     padding: 0 15px;
   }
-  
+
   .theme-toggle {
     background: transparent;
     border: none;
@@ -134,11 +134,11 @@ style.textContent = `
     justify-content: center;
     transition: background-color 0.3s;
   }
-  
+
   .theme-toggle:hover {
     background-color: rgba(0, 0, 0, 0.1);
   }
-  
+
   :root.dark-theme .theme-toggle:hover {
     background-color: rgba(255, 255, 255, 0.1);
   }
@@ -150,5 +150,5 @@ document.addEventListener('DOMContentLoaded', () => {
   window.themeSwitcher = new ThemeSwitcher();
 });
 
-// Export the ThemeSwitcher class
-export default ThemeSwitcher;
+// Make ThemeSwitcher available globally
+window.ThemeSwitcher = ThemeSwitcher;

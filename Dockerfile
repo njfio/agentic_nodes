@@ -2,13 +2,22 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package files first for better caching
 COPY package*.json ./
-RUN npm install --no-optional && npm cache clean --force
-RUN npm install helmet compression express cors morgan mongoose dotenv bcryptjs jsonwebtoken node-fetch@2.7.0 ws uuid mongodb-memory-server
+
+# Install all dependencies (including dev dependencies for Tailwind)
+RUN npm install
+
+# Copy Tailwind config files
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
 
 # Copy application code
 COPY . .
+
+# Create dist directory and build Tailwind CSS
+RUN mkdir -p client/dist
+RUN npm run build:css:prod
 
 # Expose the application port
 EXPOSE 8732

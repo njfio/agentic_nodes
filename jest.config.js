@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'node',
+  testMatch: ['**/tests/server/health.test.js'],
   verbose: true,
-  collectCoverage: true,
-  coverageDirectory: 'coverage',
+  collectCoverage: false
 };

@@ -123,16 +123,39 @@ const DebugManager = {
   },
 
   startDebugLoop() {
-    const updateDebug = () => {
-      const now = performance.now();
-      const delta = now - this.state.lastFrameTime;
-      this.state.fps = Math.round(1000 / delta);
-      this.state.lastFrameTime = now;
+    let isRunning = false;
+    const targetFPS = 10; // Limit debug updates to 10 FPS to reduce load
+    const frameInterval = 1000 / targetFPS;
+    let lastUpdateTime = 0;
 
-      this.updateDebugPanel();
-      requestAnimationFrame(updateDebug);
+    const updateDebug = (currentTime) => {
+      if (isRunning) return; // Prevent multiple concurrent updates
+
+      // Throttle updates to target FPS
+      if (currentTime - lastUpdateTime < frameInterval) {
+        requestAnimationFrame(updateDebug);
+        return;
+      }
+
+      isRunning = true;
+      lastUpdateTime = currentTime;
+
+      try {
+        const now = performance.now();
+        const delta = now - this.state.lastFrameTime;
+        this.state.fps = Math.round(1000 / delta);
+        this.state.lastFrameTime = now;
+
+        this.updateDebugPanel();
+      } catch (error) {
+        console.error('Debug loop error:', error);
+      } finally {
+        isRunning = false;
+        requestAnimationFrame(updateDebug);
+      }
     };
-    updateDebug();
+
+    requestAnimationFrame(updateDebug);
   },
 
   updateDebugPanel() {
@@ -363,9 +386,15 @@ class Node {
 
   // Update the node's content without cache-busting to prevent reloading loops
   updateNodeContent(content) {
+    // Prevent infinite loops by checking if content actually changed
+    if (this.content === content) {
+      return; // No change, skip update
+    }
+
     // If this is an image node and the content has changed, update it
     if ((this.contentType === 'image' || this.aiProcessor === 'text-to-image' || this.aiProcessor === 'image-to-image') &&
-        this.content !== content) {
+        Utils.isImageData(content)) {
+
       // Clean up previous image object to prevent memory leaks
       if (this.contentImage) {
         // Remove event listeners
@@ -377,41 +406,71 @@ class Node {
         this.contentImage = null;
       }
 
-      // Update the content directly without cache-busting
+      // Update the content directly
       this.content = content;
 
-      // Create a new image object with weak event handlers
+      // Throttle image loading to prevent excessive requests
+      if (this._imageLoadTimeout) {
+        clearTimeout(this._imageLoadTimeout);
+      }
+
+      this._imageLoadTimeout = setTimeout(() => {
+        this._loadImageContent(content);
+      }, 100); // 100ms delay to throttle rapid updates
+
+    } else {
+      // For non-image nodes, just update the content
+      this.content = content;
+    }
+
+    this.hasBeenProcessed = true;
+  }
+
+  // Separate method for loading image content with proper error handling
+  _loadImageContent(content) {
+    const nodeId = this.id;
+
+    try {
+      // Create a new image object
       this.contentImage = new Image();
 
-      // Use a weak reference for event handlers to prevent memory leaks
-      const nodeId = this.id; // Store reference to this.id
+      // Set up event handlers with timeout
+      const loadTimeout = setTimeout(() => {
+        if (this.contentImage && !this.contentImage.complete) {
+          DebugManager.addLog(`Image load timeout for node ${nodeId}`, 'warning');
+          this.contentImage.src = '';
+          this.contentImage = null;
+        }
+      }, 10000); // 10 second timeout
 
-      // Set up event handlers
       this.contentImage.onload = () => {
-        DebugManager.addLog(`Image loaded for node ${nodeId} after content update`, 'success');
+        clearTimeout(loadTimeout);
+        DebugManager.addLog(`Image loaded for node ${nodeId}`, 'success');
 
-        // Update size if needed, but don't trigger a redraw
+        // Update size if needed, but don't trigger immediate redraw
         if (this.autoSize) {
           this.calculateOptimalSize();
         }
 
-        // If this is an output node, update the workflow chat panel
-        if (this.workflowRole === 'output' && typeof WorkflowPanel !== 'undefined') {
-          // Only update if we're not showing all node outputs
-          const showAllNodeOutputs = document.getElementById('showAllNodeOutputs')?.checked || false;
-          if (!showAllNodeOutputs) {
-            WorkflowPanel.addMessage(content, 'assistant', true);
-            DebugManager.addLog(`Updated workflow chat with new image from node ${nodeId}`, 'success');
-          }
+        // Schedule a single redraw to avoid excessive redraws
+        if (!this._redrawScheduled) {
+          this._redrawScheduled = true;
+          requestAnimationFrame(() => {
+            this._redrawScheduled = false;
+            if (typeof App !== 'undefined' && App.draw) {
+              App.draw();
+            }
+          });
         }
 
-        // Clean up the event handler after it's fired
+        // Clean up the event handler
         if (this.contentImage) {
           this.contentImage.onload = null;
         }
       };
 
       this.contentImage.onerror = (err) => {
+        clearTimeout(loadTimeout);
         DebugManager.addLog(`Error loading image for node ${nodeId}: ${err.message || 'Unknown error'}`, 'error');
 
         // Clean up on error
@@ -425,13 +484,9 @@ class Node {
       // Set the source to trigger loading
       this.contentImage.src = content;
 
-      DebugManager.addLog(`Updating image content for node ${nodeId}`, 'info');
-    } else {
-      // For non-image nodes, just update the content
-      this.content = content;
+    } catch (error) {
+      DebugManager.addLog(`Error setting up image load for node ${nodeId}: ${error.message}`, 'error');
     }
-
-    this.hasBeenProcessed = true;
   }
 
   // Process a chat message to get AI response
@@ -465,10 +520,10 @@ class Node {
 
       // Prepare the request data
       const requestData = {
-        model: config.model || Config.defaultOpenAIConfig.model,
+        model: config.model || window.Config.defaultOpenAIConfig.model,
         messages: messages,
-        temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
-        max_tokens: config.max_tokens || Config.defaultOpenAIConfig.maxTokens
+        temperature: config.temperature || window.Config.defaultOpenAIConfig.temperature,
+        max_tokens: config.max_tokens || window.Config.defaultOpenAIConfig.maxTokens
       };
 
       // Store the request payload and timestamp
@@ -885,15 +940,15 @@ class Node {
 
         // Create the request with the content array
         requestData = {
-          model: Config.imageAnalysisModel || "gpt-4o",
+          model: window.Config.imageAnalysisModel || "gpt-4o",
           messages: [
             {
               role: "user",
               content: contentArray
             }
           ],
-          temperature: config.temperature || Config.defaultOpenAIConfig.temperature,
-          max_tokens: config.maxTokens || Config.defaultOpenAIConfig.maxTokens
+          temperature: config.temperature || window.Config.defaultOpenAIConfig.temperature,
+          max_tokens: config.maxTokens || window.Config.defaultOpenAIConfig.maxTokens
         };
       } else {
         // Standard text-to-text request
@@ -6483,7 +6538,7 @@ const App = {
     const isAgentNode = node.nodeType === 'agent' ||
                          node._nodeType === 'agent' ||
                          node.isAgentNode === true;
-    
+
     if (isAgentNode) {
       DebugManager.addLog(`Agent node "${node.title}" (ID: ${node.id}) detected, using special processing flow`, 'info');
     }
@@ -6525,11 +6580,11 @@ const App = {
       if (isAgentNode && window.AgentProcessor && typeof window.AgentProcessor.processAgentNode === 'function') {
         DebugManager.addLog(`Processing agent node "${node.title}" (ID: ${node.id}) with AgentProcessor`, 'info');
         output = await window.AgentProcessor.processAgentNode(node, processInput);
-        
+
         // For agent nodes, we don't mark as processed here, as they might need to process again
         // Just mark that this round of processing is complete
         node.processing = false;
-        
+
         // Log completion
         DebugManager.addLog(`Agent node "${node.title}" (ID: ${node.id}) completed processing through AgentProcessor`, 'success');
       } else {
@@ -7727,25 +7782,72 @@ const App = {
   },
 
   draw() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // Throttle draw calls to prevent excessive redraws
+    if (this._drawScheduled) {
+      return; // Already scheduled, skip this call
+    }
 
-    // Apply pan and zoom transformations
-    this.ctx.save();
-    this.ctx.translate(this.offsetX, this.offsetY);
-    this.ctx.scale(this.scale, this.scale);
+    this._drawScheduled = true;
+    requestAnimationFrame(() => {
+      this._drawScheduled = false;
+      this._performDraw();
+    });
+  },
 
-    // Draw grid background
-    this.drawGrid();
+  // Actual draw implementation
+  _performDraw() {
+    const startTime = performance.now();
 
-    // Draw connections and nodes
-    this.connections.forEach(conn => conn.draw(this.ctx));
-    this.nodes.forEach(node => node.draw(this.ctx));
+    try {
+      // Clear the canvas
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Restore the context
-    this.ctx.restore();
+      // Apply pan and zoom transformations
+      this.ctx.save();
+      this.ctx.translate(this.offsetX, this.offsetY);
+      this.ctx.scale(this.scale, this.scale);
 
-    // Draw zoom level indicator
-    this.drawZoomIndicator();
+      // Draw grid background
+      this.drawGrid();
+
+      // Draw connections and nodes with error handling
+      this.connections.forEach(conn => {
+        try {
+          conn.draw(this.ctx);
+        } catch (error) {
+          console.error('Error drawing connection:', error);
+        }
+      });
+
+      this.nodes.forEach(node => {
+        try {
+          node.draw(this.ctx);
+        } catch (error) {
+          console.error('Error drawing node:', error);
+        }
+      });
+
+      // Restore the context
+      this.ctx.restore();
+
+      // Draw zoom level indicator
+      this.drawZoomIndicator();
+
+    } catch (error) {
+      console.error('Error in draw function:', error);
+      // Try to restore context in case of error
+      try {
+        this.ctx.restore();
+      } catch (restoreError) {
+        console.error('Error restoring context:', restoreError);
+      }
+    } finally {
+      // Record render time for performance monitoring
+      const renderTime = performance.now() - startTime;
+      if (typeof PerformanceMonitor !== 'undefined') {
+        PerformanceMonitor.recordRenderTime(renderTime);
+      }
+    }
   },
 
   // Draw a grid background
@@ -7786,115 +7888,15 @@ const App = {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+  // Initialize the main app first
   App.init();
 
-  // Wait for all scripts to load before checking for AgentNodes
-  setTimeout(() => {
-    // Check if the AgentNodes script is already loaded in the DOM
-    const agentNodesScriptExists = Array.from(document.scripts).some(script =>
-      script.src && script.src.includes('agent-nodes.js')
-    );
+  // Simplified agent initialization - let the unified system handle it
+  console.log('App initialized, waiting for unified agent system...');
 
-    // Explicitly initialize agent nodes if the module exists
-    if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
-      console.log('Explicitly initializing AgentNodes module');
-      window.AgentNodes.init();
-    } else if (!agentNodesScriptExists) {
-      // Only try to load the script if it's not already in the DOM
-      console.warn('AgentNodes module not found or init method not available');
-
-      // Create a new script element
-      const script = document.createElement('script');
-      script.src = 'agent-nodes.js';
-      script.onload = () => {
-        console.log('AgentNodes module loaded dynamically');
-        if (window.AgentNodes && typeof window.AgentNodes.init === 'function') {
-          window.AgentNodes.init();
-        }
-      };
-      document.head.appendChild(script);
-    } else {
-      console.log('AgentNodes script already exists in the DOM, waiting for it to be ready');
-
-      // Verify that AgentNodes is available
-      if (!window.AgentNodes) {
-        console.error('AgentNodes not available in app.js');
-        // Create a fallback object
-        window.AgentNodes = {
-          ready: function() {
-            return Promise.resolve();
-          }
-        };
-        console.log('Created fallback AgentNodes object in app.js');
-      } else {
-        console.log('AgentNodes is available in app.js');
-      }
-
-      // Use the AgentNodes.ready() promise to wait for initialization
-      if (window.AgentNodes && typeof window.AgentNodes.ready === 'function') {
-        window.AgentNodes.ready().then(() => {
-          console.log('AgentNodes is ready from ready() promise');
-          DebugManager.addLog('AgentNodes is ready from ready() promise', 'success');
-
-          // Add the agent node button to the toolbar
-          if (typeof window.AgentNodes.addAgentNodeButton === 'function') {
-            console.log('Adding agent node button from app.js');
-            window.AgentNodes.addAgentNodeButton();
-          }
-
-          // Notify the app that AgentNodes is ready
-          if (window.AppInitSystem && AppInitSystem.markReady) {
-            AppInitSystem.markReady('agentNodes');
-          }
-        }).catch(error => {
-          console.error('Error waiting for AgentNodes to be ready:', error);
-          DebugManager.addLog(`Error waiting for AgentNodes to be ready: ${error.message}`, 'error');
-        });
-      } else {
-        console.warn('AgentNodes.ready() function not available');
-        DebugManager.addLog('AgentNodes.ready() function not available', 'warning');
-
-        // Listen for app initialization complete event as fallback
-        document.addEventListener('app-initialization-complete', function() {
-          console.log('App initialization complete event received by App');
-
-          // Check if AgentNodes is available
-          if (window.AgentNodes) {
-            console.log('AgentNodes is available after app initialization');
-            DebugManager.addLog('AgentNodes is available after app initialization', 'success');
-          } else {
-            console.error('AgentNodes is not available after app initialization');
-            DebugManager.addLog('AgentNodes is not available after app initialization', 'error');
-          }
-        });
-
-        // Set up a minimal retry mechanism as a last resort
-        let retryCount = 0;
-        const maxRetries = 5;
-        const retryInterval = 200; // ms
-
-        const checkAgentNodes = () => {
-          if (window.AgentNodes) {
-            console.log('AgentNodes found after retry');
-            DebugManager.addLog('AgentNodes found after retry', 'success');
-
-            // Notify the app that AgentNodes is ready
-            if (window.AppInitSystem && AppInitSystem.markReady) {
-              AppInitSystem.markReady('agentNodes');
-            }
-          } else if (retryCount < maxRetries) {
-            retryCount++;
-            console.log(`Retry ${retryCount}/${maxRetries} waiting for AgentNodes`);
-            setTimeout(checkAgentNodes, retryInterval);
-          } else {
-            console.error('Failed to find AgentNodes after retries');
-            DebugManager.addLog('Failed to find AgentNodes after retries', 'error');
-          }
-        };
-
-        // Start the retry process
-        setTimeout(checkAgentNodes, 500);
-      }
-    }
-  }, 1000); // Wait 1 second to ensure all scripts are loaded
+  // Listen for the unified system initialization
+  document.addEventListener('app-initialization-complete', function() {
+    console.log('App initialization complete event received');
+    DebugManager.addLog('App initialization complete', 'success');
+  });
 });

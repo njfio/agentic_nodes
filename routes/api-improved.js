@@ -110,10 +110,10 @@ router.get('/workflows/:id/versions', optionalAuth, workflowController.getWorkfl
 router.get('/workflows/:id/versions/:versionId', optionalAuth, workflowController.getWorkflowVersion || (async (req, res) => {
   res.status(501).json({ message: 'Not implemented' });
 }));
-router.post('/workflows/:id/versions', auth, apiRateLimiter, workflowController.createWorkflowVersion || (async (req, res) => {
+router.post('/workflows/:id/versions', auth, apiLimiter, workflowController.createWorkflowVersion || (async (req, res) => {
   res.status(501).json({ message: 'Not implemented' });
 }));
-router.post('/workflows/:id/rollback/:versionId', auth, apiRateLimiter, workflowController.rollbackToVersion);
+router.post('/workflows/:id/rollback/:versionId', auth, apiLimiter, workflowController.rollbackToVersion);
 
 // Node routes
 router.get('/nodes', optionalAuth, nodeController.getAllNodes);
@@ -136,7 +136,7 @@ router.post('/users/request-password-reset', passwordResetLimiter, validatePassw
 router.post('/users/reset-password', passwordResetLimiter, userController.resetPassword);
 
 // Add refresh token endpoint
-router.post('/users/refresh-token', authRateLimiter, userController.refreshToken);
+router.post('/users/refresh-token', authLimiter, userController.refreshToken);
 
 // Docker environment routes
 router.get('/docker/auto-login', dockerController.autoLogin);
@@ -145,8 +145,8 @@ router.get('/docker/status', dockerController.checkStatus);
 // Image routes
 router.get('/images/workflow/:workflowId', imageController.getWorkflowImages);
 router.get('/images/:id', imageController.getImageById);
-router.post('/images', optionalAuth, apiRateLimiter, imageController.saveImage);
-router.delete('/images/:id', optionalAuth, apiRateLimiter, imageController.deleteImage);
+router.post('/images', optionalAuth, apiLimiter, imageController.saveImage);
+router.delete('/images/:id', optionalAuth, apiLimiter, imageController.deleteImage);
 
 // MCP routes
 router.use('/mcp', mcpRoutes);

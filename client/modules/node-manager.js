@@ -3,7 +3,7 @@
  * Handles node creation, management, and operations
  */
 
-export class NodeManager {
+window.NodeManager = class NodeManager {
   constructor() {
     this.nodes = [];
     this.nodeTypes = new Map();
@@ -62,7 +62,7 @@ export class NodeManager {
 
     this.nodes.push(node);
     this.emitEvent('node:created', node);
-    
+
     return node;
   }
 
@@ -81,7 +81,7 @@ export class NodeManager {
     node.updatedAt = Date.now();
 
     this.emitEvent('node:updated', { node, oldValues, updates });
-    
+
     return node;
   }
 
@@ -96,7 +96,7 @@ export class NodeManager {
     this.nodes.splice(index, 1);
 
     this.emitEvent('node:deleted', node);
-    
+
     return true;
   }
 
@@ -182,14 +182,14 @@ export class NodeManager {
     if (!node) return null;
 
     const oldSize = { width: node.width, height: node.height };
-    
+
     // Apply constraints
     node.width = Math.max(100, Math.min(800, width));
     node.height = Math.max(50, Math.min(600, height));
     node.updatedAt = Date.now();
 
     this.emitEvent('node:resized', { node, oldSize });
-    
+
     return node;
   }
 
@@ -256,7 +256,7 @@ export class NodeManager {
 
     const node = this.nodes.splice(index, 1)[0];
     this.nodes.push(node);
-    
+
     this.emitEvent('node:reordered', node);
   }
 
@@ -269,7 +269,7 @@ export class NodeManager {
 
     const node = this.nodes.splice(index, 1)[0];
     this.nodes.unshift(node);
-    
+
     this.emitEvent('node:reordered', node);
   }
 
@@ -290,7 +290,7 @@ export class NodeManager {
           n.updatedAt = Date.now();
         });
         break;
-      
+
       case 'right':
         targetValue = Math.max(...nodes.map(n => n.x + n.width));
         nodes.forEach(n => {
@@ -298,7 +298,7 @@ export class NodeManager {
           n.updatedAt = Date.now();
         });
         break;
-      
+
       case 'top':
         targetValue = Math.min(...nodes.map(n => n.y));
         nodes.forEach(n => {
@@ -306,7 +306,7 @@ export class NodeManager {
           n.updatedAt = Date.now();
         });
         break;
-      
+
       case 'bottom':
         targetValue = Math.max(...nodes.map(n => n.y + n.height));
         nodes.forEach(n => {
@@ -314,7 +314,7 @@ export class NodeManager {
           n.updatedAt = Date.now();
         });
         break;
-      
+
       case 'center-h':
         targetValue = nodes.reduce((sum, n) => sum + n.x + n.width/2, 0) / nodes.length;
         nodes.forEach(n => {
@@ -322,7 +322,7 @@ export class NodeManager {
           n.updatedAt = Date.now();
         });
         break;
-      
+
       case 'center-v':
         targetValue = nodes.reduce((sum, n) => sum + n.y + n.height/2, 0) / nodes.length;
         nodes.forEach(n => {
@@ -346,7 +346,7 @@ export class NodeManager {
       nodes.sort((a, b) => a.x - b.x);
       const startX = nodes[0].x;
       let currentX = startX;
-      
+
       nodes.forEach((node, index) => {
         if (index > 0) {
           currentX += nodes[index - 1].width + spacing;
@@ -358,7 +358,7 @@ export class NodeManager {
       nodes.sort((a, b) => a.y - b.y);
       const startY = nodes[0].y;
       let currentY = startY;
-      
+
       nodes.forEach((node, index) => {
         if (index > 0) {
           currentY += nodes[index - 1].height + spacing;
@@ -389,7 +389,7 @@ export class NodeManager {
    */
   deserialize(data) {
     this.nodes = [];
-    
+
     data.forEach(nodeData => {
       const node = {
         ...nodeData,

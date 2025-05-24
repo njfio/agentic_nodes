@@ -71,12 +71,22 @@ This is a known good commit with:
    ```
    MONGODB_URI=mongodb://localhost:27017/multimodal-ai-agent
    ```
-6. Start the application:
+6. Build CSS and start the application:
    ```bash
-   npm start
+   npm run dev
    ```
 
 ## Development
+
+### CSS Development
+
+This project uses Tailwind CSS v3 with a proper build process to eliminate browser build warnings and improve performance:
+
+- **Development**: `npm run dev` (builds CSS and starts server)
+- **CSS Watch**: `npm run dev:css` (watches for CSS changes in separate terminal)
+- **Production Build**: `npm run build:css:prod`
+
+See [TAILWIND_SETUP.md](TAILWIND_SETUP.md) for detailed information about the CSS setup and custom classes.
 
 ### Project Structure
 
@@ -90,9 +100,13 @@ This is a known good commit with:
 
 ### Available Scripts
 
-- `npm start`: Start the server
-- `npm run dev`: Start the server with nodemon for development
+- `npm start`: Start the server (production)
+- `npm run dev`: Build CSS and start server with nodemon for development
+- `npm run dev:css`: Watch CSS changes (run in separate terminal)
+- `npm run build:css:prod`: Build minified CSS for production
 - `npm test`: Run tests
+- `npm run lint`: Run ESLint
+- `npm run docker:up`: Start with Docker Compose
 
 ## License
 

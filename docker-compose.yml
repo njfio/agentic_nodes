@@ -9,8 +9,10 @@ services:
       - NODE_ENV=development
       - PORT=8732
       - MONGODB_URI=mongodb://mongodb:27017/multimodal-ai-agent
+      - MONGODB_DOCKER_URI=mongodb://mongodb:27017/multimodal-ai-agent
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      - ALLOWED_ORIGINS=http://localhost:8732,http://127.0.0.1:8732
     depends_on:
       - mongodb
     volumes:

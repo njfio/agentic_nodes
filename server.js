@@ -20,6 +20,7 @@ const { createIndexes } = require('./utils/db-indexes');
 // Import routes and middleware
 const apiRoutes = require('./routes/api');
 const apiImprovedRoutes = require('./routes/api-improved');
+const apiV2Routes = require('./routes/api-v2');
 const { apiLimiter, authLimiter } = require('./middleware/security/rateLimiter');
 
 // Create Express app
@@ -61,7 +62,7 @@ if (process.env.NODE_ENV === 'production') {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Allow eval in development
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"], // Only allow self and inline styles - no CDN
         imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
         connectSrc: ["'self'", "https:", "http:", "wss:", "ws:"],
         fontSrc: ["'self'", "https:", "data:"],
@@ -69,11 +70,12 @@ if (process.env.NODE_ENV === 'production') {
         mediaSrc: ["'self'"]
       }
     },
+    hsts: false, // Explicitly disable HSTS in development
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
     crossOriginOpenerPolicy: false
   }));
-  console.log('Running in development mode with relaxed security settings');
+  console.log('Running in development mode with relaxed security settings (HSTS disabled)');
 }
 
 // Performance middleware
@@ -84,11 +86,11 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    const allowedOrigins = process.env.ALLOWED_ORIGINS 
+
+    const allowedOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',')
       : ['http://localhost:3000', 'http://localhost:8732'];
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -108,13 +110,13 @@ if (process.env.NODE_ENV === 'development') {
 app.use(cors(corsOptions));
 
 // Body parsing middleware with security limits
-app.use(express.json({ 
+app.use(express.json({
   limit: '10mb', // Reduced from 50mb for security
   strict: true,
   type: 'application/json'
 }));
-app.use(express.urlencoded({ 
-  extended: true, 
+app.use(express.urlencoded({
+  extended: true,
   limit: '10mb', // Reduced from 50mb for security
   parameterLimit: 1000 // Limit number of parameters
 }));
@@ -138,12 +140,34 @@ app.use((req, res, next) => {
   next();
 });
 
+// Debug middleware for static files in development
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    if (req.url.endsWith('.js') || req.url.endsWith('.css')) {
+      console.log(`[STATIC] Serving: ${req.url}`);
+    }
+    next();
+  });
+}
+
 // Serve static files from the 'client' directory
 app.use(express.static(path.join(__dirname, 'client')));
 
 // Apply rate limiting to API routes
-app.use('/api', apiLimiter, apiRoutes);
-app.use('/api/v2', apiLimiter, apiImprovedRoutes);
+app.use('/api/v1', apiLimiter, apiRoutes);
+app.use('/api/v1.5', apiLimiter, apiImprovedRoutes);
+app.use('/api/v2', apiLimiter, apiV2Routes);
+
+// Backwards compatibility - redirect /api to latest version
+app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/v')) {
+    // Already versioned, continue
+    next();
+  } else {
+    // Redirect to v2 (latest)
+    res.redirect(301, `/api/v2${req.path}`);
+  }
+});
 
 // Apply stricter rate limiting to auth endpoints
 app.use('/api/users/login', authLimiter);

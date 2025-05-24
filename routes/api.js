@@ -17,6 +17,7 @@ const dataMigration = require('../utils/data-migration');
 
 // Import middleware
 const { auth, optionalAuth } = require('../middleware/auth');
+const { enrichApiKeys, getApiKeys, updateApiKey } = require('../middleware/apiKeyMiddleware');
 
 /**
  * Process an optimized payload to restore any image references
@@ -112,6 +113,10 @@ router.get('/test', (req, res) => {
   res.json({ message: 'API is working!' });
 });
 
+// API Key Management routes
+router.get('/settings/api-keys', auth, getApiKeys);
+router.put('/settings/api-keys', auth, updateApiKey);
+
 // Data migration route
 router.post('/migrate', async (req, res) => {
   try {
@@ -124,7 +129,7 @@ router.post('/migrate', async (req, res) => {
 });
 
 // OpenAI API proxy routes
-router.post('/openai/chat', async (req, res) => {
+router.post('/openai/chat', auth, enrichApiKeys, async (req, res) => {
   try {
     // Get API key from request headers or fall back to env variable
     const apiKey = req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY;
@@ -219,7 +224,7 @@ router.post('/openai/chat', async (req, res) => {
   }
 });
 
-router.post('/openai/images', async (req, res) => {
+router.post('/openai/images', auth, enrichApiKeys, async (req, res) => {
   try {
     // Get API key from request headers or fall back to env variable
     const apiKey = req.headers['x-openai-api-key'] || process.env.OPENAI_API_KEY;

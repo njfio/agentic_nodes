@@ -88,6 +88,28 @@ const userSchema = new mongoose.Schema({
     notifications: {
       type: Boolean,
       default: true
+    },
+    apiKeys: {
+      openai: {
+        type: String,
+        default: '',
+        select: false // Don't include in queries by default for security
+      },
+      anthropic: {
+        type: String,
+        default: '',
+        select: false
+      },
+      google: {
+        type: String,
+        default: '',
+        select: false
+      },
+      perplexity: {
+        type: String,
+        default: '',
+        select: false
+      }
     }
   },
   createdAt: {
@@ -145,6 +167,41 @@ userSchema.statics.findByCredentials = async (username, password) => {
   }
 
   return user;
+};
+
+// Get API key for a specific service
+userSchema.methods.getApiKey = async function(service) {
+  // Need to explicitly select the API key field since it's excluded by default
+  const user = await User.findById(this._id).select(`+settings.apiKeys.${service}`);
+  return user?.settings?.apiKeys?.[service] || null;
+};
+
+// Set API key for a specific service
+userSchema.methods.setApiKey = async function(service, apiKey) {
+  const validServices = ['openai', 'anthropic', 'google', 'perplexity'];
+  
+  if (!validServices.includes(service)) {
+    throw new Error(`Invalid service: ${service}`);
+  }
+
+  // Update the specific API key
+  this.settings.apiKeys[service] = apiKey;
+  await this.save();
+  
+  return true;
+};
+
+// Get all API keys (for settings page)
+userSchema.methods.getAllApiKeys = async function() {
+  const user = await User.findById(this._id)
+    .select('+settings.apiKeys.openai +settings.apiKeys.anthropic +settings.apiKeys.google +settings.apiKeys.perplexity');
+  
+  return {
+    openai: user?.settings?.apiKeys?.openai ? '***' + user.settings.apiKeys.openai.slice(-4) : '',
+    anthropic: user?.settings?.apiKeys?.anthropic ? '***' + user.settings.apiKeys.anthropic.slice(-4) : '',
+    google: user?.settings?.apiKeys?.google ? '***' + user.settings.apiKeys.google.slice(-4) : '',
+    perplexity: user?.settings?.apiKeys?.perplexity ? '***' + user.settings.apiKeys.perplexity.slice(-4) : ''
+  };
 };
 
 // Hash password before saving

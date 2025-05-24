@@ -31,11 +31,8 @@ const REQUIRED_ENV_VARS = {
     error: 'PORT must be a valid port number between 1 and 65535',
     default: '8732'
   },
-  OPENAI_API_KEY: {
-    required: false, // Optional since users might not have it initially
-    validate: (value) => !value || value.startsWith('sk-'),
-    error: 'OPENAI_API_KEY must start with "sk-"'
-  }
+  // Removed OPENAI_API_KEY from here since it should come from user settings,
+  // not environment variables
 };
 
 /**
@@ -163,8 +160,8 @@ function validateConfig() {
     console.log(`  - PORT: ${process.env.PORT}`);
     console.log(`  - JWT_SECRET: ${process.env.JWT_SECRET ? '***set***' : 'not set'}`);
     console.log(`  - MONGODB_URI: ${process.env.MONGODB_URI ? '***set***' : 'not set (will use fallback)'}`);
-    console.log(`  - OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? '***set***' : 'not set'}`);
     console.log(`  - ALLOWED_ORIGINS: ${process.env.ALLOWED_ORIGINS}`);
+    console.log('  - API Keys: Stored in user settings (not environment variables)');
   }
 }
 
