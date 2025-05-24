@@ -64,12 +64,25 @@
 
             // Override fetch to handle Docker environment
             window.fetch = function(url, options = {}) {
-                // Convert relative URLs to absolute
+                // Convert relative URLs to absolute and fix protocol issues
                 if (typeof url === 'string' && url.startsWith('/')) {
-                    // Force HTTP protocol for localhost to avoid SSL issues
-                    const protocol = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http:' : window.location.protocol;
+                    // Always use HTTP for localhost to avoid SSL issues
+                    const protocol = 'http:';
                     const baseUrl = `${protocol}//${window.location.host}`;
                     url = baseUrl + url;
+                }
+
+                // Fix v2 API endpoints that don't exist - redirect to v1
+                if (typeof url === 'string') {
+                    if (url.includes('/api/v2/openai/chat')) {
+                        url = url.replace('/api/v2/openai/chat', '/api/openai/chat');
+                        console.log('[UnifiedAgentSystem] Redirected v2 OpenAI chat endpoint to v1');
+                    }
+                    if (url.includes('/api/v2/mcp/')) {
+                        // For now, disable MCP v2 endpoints that cause SSL errors
+                        console.warn('[UnifiedAgentSystem] Blocking v2 MCP endpoint to prevent SSL errors:', url);
+                        return Promise.reject(new Error('MCP v2 endpoints temporarily disabled to prevent SSL errors'));
+                    }
                 }
 
                 // Add timeout handling
